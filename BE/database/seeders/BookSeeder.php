@@ -648,9 +648,7 @@ class BookSeeder extends Seeder
             $extension = $this->digitalFileExtension($book['file_format'] ?? null);
             $filePath = 'digital-documents/'.$book['book_id'].'/tai-lieu.'.$extension;
 
-            if (! $storage->exists($filePath)) {
-                $this->writeDigitalFile($storage, $filePath, $extension, $book);
-            }
+            $this->writeDigitalFile($storage, $filePath, $extension, $book);
 
             DB::table('books')
                 ->where('book_id', $book['book_id'])
@@ -696,20 +694,20 @@ class BookSeeder extends Seeder
     private function buildPdfContent(array $book): string
     {
         $lines = [
-            'HCMUE Digital Library',
-            'Tai lieu so',
+            'Thư viện số HCMUE',
+            'Tài liệu số',
             '',
-            'Tieu de: '.$this->escapePdfText((string) ($book['title'] ?? 'Tai lieu so')),
-            'Tac gia: '.$this->escapePdfText((string) ($book['author'] ?? 'Khong ro')),
-            'Dinh dang: '.$this->escapePdfText((string) ($book['file_format'] ?? 'N/A')),
-            'Loai tai nguyen: '.$this->escapePdfText((string) ($book['resource_type'] ?? $book['genre'] ?? 'N/A')),
+            'Tiêu đề: '.(string) ($book['title'] ?? 'Tài liệu số'),
+            'Tác giả: '.(string) ($book['author'] ?? 'Không rõ'),
+            'Định dạng: '.(string) ($book['file_format'] ?? 'Chưa cập nhật'),
+            'Loại tài nguyên: '.(string) ($book['resource_type'] ?? $book['genre'] ?? 'Chưa cập nhật'),
             '',
-            'Noi dung tai lieu so.',
+            'Nội dung tài liệu số.',
         ];
 
         $content = "BT\n/F1 14 Tf\n72 720 Td\n";
         foreach ($lines as $line) {
-            $content .= '('.$this->escapePdfText($line).") Tj\n";
+            $content .= '<'.$this->pdfTextHex($line)."> Tj\n";
             $content .= "0 -18 Td\n";
         }
         $content .= "ET\n";
@@ -755,8 +753,8 @@ class BookSeeder extends Seeder
             return;
         }
 
-        $title = $this->escapeXml((string) ($book['title'] ?? 'Tai lieu so'));
-        $author = $this->escapeXml((string) ($book['author'] ?? 'Khong ro'));
+        $title = $this->escapeXml((string) ($book['title'] ?? 'Tài liệu số'));
+        $author = $this->escapeXml((string) ($book['author'] ?? 'Không rõ'));
 
         $zip->addFromString('mimetype', 'application/epub+zip');
         $zip->setCompressionName('mimetype', \ZipArchive::CM_STORE);
@@ -792,8 +790,8 @@ class BookSeeder extends Seeder
             "  <head><title>".$title."</title></head>\n".
             "  <body>\n".
             "    <h1>".$title."</h1>\n".
-            "    <p><strong>Tac gia:</strong> ".$author."</p>\n".
-            "    <p>Noi dung tai lieu so.</p>\n".
+            "    <p><strong>Tác giả:</strong> ".$author."</p>\n".
+            "    <p>Nội dung tài liệu số.</p>\n".
             "  </body>\n".
             "</html>\n"
         );
@@ -819,30 +817,33 @@ class BookSeeder extends Seeder
 
     private function buildSlidesContent(array $book): string
     {
-        $title = $book['title'] ?? 'Tai lieu so';
-        $author = $book['author'] ?? 'Khong ro';
-        $format = $book['file_format'] ?? 'N/A';
-        $type = $book['resource_type'] ?? $book['genre'] ?? 'N/A';
+        $title = $book['title'] ?? 'Tài liệu số';
+        $author = $book['author'] ?? 'Không rõ';
+        $format = $book['file_format'] ?? 'Chưa cập nhật';
+        $type = $book['resource_type'] ?? $book['genre'] ?? 'Chưa cập nhật';
 
         return implode(PHP_EOL, [
-            'Thu vien so HCMUE',
-            'Tai lieu so',
+            'Thư viện số HCMUE',
+            'Tài liệu số',
             '',
-            'Tieu de: '.$title,
-            'Tac gia: '.$author,
-            'Dinh dang: '.$format,
-            'Loai tai nguyen: '.$type,
+            'Tiêu đề: '.$title,
+            'Tác giả: '.$author,
+            'Định dạng: '.$format,
+            'Loại tài nguyên: '.$type,
             '',
-            'Day la tep tai lieu so.',
+            'Đây là tệp tài liệu số.',
         ]);
     }
 
-    private function escapePdfText(string $value): string
+    private function pdfTextHex(string $value): string
     {
-        $clean = preg_replace('/[^\x20-\x7E]/', '', $value) ?? '';
-        $clean = str_replace(['\\', '(', ')'], ['\\\\', '\\(', '\\)'], $clean);
+        $encoded = iconv('UTF-8', 'UTF-16BE//IGNORE', $value);
 
-        return $clean;
+        if ($encoded === false) {
+            $encoded = $value;
+        }
+
+        return 'FEFF'.strtoupper(bin2hex($encoded));
     }
 
     private function escapeXml(string $value): string

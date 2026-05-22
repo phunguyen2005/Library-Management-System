@@ -85,9 +85,10 @@ class DigitalDocumentAccessTest extends TestCase
             ['book' => $book->book_id, 'disposition' => 'inline'],
         );
 
-        $this->get($url)
-            ->assertOk()
-            ->assertSee('Digital resource preview');
+        $response = $this->get($url)
+            ->assertOk();
+
+        $this->assertStringStartsWith('%PDF-1.4', $response->getContent());
 
         $this->assertDatabaseHas('books', [
             'book_id' => $book->book_id,
@@ -129,7 +130,7 @@ class DigitalDocumentAccessTest extends TestCase
             ->post('/api/books/7/digital-file', ['file' => $file])
             ->assertForbidden()
             ->assertJson([
-                'message' => 'Forbidden.',
+                'message' => 'Bạn không có quyền thực hiện thao tác này.',
             ]);
     }
 

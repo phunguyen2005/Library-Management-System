@@ -27,9 +27,9 @@ export default function Sidebar() {
           <span className="material-symbols-outlined filled">school</span>
         </div>
         <div>
-          <h1 className="text-sm font-bold leading-tight text-primary">HCMUE Library</h1>
+          <h1 className="text-sm font-bold leading-tight text-primary">Thư viện HCMUE</h1>
           <p className="text-[10px] uppercase tracking-wider text-on-surface-variant">
-            Digital System
+            Hệ thống số
           </p>
         </div>
       </div>

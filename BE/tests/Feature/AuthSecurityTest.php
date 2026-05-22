@@ -24,7 +24,7 @@ class AuthSecurityTest extends TestCase
 
         for ($attempt = 0; $attempt < 5; $attempt++) {
             $this->postJson('/api/login', $payload)->assertStatus(401)->assertJson([
-                'message' => 'Invalid credentials.',
+                'message' => 'Thông tin đăng nhập không đúng.',
             ]);
         }
 
@@ -37,7 +37,7 @@ class AuthSecurityTest extends TestCase
         $this->getJson('/api/me')
             ->assertUnauthorized()
             ->assertJson([
-                'message' => 'Unauthenticated.',
+                'message' => 'Vui lòng đăng nhập để tiếp tục.',
             ]);
     }
 
@@ -50,7 +50,7 @@ class AuthSecurityTest extends TestCase
             ->getJson('/api/members')
             ->assertForbidden()
             ->assertJson([
-                'message' => 'Forbidden.',
+                'message' => 'Bạn không có quyền thực hiện thao tác này.',
             ]);
     }
 
@@ -71,7 +71,7 @@ class AuthSecurityTest extends TestCase
             ->getJson('/api/me')
             ->assertUnauthorized()
             ->assertJson([
-                'message' => 'Unauthenticated.',
+                'message' => 'Vui lòng đăng nhập để tiếp tục.',
             ]);
     }
 }

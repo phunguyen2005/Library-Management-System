@@ -58,7 +58,7 @@ async function performRequest<T>(
     : await response.text().catch(() => null);
 
   if (!response.ok) {
-    const fallbackMessage = `Request failed with status ${response.status}`;
+    const fallbackMessage = `Yêu cầu thất bại với mã trạng thái ${response.status}`;
     const message =
       typeof payload === 'object' && payload && 'message' in payload
         ? String(payload.message)

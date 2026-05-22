@@ -49,7 +49,7 @@ export default function Login() {
             <span className="material-symbols-outlined filled">school</span>
           </div>
           <span className="font-headline text-xl font-bold tracking-tight text-primary">
-            HCMUE Library
+            Thư viện HCMUE
           </span>
         </div>
         <div className="flex items-center gap-4">

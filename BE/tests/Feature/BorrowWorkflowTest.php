@@ -24,7 +24,7 @@ class BorrowWorkflowTest extends TestCase
             ->postJson('/api/requests', ['book_id' => 1])
             ->assertStatus(422)
             ->assertJson([
-                'message' => 'Ban da co mot yeu cau hoac phieu muon cho cuon sach nay.',
+                'message' => 'Bạn đã có một yêu cầu hoặc phiếu mượn cho cuốn sách này.',
             ]);
     }
 
@@ -38,7 +38,7 @@ class BorrowWorkflowTest extends TestCase
             ->postJson('/api/requests', ['book_id' => $digitalBook->book_id])
             ->assertStatus(422)
             ->assertJson([
-                'message' => 'Tai lieu so khong the duoc muon nhu sach vat ly.',
+                'message' => 'Tài liệu số không thể được mượn như sách vật lý.',
             ]);
     }
 
@@ -107,7 +107,7 @@ class BorrowWorkflowTest extends TestCase
             ->postJson('/api/requests', ['book_id' => 6])
             ->assertStatus(422)
             ->assertJson([
-                'message' => 'Ban da dat gioi han 5 yeu cau dang hoat dong.',
+                'message' => 'Bạn đã đạt giới hạn 5 yêu cầu đang hoạt động.',
             ]);
     }
 
@@ -211,7 +211,7 @@ class BorrowWorkflowTest extends TestCase
             ->postJson('/api/requests/1/reject', ['reason' => 'Already borrowed.'])
             ->assertStatus(422)
             ->assertJson([
-                'message' => 'Chi co the tu choi yeu cau dang cho duyet.',
+                'message' => 'Chỉ có thể từ chối yêu cầu đang chờ duyệt.',
             ]);
     }
 }

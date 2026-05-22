@@ -8,7 +8,6 @@ type PaginatedResponse<T> = {
 
 type UpdateProfilePayload = {
   name: string;
-  email?: string | null;
   phone_number?: string | null;
   current_password?: string;
   password?: string;

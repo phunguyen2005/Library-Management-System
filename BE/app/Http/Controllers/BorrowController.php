@@ -25,7 +25,7 @@ class BorrowController extends Controller
             $book = Book::query()->lockForUpdate()->findOrFail($validated['book_id']);
 
             if ($book->available_quantity <= 0) {
-                throw new HttpResponseException(response()->json(['message' => 'Sach hien khong co san de muon.'], 422));
+                throw new HttpResponseException(response()->json(['message' => 'Sách hiện không có sẵn để mượn.'], 422));
             }
 
             $settings = LibrarySetting::singleton();
@@ -38,7 +38,7 @@ class BorrowController extends Controller
 
             if ($activeLoanCount >= $maxActiveLoans) {
                 throw new HttpResponseException(response()->json([
-                    'message' => 'Ban da dat gioi han '.$maxActiveLoans.' yeu cau dang hoat dong.',
+                    'message' => 'Bạn đã đạt giới hạn '.$maxActiveLoans.' yêu cầu đang hoạt động.',
                 ], 422));
             }
 
@@ -50,11 +50,11 @@ class BorrowController extends Controller
                 ->exists();
 
             if ($duplicateLoan) {
-                throw new HttpResponseException(response()->json(['message' => 'Ban da co mot yeu cau hoac phieu muon cho cuon sach nay.'], 422));
+                throw new HttpResponseException(response()->json(['message' => 'Bạn đã có một yêu cầu hoặc phiếu mượn cho cuốn sách này.'], 422));
             }
 
             if ($book->is_digital) {
-                throw new HttpResponseException(response()->json(['message' => 'Tai lieu so khong the duoc muon nhu sach vat ly.'], 422));
+                throw new HttpResponseException(response()->json(['message' => 'Tài liệu số không thể được mượn như sách vật lý.'], 422));
             }
 
             return Borrowing::query()->create([
@@ -66,7 +66,7 @@ class BorrowController extends Controller
         });
 
         return response()->json([
-            'message' => 'Yeu cau muon sach da duoc gui.',
+            'message' => 'Yêu cầu mượn sách đã được gửi.',
             'loan' => BorrowingResource::make($loan->fresh(['book', 'member', 'librarian'])),
         ], 201);
     }
@@ -79,17 +79,17 @@ class BorrowController extends Controller
             $loan = Borrowing::query()->lockForUpdate()->find($loanId);
 
             if (! $loan) {
-                throw new HttpResponseException(response()->json(['message' => 'Khong tim thay yeu cau muon.'], 404));
+                throw new HttpResponseException(response()->json(['message' => 'Không tìm thấy yêu cầu mượn.'], 404));
             }
 
             if ($loan->status !== 'pending') {
-                throw new HttpResponseException(response()->json(['message' => 'Yeu cau nay da duoc xu ly.'], 422));
+                throw new HttpResponseException(response()->json(['message' => 'Yêu cầu này đã được xử lý.'], 422));
             }
 
             $book = Book::query()->lockForUpdate()->find($loan->book_id);
 
             if (! $book || $book->available_quantity <= 0) {
-                throw new HttpResponseException(response()->json(['message' => 'Sach hien khong con ban sao kha dung.'], 422));
+                throw new HttpResponseException(response()->json(['message' => 'Sách hiện không còn bản sao khả dụng.'], 422));
             }
 
             $loan->status = 'borrowed';
@@ -107,7 +107,7 @@ class BorrowController extends Controller
         });
 
         return response()->json([
-            'message' => 'Da duyet yeu cau muon sach.',
+            'message' => 'Đã duyệt yêu cầu mượn sách.',
             'loan' => BorrowingResource::make($loan),
         ]);
     }
@@ -121,11 +121,11 @@ class BorrowController extends Controller
             $loan = Borrowing::query()->lockForUpdate()->find($loanId);
 
             if (! $loan) {
-                throw new HttpResponseException(response()->json(['message' => 'Khong tim thay yeu cau muon.'], 404));
+                throw new HttpResponseException(response()->json(['message' => 'Không tìm thấy yêu cầu mượn.'], 404));
             }
 
             if ($loan->status !== 'pending') {
-                throw new HttpResponseException(response()->json(['message' => 'Chi co the tu choi yeu cau dang cho duyet.'], 422));
+                throw new HttpResponseException(response()->json(['message' => 'Chỉ có thể từ chối yêu cầu đang chờ duyệt.'], 422));
             }
 
             $loan->status = 'rejected';
@@ -138,7 +138,7 @@ class BorrowController extends Controller
         });
 
         return response()->json([
-            'message' => 'Da tu choi yeu cau muon sach.',
+            'message' => 'Đã từ chối yêu cầu mượn sách.',
             'loan' => BorrowingResource::make($loan),
         ]);
     }
@@ -149,11 +149,11 @@ class BorrowController extends Controller
             $loan = Borrowing::query()->lockForUpdate()->find($loanId);
 
             if (! $loan) {
-                throw new HttpResponseException(response()->json(['message' => 'Khong tim thay phieu muon.'], 404));
+                throw new HttpResponseException(response()->json(['message' => 'Không tìm thấy phiếu mượn.'], 404));
             }
 
             if ($loan->status !== 'borrowed') {
-                throw new HttpResponseException(response()->json(['message' => 'Chi co the tra sach dang o trang thai borrowed.'], 422));
+                throw new HttpResponseException(response()->json(['message' => 'Chỉ có thể trả sách đang ở trạng thái đang mượn.'], 422));
             }
 
             $book = Book::query()->lockForUpdate()->find($loan->book_id);
@@ -174,7 +174,7 @@ class BorrowController extends Controller
         });
 
         return response()->json([
-            'message' => 'Da xu ly tra sach.',
+            'message' => 'Đã xử lý trả sách.',
             'loan' => BorrowingResource::make($loan),
         ]);
     }

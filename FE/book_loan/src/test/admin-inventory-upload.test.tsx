@@ -100,8 +100,8 @@ describe('AdminInventory digital upload', () => {
   it('renders separate tabs for borrow books and digital resources', async () => {
     renderAdminInventory();
 
-    expect(await screen.findByRole('tab', { name: 'Borrow Books' })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: 'Digital Resources' })).toBeInTheDocument();
+    expect(await screen.findByRole('tab', { name: 'Sách mượn' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Tài nguyên số' })).toBeInTheDocument();
   });
 
   it('creates a borrow book without uploading a digital file', async () => {
@@ -110,11 +110,11 @@ describe('AdminInventory digital upload', () => {
     renderAdminInventory();
 
     await waitFor(() => expect(fetchBorrowableBooksMock).toHaveBeenCalled());
-    await user.click(screen.getByRole('button', { name: 'Add borrow book' }));
-    await user.type(screen.getByLabelText('Book title'), 'Physical Algorithms');
-    await user.type(screen.getByLabelText('Book author'), 'Library Admin');
-    await user.type(screen.getByLabelText('Book location'), 'Shelf B');
-    await user.click(screen.getByRole('button', { name: 'Save borrow book' }));
+    await user.click(screen.getByRole('button', { name: 'Thêm sách mượn' }));
+    await user.type(screen.getByLabelText('Tiêu đề sách'), 'Physical Algorithms');
+    await user.type(screen.getByLabelText('Tác giả sách'), 'Library Admin');
+    await user.type(screen.getByLabelText('Vị trí sách'), 'Shelf B');
+    await user.click(screen.getByRole('button', { name: 'Lưu sách mượn' }));
 
     await waitFor(() => {
       expect(addBorrowableBookMock).toHaveBeenCalledWith(
@@ -133,12 +133,12 @@ describe('AdminInventory digital upload', () => {
     renderAdminInventory();
 
     await waitFor(() => expect(fetchBorrowableBooksMock).toHaveBeenCalled());
-    await user.click(screen.getByRole('tab', { name: 'Digital Resources' }));
-    await user.click(screen.getByRole('button', { name: 'Add digital resource' }));
-    await user.type(screen.getByLabelText('Book title'), 'Digital Systems');
-    await user.type(screen.getByLabelText('Book author'), 'Library Admin');
-    await user.upload(screen.getByLabelText('Digital file'), file);
-    await user.click(screen.getByRole('button', { name: 'Save digital resource' }));
+    await user.click(screen.getByRole('tab', { name: 'Tài nguyên số' }));
+    await user.click(screen.getByRole('button', { name: 'Thêm tài nguyên số' }));
+    await user.type(screen.getByLabelText('Tiêu đề sách'), 'Digital Systems');
+    await user.type(screen.getByLabelText('Tác giả sách'), 'Library Admin');
+    await user.upload(screen.getByLabelText('Tệp số'), file);
+    await user.click(screen.getByRole('button', { name: 'Lưu tài nguyên số' }));
 
     await waitFor(() => {
       expect(addDigitalResourceMock).toHaveBeenCalledWith(

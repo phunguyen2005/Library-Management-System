@@ -32,14 +32,14 @@ class AuthController extends Controller
 
         if (! $user || ! Hash::check($password, $user->password)) {
             return response()->json([
-                'message' => 'Invalid credentials.',
+                'message' => 'Thông tin đăng nhập không đúng.',
             ], 401);
         }
 
         $token = $user->createToken($user->getRoleName().'-session', ['role:'.$user->getRoleName()])->plainTextToken;
 
         return response()->json([
-            'message' => 'Dang nhap thanh cong',
+            'message' => 'Đăng nhập thành công.',
             'user' => AuthenticatedUserResource::make($user),
             'role' => $user->getRoleName(),
             'token' => $token,
@@ -61,7 +61,7 @@ class AuthController extends Controller
         $token = $user->createToken('student-session', ['role:student'])->plainTextToken;
 
         return response()->json([
-            'message' => 'Dang ky thanh cong',
+            'message' => 'Đăng ký thành công.',
             'user' => AuthenticatedUserResource::make($user),
             'role' => 'student',
             'token' => $token,
@@ -85,17 +85,13 @@ class AuthController extends Controller
 
         if (! empty($validated['password'])) {
             if (empty($validated['current_password']) || ! Hash::check($validated['current_password'], $user->password)) {
-                return response()->json(['message' => 'Mat khau hien tai khong dung.'], 422);
+                return response()->json(['message' => 'Mật khẩu hiện tại không đúng.'], 422);
             }
 
             $user->password = $validated['password'];
         }
 
         $user->name = $validated['name'];
-
-        if (array_key_exists('email', $validated)) {
-            $user->email = $validated['email'];
-        }
 
         if (array_key_exists('phone_number', $validated)) {
             $user->phone_number = $validated['phone_number'];
@@ -104,7 +100,7 @@ class AuthController extends Controller
         $user->save();
 
         return response()->json([
-            'message' => 'Cap nhat ho so thanh cong.',
+            'message' => 'Cập nhật hồ sơ thành công.',
             'user' => AuthenticatedUserResource::make($user->fresh()),
             'role' => $user->getRoleName(),
         ]);
@@ -115,7 +111,7 @@ class AuthController extends Controller
         $request->user()?->currentAccessToken()?->delete();
 
         return response()->json([
-            'message' => 'Dang xuat thanh cong.',
+            'message' => 'Đăng xuất thành công.',
         ]);
     }
 

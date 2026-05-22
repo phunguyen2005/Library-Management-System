@@ -20,10 +20,10 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->render(function (AuthenticationException $exception, $request) {
-            return response()->json(['message' => 'Unauthenticated.'], 401);
+            return response()->json(['message' => 'Vui lòng đăng nhập để tiếp tục.'], 401);
         });
 
         $exceptions->render(function (AuthorizationException $exception, $request) {
-            return response()->json(['message' => 'Forbidden.'], 403);
+            return response()->json(['message' => 'Bạn không có quyền thực hiện thao tác này.'], 403);
         });
     })->create();

@@ -77,15 +77,15 @@ function getValidationMessage(formData: MemberFormData, mode: ModalMode) {
 
   if (mode === 'add' || hasPasswordInput) {
     if (!password) {
-      return 'Vui long nhap mat khau cho thanh vien.';
+      return 'Vui lòng nhập mật khẩu cho thành viên.';
     }
 
     if (password !== confirmation) {
-      return 'Mat khau xac nhan khong khop.';
+      return 'Mật khẩu xác nhận không khớp.';
     }
 
     if (password.length < 8 || !/[A-Za-z]/.test(password) || !/\d/.test(password)) {
-      return 'Mat khau can co toi thieu 8 ky tu, gom chu cai va so.';
+      return 'Mật khẩu cần có tối thiểu 8 ký tự, gồm chữ cái và số.';
     }
   }
 
@@ -220,7 +220,7 @@ export default function AdminMembers() {
     const validationMessage = getValidationMessage(formData, modalMode);
 
     if (validationMessage) {
-      emitToast({ tone: 'error', title: 'Khong the luu thanh vien', message: validationMessage });
+      emitToast({ tone: 'error', title: 'Không thể lưu thành viên', message: validationMessage });
       return;
     }
 

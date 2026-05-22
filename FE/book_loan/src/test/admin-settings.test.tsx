@@ -47,17 +47,20 @@ describe('AdminSettings', () => {
     render(<AdminSettings />);
 
     expect(await screen.findByTestId('borrow-settings-note')).toBeInTheDocument();
+    expect(screen.getByTestId('admin-librarian-id')).toHaveValue('1');
+    expect(screen.getByTestId('admin-email')).toHaveValue('old.admin@hcmue.edu.vn');
+    expect(screen.getByTestId('admin-email')).toHaveAttribute('readonly');
   });
 
   it('saves admin profile details through the authenticated profile API', async () => {
     const user = userEvent.setup();
     updateMyProfileMock.mockResolvedValueOnce({
-      message: 'Profile updated',
+      message: 'Cập nhật hồ sơ thành công.',
       role: 'admin',
       user: {
         librarian_id: 1,
         name: 'Updated Admin',
-        email: 'updated.admin@hcmue.edu.vn',
+        email: 'old.admin@hcmue.edu.vn',
         phone_number: '0901999999',
       },
     });
@@ -71,15 +74,12 @@ describe('AdminSettings', () => {
 
     await user.clear(await screen.findByTestId('admin-name'));
     await user.type(screen.getByTestId('admin-name'), 'Updated Admin');
-    await user.clear(screen.getByTestId('admin-email'));
-    await user.type(screen.getByTestId('admin-email'), 'updated.admin@hcmue.edu.vn');
     await user.clear(screen.getByTestId('admin-phone'));
     await user.type(screen.getByTestId('admin-phone'), '0901999999');
     await user.click(screen.getByTestId('save-admin-profile'));
 
     expect(updateMyProfileMock).toHaveBeenCalledWith({
       name: 'Updated Admin',
-      email: 'updated.admin@hcmue.edu.vn',
       phone_number: '0901999999',
       current_password: undefined,
       password: undefined,
@@ -88,9 +88,44 @@ describe('AdminSettings', () => {
     expect(updateUserMock).toHaveBeenCalledWith({
       librarian_id: 1,
       name: 'Updated Admin',
-      email: 'updated.admin@hcmue.edu.vn',
+      email: 'old.admin@hcmue.edu.vn',
       phone_number: '0901999999',
     });
+  });
+
+  it('submits password fields without allowing email edits', async () => {
+    const user = userEvent.setup();
+    updateMyProfileMock.mockResolvedValueOnce({
+      message: 'Cập nhật hồ sơ thành công.',
+      role: 'admin',
+      user: {
+        librarian_id: 1,
+        name: 'Old Admin',
+        email: 'old.admin@hcmue.edu.vn',
+        phone_number: '0901000001',
+      },
+    });
+
+    fetchLibrarySettingsMock.mockResolvedValueOnce({
+      loan_period_days: 14,
+      max_active_loans: 5,
+    });
+
+    render(<AdminSettings />);
+
+    await user.type(await screen.findByLabelText('Mật khẩu hiện tại'), 'Library@2026');
+    await user.type(screen.getByLabelText('Mật khẩu mới'), 'NewPass123');
+    await user.type(screen.getByLabelText('Xác nhận mật khẩu mới'), 'NewPass123');
+    await user.click(screen.getByTestId('save-admin-profile'));
+
+    expect(updateMyProfileMock).toHaveBeenCalledWith({
+      name: 'Old Admin',
+      phone_number: '0901000001',
+      current_password: 'Library@2026',
+      password: 'NewPass123',
+      password_confirmation: 'NewPass123',
+    });
+    expect(screen.getByTestId('admin-email')).toHaveAttribute('readonly');
   });
 
   it('saves borrowing rules through the settings API', async () => {

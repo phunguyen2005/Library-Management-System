@@ -98,7 +98,6 @@ export default function AdminSettings() {
     try {
       const response = await updateMyProfile({
         name: profileForm.name.trim(),
-        email: profileForm.email.trim() || null,
         phone_number: profileForm.phone_number.trim() || null,
         current_password: isChangingPassword ? profileForm.current_password : undefined,
         password: isChangingPassword ? profileForm.password : undefined,
@@ -196,7 +195,7 @@ export default function AdminSettings() {
         ) : null}
 
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-          <label className="space-y-2 md:col-span-2">
+          <label className="space-y-2">
             <span className="block text-xs font-bold uppercase tracking-widest text-slate-500">
               Họ và tên
             </span>
@@ -215,6 +214,20 @@ export default function AdminSettings() {
 
           <label className="space-y-2">
             <span className="block text-xs font-bold uppercase tracking-widest text-slate-500">
+              Mã thủ thư
+            </span>
+            <input
+              aria-label="Mã thủ thư"
+              data-testid="admin-librarian-id"
+              type="text"
+              value={user?.librarian_id ?? ''}
+              readOnly
+              className="w-full cursor-not-allowed rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500 outline-none"
+            />
+          </label>
+
+          <label className="space-y-2">
+            <span className="block text-xs font-bold uppercase tracking-widest text-slate-500">
               Email
             </span>
             <input
@@ -222,10 +235,8 @@ export default function AdminSettings() {
               data-testid="admin-email"
               type="email"
               value={profileForm.email}
-              onChange={(event) =>
-                setProfileForm((current) => ({ ...current, email: event.target.value }))
-              }
-              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+              readOnly
+              className="w-full cursor-not-allowed rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500 outline-none"
             />
           </label>
 

@@ -26,8 +26,8 @@ export default function AdminSidebar() {
           <span className="material-symbols-outlined filled">admin_panel_settings</span>
         </div>
         <div>
-          <h1 className="text-sm font-bold leading-tight text-white">HCMUE Admin</h1>
-          <p className="text-[10px] uppercase tracking-wider text-slate-400">Librarian Panel</p>
+          <h1 className="text-sm font-bold leading-tight text-white">Quản trị HCMUE</h1>
+          <p className="text-[10px] uppercase tracking-wider text-slate-400">Bảng thủ thư</p>
         </div>
       </div>
       <nav className="custom-scrollbar flex-1 space-y-1 overflow-y-auto px-4 py-4">

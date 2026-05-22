@@ -67,7 +67,6 @@ export default function StudentSettings() {
     try {
       const response = await updateMyProfile({
         name: form.name,
-        email: form.email || null,
         phone_number: form.phone_number || null,
         current_password: form.current_password || undefined,
         password: form.password || undefined,

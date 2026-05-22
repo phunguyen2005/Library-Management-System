@@ -70,14 +70,14 @@ class AdminMemberController extends Controller
     {
         if ($member->borrowings()->exists()) {
             return response()->json([
-                'message' => 'Khong the xoa thanh vien da co lich su muon.',
+                'message' => 'Không thể xóa thành viên đã có lịch sử mượn.',
             ], 422);
         }
 
         $member->delete();
 
         return response()->json([
-            'message' => 'Xoa thanh vien thanh cong.',
+            'message' => 'Xóa thành viên thành công.',
         ]);
     }
 }

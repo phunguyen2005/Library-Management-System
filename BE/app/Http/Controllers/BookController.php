@@ -86,7 +86,7 @@ class BookController extends Controller
 
         if ($nextQuantity < $checkedOut) {
             return response()->json([
-                'message' => 'So luong moi khong the nho hon so sach dang duoc muon.',
+                'message' => 'Số lượng mới không thể nhỏ hơn số sách đang được mượn.',
             ], 422);
         }
 
@@ -119,14 +119,14 @@ class BookController extends Controller
 
         if ($hasAnyBorrowing) {
             return response()->json([
-                'message' => 'Khong the xoa sach da co lich su muon.',
+                'message' => 'Không thể xóa sách đã có lịch sử mượn.',
             ], 422);
         }
 
         $book->delete();
 
         return response()->json([
-            'message' => 'Xoa sach thanh cong.',
+            'message' => 'Xóa sách thành công.',
         ]);
     }
 
@@ -145,7 +145,7 @@ class BookController extends Controller
 
         $book->fill([
             'is_digital' => true,
-            'resource_type' => $book->resource_type ?: 'Tai lieu so',
+            'resource_type' => $book->resource_type ?: 'Tài liệu số',
             'file_format' => $this->digitalFormatFromExtension($extension),
             'file_size' => $this->formatFileSize((int) $file->getSize()),
             'file_path' => $path,
@@ -170,7 +170,7 @@ class BookController extends Controller
     {
         if (! $book->is_digital && ! $book->file_format && ! $book->file_path && ! $book->file_url) {
             return response()->json([
-                'message' => 'Tai lieu so khong ton tai.',
+                'message' => 'Tài liệu số không tồn tại.',
             ], 404);
         }
 
@@ -273,15 +273,15 @@ class BookController extends Controller
     private function fallbackDigitalDocument(Book $book): string
     {
         return implode(PHP_EOL, [
-            'HCMUE Digital Library',
-            'Digital resource preview',
+            'Thư viện số HCMUE',
+            'Bản xem trước tài nguyên số',
             '',
-            'Title: '.$book->title,
-            'Author: '.$book->author,
-            'Format: '.($book->file_format ?: 'N/A'),
-            'Type: '.($book->resource_type ?: $book->genre ?: 'N/A'),
+            'Nhan đề: '.$book->title,
+            'Tác giả: '.$book->author,
+            'Định dạng: '.($book->file_format ?: 'Chưa cập nhật'),
+            'Loại: '.($book->resource_type ?: $book->genre ?: 'Chưa cập nhật'),
             '',
-            'No physical file has been attached to this record yet.',
+            'Bản ghi này chưa có tệp vật lý đính kèm.',
         ]);
     }
 }
