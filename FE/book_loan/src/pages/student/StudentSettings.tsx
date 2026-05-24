@@ -1,22 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { updateMyProfile } from '../../api/userApi';
+import { getActiveDevices, revokeDevice, type DeviceSession } from '../../api/authApi';
 import { useAuth } from '../../auth/AuthContext';
 import { getErrorMessage, isUnauthorizedError } from '../../lib/errors';
 import { emitToast } from '../../notifications/events';
-
-const PREFS_KEY = 'student-notification-prefs';
-
 type Feedback = {
   tone: 'success' | 'error' | 'info';
   message: string;
 };
-
-type NotificationPrefs = {
-  dueSoon: boolean;
-  newBooks: boolean;
-  smsUpdates: boolean;
-};
-
 export default function StudentSettings() {
   const { user, updateUser } = useAuth();
   const [form, setForm] = useState({
@@ -26,14 +17,39 @@ export default function StudentSettings() {
     current_password: '',
     password: '',
     password_confirmation: '',
-  });
-  const [prefs, setPrefs] = useState<NotificationPrefs>({
-    dueSoon: true,
-    newBooks: true,
-    smsUpdates: false,
+    notify_due_soon: true,
+    notify_new_books: true,
   });
   const [isSaving, setIsSaving] = useState(false);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
+  const [devices, setDevices] = useState<DeviceSession[]>([]);
+  const [loadingDevices, setLoadingDevices] = useState(true);
+
+  const fetchDevices = async () => {
+    try {
+      setLoadingDevices(true);
+      const res = await getActiveDevices();
+      setDevices(res);
+    } catch (e) {
+      // Ignore
+    } finally {
+      setLoadingDevices(false);
+    }
+  };
+
+  const handleRevoke = async (tokenId: string) => {
+    try {
+      await revokeDevice(tokenId);
+      emitToast({ tone: 'success', title: 'Thành công', message: 'Đã hủy phiên làm việc của thiết bị thành công.' });
+      setDevices((prev) => prev.filter((d) => d.token_id !== tokenId));
+    } catch (error: any) {
+      emitToast({ tone: 'error', title: 'Thất bại', message: error?.message || 'Không thể hủy phiên đăng nhập.' });
+    }
+  };
+
+  useEffect(() => {
+    fetchDevices();
+  }, []);
 
   useEffect(() => {
     setForm((current) => ({
@@ -41,23 +57,9 @@ export default function StudentSettings() {
       name: user?.name || '',
       email: user?.email || '',
       phone_number: user?.phone_number || '',
+      notify_due_soon: user?.notify_due_soon ?? true,
+      notify_new_books: user?.notify_new_books ?? true,
     }));
-
-    const storedPrefs = localStorage.getItem(PREFS_KEY);
-    if (!storedPrefs) {
-      return;
-    }
-
-    try {
-      const parsedPrefs = JSON.parse(storedPrefs) as Partial<NotificationPrefs>;
-      setPrefs({
-        dueSoon: Boolean(parsedPrefs.dueSoon ?? true),
-        newBooks: Boolean(parsedPrefs.newBooks ?? true),
-        smsUpdates: Boolean(parsedPrefs.smsUpdates ?? false),
-      });
-    } catch {
-      localStorage.removeItem(PREFS_KEY);
-    }
   }, [user]);
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -71,10 +73,11 @@ export default function StudentSettings() {
         current_password: form.current_password || undefined,
         password: form.password || undefined,
         password_confirmation: form.password_confirmation || undefined,
+        notify_due_soon: form.notify_due_soon,
+        notify_new_books: form.notify_new_books,
       });
 
       updateUser(response.user);
-      localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
       setFeedback({ tone: 'success', message: response.message });
       emitToast({
         tone: 'success',
@@ -105,17 +108,17 @@ export default function StudentSettings() {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="mx-auto w-full max-w-4xl space-y-8 p-8">
+    <form onSubmit={handleSubmit} className="mx-auto w-full max-w-4xl space-y-6 p-4 md:p-8">
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
         <div>
-          <h2 className="text-3xl font-bold text-on-surface">Cài đặt cá nhân</h2>
-          <p className="mt-1 text-sm text-on-surface-variant">
+          <h2 className="text-2xl md:text-3xl font-bold text-on-surface">Cài đặt cá nhân</h2>
+          <p className="mt-1 text-xs md:text-sm text-on-surface-variant">
             Quản lý hồ sơ độc giả và tùy chọn nhận thông báo của bạn
           </p>
         </div>
         <button
           type="submit"
-          className="flex items-center gap-2 rounded-xl bg-primary px-6 py-2.5 font-medium text-white shadow-lg shadow-primary/20 transition-all hover:-translate-y-0.5"
+          className="w-full md:w-auto flex items-center justify-center gap-2 rounded-xl bg-primary px-6 py-2.5 font-medium text-white shadow-lg shadow-primary/20 transition-all hover:-translate-y-0.5 cursor-pointer"
         >
           <span className="material-symbols-outlined text-sm">save</span>
           {isSaving ? 'Đang lưu...' : 'Lưu thay đổi'}
@@ -139,7 +142,7 @@ export default function StudentSettings() {
       ) : null}
 
       <div className="divide-y divide-surface-container overflow-hidden rounded-2xl border border-surface-container-low bg-surface-bright scholar-shadow">
-        <section className="p-8">
+        <section className="p-4 md:p-8">
           <h4 className="mb-6 flex items-center gap-2 text-lg font-bold text-slate-800">
             <span className="material-symbols-outlined filled text-[20px] text-primary">
               account_circle
@@ -218,7 +221,7 @@ export default function StudentSettings() {
           </div>
         </section>
 
-        <section className="p-8">
+        <section className="p-4 md:p-8">
           <h4 className="mb-6 flex items-center gap-2 text-lg font-bold text-slate-800">
             <span className="material-symbols-outlined filled text-[20px] text-orange-500">
               lock
@@ -277,7 +280,7 @@ export default function StudentSettings() {
           </div>
         </section>
 
-        <section className="p-8">
+        <section className="p-4 md:p-8">
           <h4 className="mb-6 flex items-center gap-2 text-lg font-bold text-slate-800">
             <span className="material-symbols-outlined filled text-[20px] text-purple-500">
               notifications
@@ -288,8 +291,8 @@ export default function StudentSettings() {
             <label className="flex cursor-pointer items-start gap-4">
               <input
                 type="checkbox"
-                checked={prefs.dueSoon}
-                onChange={(e) => setPrefs({ ...prefs, dueSoon: e.target.checked })}
+                checked={form.notify_due_soon}
+                onChange={(e) => setForm({ ...form, notify_due_soon: e.target.checked })}
                 className="mt-1 h-4 w-4 rounded border-outline text-primary focus:ring-primary"
               />
               <span>
@@ -302,8 +305,8 @@ export default function StudentSettings() {
             <label className="flex cursor-pointer items-start gap-4">
               <input
                 type="checkbox"
-                checked={prefs.newBooks}
-                onChange={(e) => setPrefs({ ...prefs, newBooks: e.target.checked })}
+                checked={form.notify_new_books}
+                onChange={(e) => setForm({ ...form, notify_new_books: e.target.checked })}
                 className="mt-1 h-4 w-4 rounded border-outline text-primary focus:ring-primary"
               />
               <span>
@@ -313,21 +316,69 @@ export default function StudentSettings() {
                 </p>
               </span>
             </label>
-            <label className="flex cursor-pointer items-start gap-4">
-              <input
-                type="checkbox"
-                checked={prefs.smsUpdates}
-                onChange={(e) => setPrefs({ ...prefs, smsUpdates: e.target.checked })}
-                className="mt-1 h-4 w-4 rounded border-outline text-primary focus:ring-primary"
-              />
-              <span>
-                <p className="text-sm font-bold text-slate-800">Nhận cập nhật qua SMS</p>
-                <p className="mt-0.5 text-xs text-slate-500">
-                  Chỉ bật nếu bạn muốn nhận nhắc nhở bằng số điện thoại.
-                </p>
-              </span>
-            </label>
           </div>
+        </section>
+
+        <section className="p-4 md:p-8">
+          <h4 className="mb-6 flex items-center gap-2 text-lg font-bold text-slate-800">
+            <span className="material-symbols-outlined filled text-[20px] text-blue-500">
+              devices
+            </span>
+            Thiết bị đang hoạt động
+          </h4>
+          <p className="text-xs text-slate-500 mb-6">
+            Danh sách các thiết bị hiện đang đăng nhập vào tài khoản của bạn. Bạn có thể đăng xuất khỏi các thiết bị khác từ xa nếu phát hiện truy cập đáng ngờ.
+          </p>
+
+          {loadingDevices ? (
+            <div className="text-xs text-slate-400 py-4 flex items-center gap-2">
+              <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+              Đang tải danh sách thiết bị...
+            </div>
+          ) : devices.length === 0 ? (
+            <div className="text-xs text-slate-400 py-4">Không tìm thấy thông tin thiết bị hoạt động.</div>
+          ) : (
+            <div className="space-y-4">
+              {devices.map((device) => (
+                <div key={device.history_id} className="flex flex-col sm:flex-row sm:items-center justify-between border border-slate-100 rounded-xl p-4 bg-slate-50/50 hover:bg-slate-50 transition-colors gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="text-slate-500 bg-white border border-slate-200 p-2.5 rounded-lg flex items-center justify-center shrink-0 shadow-sm">
+                      <span className="material-symbols-outlined">
+                        {device.device_type === 'Mobile' ? 'smartphone' : device.device_type === 'Tablet' ? 'tablet' : 'desktop_windows'}
+                      </span>
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-semibold text-slate-800 text-sm">
+                          {device.platform} - {device.browser}
+                        </span>
+                        {device.is_current ? (
+                          <span className="bg-green-100 text-green-800 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                            Thiết bị này
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className="text-[11px] text-slate-500 mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                        <span>IP: {device.ip_address}</span>
+                        <span className="w-1 h-1 bg-slate-300 rounded-full shrink-0" />
+                        <span className="line-clamp-1">Lúc: {new Date(device.created_at).toLocaleString('vi-VN')}</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {!device.is_current && (
+                    <button
+                      type="button"
+                      onClick={() => handleRevoke(device.token_id)}
+                      className="w-full sm:w-auto text-center text-xs font-bold text-red-600 hover:text-red-700 bg-white border border-red-200 hover:bg-red-50 px-3 py-1.5 rounded-lg transition-all shadow-sm cursor-pointer"
+                    >
+                      Đăng xuất
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </section>
       </div>
     </form>
