@@ -4,8 +4,18 @@ import { useAuth } from '../auth/AuthContext';
 import type { UserRole } from '../auth/storage';
 import PageLoader from './PageLoader';
 
-export default function ProtectedRoute({ role }: { role?: UserRole }) {
-  const { isAuthReady, isAuthenticated, role: currentRole } = useAuth();
+export default function ProtectedRoute({
+  role,
+  roles,
+  permission,
+  permissions
+}: {
+  role?: UserRole;
+  roles?: UserRole[];
+  permission?: string;
+  permissions?: string[];
+}) {
+  const { isAuthReady, isAuthenticated, role: currentRole, hasPermission } = useAuth();
 
   if (!isAuthReady) {
     return <PageLoader />;
@@ -16,7 +26,23 @@ export default function ProtectedRoute({ role }: { role?: UserRole }) {
   }
 
   if (role && currentRole !== role) {
-    return <Navigate to={currentRole === 'admin' ? '/admin/dashboard' : '/home'} replace />;
+    const isStaff = currentRole === 'admin' || currentRole === 'librarian';
+    return <Navigate to={isStaff ? '/admin/dashboard' : '/home'} replace />;
+  }
+
+  if (roles && !roles.includes(currentRole as UserRole)) {
+    const isStaff = currentRole === 'admin' || currentRole === 'librarian';
+    return <Navigate to={isStaff ? '/admin/dashboard' : '/home'} replace />;
+  }
+
+  if (permission && !hasPermission(permission)) {
+    const isStaff = currentRole === 'admin' || currentRole === 'librarian';
+    return <Navigate to={isStaff ? '/admin/dashboard' : '/home'} replace />;
+  }
+
+  if (permissions && !permissions.some(perm => hasPermission(perm))) {
+    const isStaff = currentRole === 'admin' || currentRole === 'librarian';
+    return <Navigate to={isStaff ? '/admin/dashboard' : '/home'} replace />;
   }
 
   return <Outlet />;
