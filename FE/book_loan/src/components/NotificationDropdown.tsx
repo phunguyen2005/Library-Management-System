@@ -1,0 +1,159 @@
+import React, { useEffect, useRef, useState } from 'react';
+import { getNotifications, markAllNotificationsAsRead, markNotificationAsRead, type AppNotification } from '../api/notificationApi';
+import { useAuth } from '../auth/AuthContext';
+import { emitToast } from '../notifications/events';
+
+export default function NotificationDropdown() {
+  const { user } = useAuth();
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [isOpen, setIsOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  const fetchNotifications = async () => {
+    try {
+      const data = await getNotifications();
+      setNotifications(data.data);
+      setUnreadCount(data.data.filter((n) => !n.read_at).length);
+    } catch {
+      // Ignore errors
+    }
+  };
+
+  useEffect(() => {
+    if (user) {
+      fetchNotifications();
+      // Optional: Polling every 60 seconds
+      const interval = setInterval(fetchNotifications, 60000);
+      return () => clearInterval(interval);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    const handler = (event: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const handleToggle = () => {
+    setIsOpen(!isOpen);
+    if (!isOpen) {
+      fetchNotifications(); // Refresh on open
+    }
+  };
+
+  const handleMarkAsRead = async (id: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    try {
+      await markNotificationAsRead(id);
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, read_at: new Date().toISOString() } : n))
+      );
+      setUnreadCount((prev) => Math.max(0, prev - 1));
+    } catch {
+      emitToast({ tone: 'error', title: 'Lỗi', message: 'Không thể đánh dấu đã đọc.' });
+    }
+  };
+
+  const handleMarkAllAsRead = async () => {
+    try {
+      await markAllNotificationsAsRead();
+      setNotifications((prev) =>
+        prev.map((n) => ({ ...n, read_at: n.read_at || new Date().toISOString() }))
+      );
+      setUnreadCount(0);
+    } catch {
+      emitToast({ tone: 'error', title: 'Lỗi', message: 'Không thể đánh dấu tất cả đã đọc.' });
+    }
+  };
+
+  const handleNotificationClick = (notification: AppNotification) => {
+    if (!notification.read_at) {
+      handleMarkAsRead(notification.id);
+    }
+  };
+
+  return (
+    <div className="relative" ref={wrapperRef}>
+      <button
+        onClick={handleToggle}
+        className="relative rounded-full p-2 text-on-surface-variant transition-colors hover:bg-surface-container-low"
+      >
+        <span className="material-symbols-outlined">notifications</span>
+        {unreadCount > 0 && (
+          <div className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-error border-2 border-surface-bright flex items-center justify-center">
+            {/* Can add tiny number if wanted, but standard dot is cleaner */}
+          </div>
+        )}
+      </button>
+
+      {isOpen && (
+        <div className="absolute right-0 top-full z-50 mt-2 w-80 overflow-hidden rounded-xl border border-surface-container-low bg-surface-bright shadow-2xl">
+          <div className="flex items-center justify-between border-b border-surface-container-low px-4 py-3">
+            <h3 className="text-sm font-bold text-on-surface">Thông báo</h3>
+            {unreadCount > 0 && (
+              <button
+                onClick={handleMarkAllAsRead}
+                className="text-xs font-semibold text-primary hover:underline"
+              >
+                Đánh dấu tất cả đã đọc
+              </button>
+            )}
+          </div>
+          
+          <div className="max-h-[400px] overflow-y-auto">
+            {notifications.length > 0 ? (
+              notifications.map((notification) => {
+                const isUnread = !notification.read_at;
+                const content = (
+                  <>
+                    <div className="flex w-full items-start justify-between gap-2">
+                      <p className={`text-sm ${isUnread ? 'font-bold text-on-surface' : 'text-on-surface-variant'}`}>
+                        {notification.data.message}
+                      </p>
+                      {isUnread && (
+                        <div className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary" />
+                      )}
+                    </div>
+                    <span className="text-[10px] text-outline">
+                      {new Date(notification.created_at).toLocaleString('vi-VN')}
+                    </span>
+                  </>
+                );
+
+                if (isUnread) {
+                  return (
+                    <button
+                      key={notification.id}
+                      onClick={() => handleNotificationClick(notification)}
+                      className="flex w-full flex-col items-start gap-1 border-b border-surface-container-low p-4 text-left transition-colors hover:bg-surface-container-low bg-primary/5 cursor-pointer"
+                    >
+                      {content}
+                    </button>
+                  );
+                }
+
+                return (
+                  <div
+                    key={notification.id}
+                    className="flex w-full flex-col items-start gap-1 border-b border-surface-container-low p-4 text-left text-on-surface-variant bg-surface-bright"
+                  >
+                    {content}
+                  </div>
+                );
+              })
+            ) : (
+              <div className="p-8 text-center text-sm text-on-surface-variant">
+                Không có thông báo nào.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
