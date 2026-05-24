@@ -20,6 +20,13 @@ export interface BookApiRecord {
   total_quantity?: number | null;
   available_quantity?: number | null;
   is_available?: boolean | number;
+  favorite_count?: number | null;
+  is_favorite?: boolean | number;
+  avg_rating?: number | null;
+  reviews_count?: number | null;
+  ai_summary?: string | null;
+  ai_tags?: string[] | null;
+  ai_summary_generated_at?: string | null;
 }
 
 export interface FormattedBook {
@@ -32,6 +39,7 @@ export interface FormattedBook {
   genre: string;
   location: string;
   status: string;
+  statusKey?: 'available' | 'unavailable';
   statusColor: string;
   cover: string;
   quantity: number;
@@ -45,6 +53,13 @@ export interface FormattedBook {
   has_digital_file?: boolean;
   digital_file_name?: string | null;
   download_count?: number | null;
+  favorite_count?: number | null;
+  is_favorite?: boolean;
+  avg_rating?: number;
+  reviews_count?: number;
+  ai_summary?: string | null;
+  ai_tags?: string[];
+  ai_summary_generated_at?: string | null;
 }
 
 export interface DigitalDocument {
@@ -60,4 +75,26 @@ export interface DigitalDocument {
   openUrl: string | null;
   downloadUrl: string | null;
   hasAttachedFile: boolean;
+  aiSummary?: string | null;
+  aiTags?: string[];
+  aiSummaryGeneratedAt?: string | null;
+  readingProgress?: ReadingProgressRecord | null;
+}
+
+export interface ReadingProgressRecord {
+  progress_id: number;
+  book_id: number;
+  member_id: number;
+  current_page: number;
+  total_pages: number;
+  progress_percent: number;
+  last_read_at?: string | null;
+  updated_at?: string | null;
+  book?: {
+    book_id: number;
+    title: string;
+    author: string;
+    cover?: string | null;
+    file_format?: string | null;
+  } | null;
 }
