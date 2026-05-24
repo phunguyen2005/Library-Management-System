@@ -42,6 +42,9 @@ describe('AdminSettings', () => {
     fetchLibrarySettingsMock.mockResolvedValueOnce({
       loan_period_days: 14,
       max_active_loans: 5,
+      fine_per_day: 5000,
+      max_fine_per_loan: 200000,
+      grace_period_days: 0,
     });
 
     render(<AdminSettings />);
@@ -68,6 +71,9 @@ describe('AdminSettings', () => {
     fetchLibrarySettingsMock.mockResolvedValueOnce({
       loan_period_days: 14,
       max_active_loans: 5,
+      fine_per_day: 5000,
+      max_fine_per_loan: 200000,
+      grace_period_days: 0,
     });
 
     render(<AdminSettings />);
@@ -109,6 +115,9 @@ describe('AdminSettings', () => {
     fetchLibrarySettingsMock.mockResolvedValueOnce({
       loan_period_days: 14,
       max_active_loans: 5,
+      fine_per_day: 5000,
+      max_fine_per_loan: 200000,
+      grace_period_days: 0,
     });
 
     render(<AdminSettings />);
@@ -133,10 +142,16 @@ describe('AdminSettings', () => {
     fetchLibrarySettingsMock.mockResolvedValueOnce({
       loan_period_days: 14,
       max_active_loans: 5,
+      fine_per_day: 5000,
+      max_fine_per_loan: 200000,
+      grace_period_days: 0,
     });
     updateLibrarySettingsMock.mockResolvedValueOnce({
       loan_period_days: 21,
       max_active_loans: 7,
+      fine_per_day: 10000,
+      max_fine_per_loan: 150000,
+      grace_period_days: 2,
     });
 
     render(<AdminSettings />);
@@ -145,11 +160,20 @@ describe('AdminSettings', () => {
     await user.type(screen.getByTestId('loan-period-days'), '21');
     await user.clear(screen.getByTestId('max-active-loans'));
     await user.type(screen.getByTestId('max-active-loans'), '7');
+    await user.clear(screen.getByTestId('fine-per-day'));
+    await user.type(screen.getByTestId('fine-per-day'), '10000');
+    await user.clear(screen.getByTestId('max-fine-per-loan'));
+    await user.type(screen.getByTestId('max-fine-per-loan'), '150000');
+    await user.clear(screen.getByTestId('grace-period-days'));
+    await user.type(screen.getByTestId('grace-period-days'), '2');
     await user.click(screen.getByTestId('save-borrow-settings'));
 
     expect(updateLibrarySettingsMock).toHaveBeenCalledWith({
       loan_period_days: 21,
       max_active_loans: 7,
+      fine_per_day: 10000,
+      max_fine_per_loan: 150000,
+      grace_period_days: 2,
     });
   });
 });
