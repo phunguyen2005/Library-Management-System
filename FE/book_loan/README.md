@@ -43,7 +43,7 @@ Use `npm.cmd` in PowerShell if script execution policy blocks `npm.ps1`.
 
 ## App Flow
 
-- Students browse the catalog, submit borrow requests, view active loans/history, and open digital documents.
-- Admins manage inventory, members, borrowing requests, and summary reports.
-- Authentication is token-based through the Laravel API.
-- Admin settings are browser-local demo preferences; Laravel still enforces real borrowing and inventory rules.
+- Students register/login (with OTP/Google OAuth), browse the catalog, add favorites, submit borrow requests (or queue reservations if books are out of stock), track reading progress of digital books, view notifications, track active loans/history, manage remote logged-in devices/sessions, and view overdue/damage fines with dynamic MoMo QR payment integration.
+- Admins manage books inventory (upload digital files), members management CRUD, review and approve/confirm-pickup/reject borrow requests, configure global library rules (settings persisted in DB via Laravel controllers), view interactive reporting charts (with CSV report exports), and view system action audit logs.
+- Authentication is token-based through Laravel Sanctum with route protection guards.
+- Admin settings and summary reports are fully database-backed and processed via server-side endpoints, ensuring real-time consistency.
