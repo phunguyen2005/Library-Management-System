@@ -1,4 +1,4 @@
-export type BorrowStatus = 'pending' | 'borrowed' | 'returned' | 'rejected';
+export type BorrowStatus = 'pending' | 'approved' | 'borrowed' | 'returned' | 'rejected' | 'cancelled';
 export type DueStatus = 'none' | 'due_today' | 'due_soon' | 'overdue' | 'active' | 'returned';
 
 export interface BorrowRequestListItem {
@@ -20,10 +20,20 @@ export interface BorrowRequestListItem {
   days_overdue?: number;
   due_status?: DueStatus;
   raw_status: BorrowStatus;
+  fine?: {
+    fine_id: number;
+    amount: number;
+    reason?: string;
+    status: 'unpaid' | 'paid' | 'waived' | 'cancelled';
+    paid_at?: string | null;
+    waived_by?: number | null;
+    waived_reason?: string | null;
+  } | null;
 }
 
 export interface MemberBorrowRequest {
   id: number;
+  book_id?: number;
   bookTitle: string;
   author: string;
   cover?: string | null;
@@ -37,4 +47,14 @@ export interface MemberBorrowRequest {
   is_overdue?: boolean;
   days_overdue?: number;
   due_status?: DueStatus;
+  is_reviewed?: boolean;
+  fine?: {
+    fine_id: number;
+    amount: number;
+    reason?: string;
+    status: 'unpaid' | 'paid' | 'waived' | 'cancelled';
+    paid_at?: string | null;
+    waived_by?: number | null;
+    waived_reason?: string | null;
+  } | null;
 }
