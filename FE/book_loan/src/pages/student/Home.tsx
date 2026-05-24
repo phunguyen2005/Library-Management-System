@@ -1,7 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchBorrowableBooks } from '../../api/bookApi';
 import { getMyRequests } from '../../api/borrowApi';
+import { fetchAiRecommendations, type RecommendationRecord } from '../../api/aiApi';
+import { getFineSummary, type FineSummary } from '../../api/fineApi';
 import EmptyState from '../../components/EmptyState';
 import { applyImageFallback } from '../../lib/display';
 import { getErrorMessage } from '../../lib/errors';
@@ -24,9 +26,14 @@ const INITIAL_STATS: HomeStats = {
 
 export default function Home() {
   const navigate = useNavigate();
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [newBooks, setNewBooks] = useState<FormattedBook[]>([]);
+  const [bannerBooks, setBannerBooks] = useState<FormattedBook[]>([]);
   const [stats, setStats] = useState<HomeStats>(INITIAL_STATS);
+  const [fineSummary, setFineSummary] = useState<FineSummary>({ has_unpaid: false, total_unpaid: 0, count: 0 });
+  const [aiRecs, setAiRecs] = useState<RecommendationRecord[]>([]);
   const [isLoadingStats, setIsLoadingStats] = useState(true);
+  const [isLoadingRecs, setIsLoadingRecs] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -34,10 +41,16 @@ export default function Home() {
 
     const loadHomeData = async () => {
       setIsLoadingStats(true);
+      setIsLoadingRecs(true);
       setLoadError(null);
 
       try {
-        const [books, requests] = await Promise.all([fetchBorrowableBooks(), getMyRequests()]);
+        const [booksResponse, requests, recsResponse, fineSummaryResponse] = await Promise.all([
+          fetchBorrowableBooks(),
+          getMyRequests(),
+          fetchAiRecommendations(),
+          getFineSummary(),
+        ]);
         const borrowed = requests.filter((request) => request.status === 'borrowed');
         const pending = requests.filter((request) => request.status === 'pending');
         const overdue = borrowed.filter((request) => {
@@ -60,9 +73,12 @@ export default function Home() {
           activeLoans: borrowed.length,
           pendingRequests: pending.length,
           overdueLoans: overdue.length,
-          catalogCount: books.length,
+          catalogCount: booksResponse.meta?.total ?? booksResponse.data.length,
         });
-        setNewBooks(books.slice(0, 5));
+        setNewBooks(booksResponse.data.slice(0, 5));
+        setBannerBooks(booksResponse.data.filter((b) => b.is_available).slice(0, 5));
+        setAiRecs(recsResponse);
+        setFineSummary(fineSummaryResponse);
       } catch (error: unknown) {
         const message = getErrorMessage(error, 'Không thể tải dữ liệu trang chủ.');
 
@@ -73,6 +89,7 @@ export default function Home() {
       } finally {
         if (isActive) {
           setIsLoadingStats(false);
+          setIsLoadingRecs(false);
         }
       }
     };
@@ -83,6 +100,14 @@ export default function Home() {
       isActive = false;
     };
   }, []);
+
+  const scrollBanner = (direction: 'left' | 'right') => {
+    if (scrollContainerRef.current) {
+      const container = scrollContainerRef.current;
+      const scrollAmount = container.clientWidth;
+      container.scrollBy({ left: direction === 'left' ? -scrollAmount : scrollAmount, behavior: 'smooth' });
+    }
+  };
 
   const statCards = [
     {
@@ -116,67 +141,241 @@ export default function Home() {
   ];
 
   return (
-    <div className="space-y-10 p-8">
+    <div className="space-y-6 md:space-y-10 p-4 md:p-8">
       {loadError ? (
         <EmptyState icon="error" title="Không thể tải đầy đủ dữ liệu" message={loadError} />
       ) : null}
 
-      <section className="grid grid-cols-1 gap-6 md:grid-cols-4">
+      {fineSummary.has_unpaid ? (
+        <section className="flex flex-col gap-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-red-800 md:flex-row md:items-center">
+          <span className="material-symbols-outlined text-3xl text-red-600">warning</span>
+          <div className="flex-1">
+            <p className="text-sm font-bold">
+              Bạn có {fineSummary.count} khoản phạt chưa thanh toán
+            </p>
+            <p className="mt-1 text-xs text-red-700">
+              Tổng nợ hiện tại: <strong>{fineSummary.total_unpaid.toLocaleString('vi-VN')} VND</strong>.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate('/fines')}
+            className="w-fit rounded-lg bg-red-600 px-4 py-2 text-xs font-bold text-white hover:bg-red-700"
+          >
+            Xem chi tiết
+          </button>
+        </section>
+      ) : null}
+
+      <section className="grid grid-cols-2 gap-4 md:grid-cols-4">
         {statCards.map((card) => (
           <button
             key={card.label}
             type="button"
-            className={`group flex cursor-pointer items-center justify-between rounded-xl p-6 text-left scholar-shadow transition-transform hover:-translate-y-1 ${card.accent}`}
+            className={`group flex cursor-pointer items-center justify-between rounded-xl p-4 md:p-6 text-left scholar-shadow transition-transform hover:-translate-y-1 ${card.accent}`}
             onClick={card.onClick}
           >
-            <div>
-              <p className="mb-1 text-sm font-medium opacity-80">{card.label}</p>
-              <h3 className="text-4xl font-bold">{card.value}</h3>
+            <div className="min-w-0 flex-1">
+              <p className="mb-1 text-xs md:text-sm font-medium opacity-80 truncate">{card.label}</p>
+              <h3 className="text-2xl md:text-4xl font-bold truncate">{card.value}</h3>
             </div>
-            <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-white/20">
-              <span className="material-symbols-outlined text-3xl">{card.icon}</span>
+            <div className="flex h-10 w-10 md:h-14 md:w-14 shrink-0 items-center justify-center rounded-lg bg-white/20 ml-2">
+              <span className="material-symbols-outlined text-2xl md:text-3xl">{card.icon}</span>
             </div>
           </button>
         ))}
       </section>
 
-      <section className="scholar-shadow relative min-h-[320px] w-full overflow-hidden rounded-xl">
-        <div className="absolute inset-0 z-10 bg-gradient-to-r from-primary to-primary/40" />
-        <img
-          src="https://images.unsplash.com/photo-1507842217343-583bb7270b66?auto=format&fit=crop&q=80&w=2000"
-          alt="Library"
-          decoding="async"
-          fetchPriority="high"
-          className="absolute inset-0 h-full w-full object-cover"
-        />
-        <div className="relative z-20 flex min-h-[320px] h-full max-w-2xl flex-col justify-center p-8 md:p-12 text-white">
-          <span className="mb-4 inline-block w-fit rounded bg-tertiary px-3 py-1 text-[10px] font-bold uppercase tracking-widest">
-            Sách hay của tháng
-          </span>
-          <h2 className="mb-4 text-3xl md:text-5xl font-bold leading-tight text-wrap">
-            Nghệ Thuật Của Tư Duy Rành Mạch
-          </h2>
-          <p className="mb-8 text-lg text-primary-container opacity-90">
-            Khám phá 99 sai lầm nhận thức phổ biến và cách để đưa ra những quyết định sáng suốt hơn
-            mỗi ngày.
-          </p>
-          <div className="flex gap-4">
+      <section className="relative w-full rounded-xl group">
+        {isLoadingStats ? (
+          <div className="scholar-shadow relative min-h-[200px] md:min-h-[320px] w-full overflow-hidden rounded-xl bg-surface-container animate-pulse" />
+        ) : bannerBooks.length === 0 ? (
+          <div className="scholar-shadow flex min-h-[200px] md:min-h-[320px] w-full flex-col items-center justify-center overflow-hidden rounded-xl bg-surface-container text-on-surface-variant">
+            <span className="material-symbols-outlined mb-2 text-4xl">auto_stories</span>
+            <p>Chưa có sách nổi bật</p>
+          </div>
+        ) : (
+          <>
+            <div 
+              ref={scrollContainerRef}
+              className="flex w-full snap-x snap-mandatory overflow-x-auto scroll-smooth gap-4 md:gap-0 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            >
+              {bannerBooks.map((book) => (
+                <div
+                  key={book.id}
+                  className="scholar-shadow relative min-h-[200px] md:min-h-[320px] w-[90%] flex-none snap-center overflow-hidden rounded-xl md:w-full"
+                >
+                  <div className="absolute inset-0 z-10 bg-gradient-to-r from-primary/95 to-primary/40" />
+                  <img
+                    src={book.cover || "https://images.unsplash.com/photo-1507842217343-583bb7270b66?auto=format&fit=crop&q=80&w=2000"}
+                    alt={book.title}
+                    onError={(event) => applyImageFallback(event.currentTarget)}
+                    decoding="async"
+                    className="absolute inset-0 h-full w-full object-cover"
+                  />
+                  <div className="relative z-20 flex h-full min-h-[200px] md:min-h-[320px] max-w-2xl flex-col justify-center p-5 md:p-12 text-white">
+                    <span className="mb-2 md:mb-4 inline-block w-fit rounded bg-tertiary px-2 py-0.5 md:px-3 md:py-1 text-[9px] md:text-[10px] font-bold uppercase tracking-widest">
+                      Sách có thể mượn
+                    </span>
+                    <h2 className="mb-2 md:mb-4 text-xl font-bold leading-tight text-wrap line-clamp-2 md:text-5xl">
+                      {book.title}
+                    </h2>
+                    <p className="mb-4 md:mb-8 text-xs md:text-lg text-primary-container opacity-90 line-clamp-1">
+                      Tác giả: {book.author}
+                    </p>
+                    <div className="flex gap-2 md:gap-4">
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/catalog?book=${book.id}`)}
+                        className="rounded-lg bg-white px-4 py-2 md:px-6 md:py-3 text-xs md:text-sm font-bold text-primary transition-colors hover:bg-surface-container"
+                      >
+                        Mượn ngay
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/catalog?q=${encodeURIComponent(book.title)}`)}
+                        className="rounded-lg border border-white/30 bg-white/20 px-4 py-2 md:px-6 md:py-3 text-xs md:text-sm font-medium text-white backdrop-blur-md transition-colors hover:bg-white/30"
+                      >
+                        Xem chi tiết
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            
             <button
               type="button"
-              onClick={() => navigate('/catalog')}
-              className="rounded-lg bg-white px-6 py-3 font-bold text-primary transition-colors hover:bg-surface-container"
+              onClick={() => scrollBanner('left')}
+              className="absolute left-4 top-1/2 z-30 -translate-y-1/2 flex h-12 w-12 items-center justify-center rounded-full bg-black/30 text-white opacity-0 backdrop-blur-md transition-all hover:bg-black/50 hover:scale-110 group-hover:opacity-100"
+              aria-label="Sách trước"
             >
-              Mượn ngay
+              <span className="material-symbols-outlined text-3xl">chevron_left</span>
             </button>
             <button
               type="button"
-              onClick={() => navigate('/catalog?q=tư duy')}
-              className="rounded-lg border border-white/30 bg-white/20 px-6 py-3 font-medium text-white backdrop-blur-md transition-colors hover:bg-white/30"
+              onClick={() => scrollBanner('right')}
+              className="absolute right-4 top-1/2 z-30 -translate-y-1/2 flex h-12 w-12 items-center justify-center rounded-full bg-black/30 text-white opacity-0 backdrop-blur-md transition-all hover:bg-black/50 hover:scale-110 group-hover:opacity-100"
+              aria-label="Sách tiếp theo"
             >
-              Xem chi tiết
+              <span className="material-symbols-outlined text-3xl">chevron_right</span>
             </button>
+          </>
+        )}
+      </section>
+
+      {/* AI Recommendations Section */}
+      <section className="space-y-6">
+        <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-primary text-2xl animate-pulse">sparkles</span>
+              <h3 className="text-2xl font-bold text-on-surface">Gợi ý từ Thủ thư AI HCMUE</h3>
+            </div>
+            <p className="text-sm text-on-surface-variant mt-1">
+              Các tựa sách được đề xuất cá nhân hóa dựa trên lịch sử đọc và sở thích của bạn
+            </p>
           </div>
         </div>
+
+        {isLoadingRecs ? (
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+            {[1, 2, 3].map((n) => (
+              <div key={n} className="flex gap-4 rounded-2xl border border-surface-container-high bg-surface-container-low p-4 animate-pulse">
+                <div className="h-32 w-24 shrink-0 rounded-lg bg-surface-container-high" />
+                <div className="flex-1 space-y-3 py-1">
+                  <div className="h-4 w-3/4 rounded bg-surface-container-high" />
+                  <div className="h-3 w-1/2 rounded bg-surface-container-high" />
+                  <div className="h-10 w-full rounded bg-surface-container-high" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : aiRecs.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-surface-container-high p-8 text-center text-on-surface-variant bg-surface-bright">
+            <span className="material-symbols-outlined text-4xl mb-2 text-outline">smart_toy</span>
+            <p className="text-sm font-semibold">Thủ thư AI chưa thể gợi ý sách cho bạn</p>
+            <p className="text-xs mt-1 text-on-surface-variant">Hãy mượn thêm sách hoặc đưa sách vào danh mục Yêu thích để AI hiểu gu đọc của bạn nhé!</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
+            {aiRecs.slice(0, 3).map((item, idx) => (
+              <div
+                key={item.book.id}
+                className="group flex flex-col rounded-2xl border border-surface-container-high bg-surface-bright scholar-shadow transition-all duration-300 hover:-translate-y-1 hover:border-primary/30 hover:shadow-lg overflow-hidden"
+              >
+                {/* Card Header: Cover + Metadata */}
+                <div className="flex gap-4 p-4 pb-3">
+                  {/* Book Cover */}
+                  <div className="relative h-28 w-20 shrink-0 overflow-hidden rounded-xl bg-surface-container shadow-md">
+                    <img
+                      src={item.book.cover}
+                      alt={item.book.title}
+                      onError={(event) => applyImageFallback(event.currentTarget)}
+                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      loading="lazy"
+                    />
+                    {/* Rank badge */}
+                    <div className="absolute bottom-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-black text-white shadow-md shadow-primary/40">
+                      {idx + 1}
+                    </div>
+                  </div>
+
+                  {/* Book info */}
+                  <div className="flex min-w-0 flex-1 flex-col gap-1">
+                    {/* AI Choice badge */}
+                    <span className="inline-flex w-fit items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-primary border border-primary/20">
+                      <span className="material-symbols-outlined text-[10px]">auto_awesome</span>
+                      AI gợi ý
+                    </span>
+
+                    {/* Category */}
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-outline">
+                      {item.book.category}
+                    </span>
+
+                    {/* Title */}
+                    <h4 className="line-clamp-2 text-sm font-bold leading-snug text-on-surface transition-colors group-hover:text-primary">
+                      {item.book.title}
+                    </h4>
+
+                    {/* Author */}
+                    <p className="line-clamp-1 text-xs text-on-surface-variant">
+                      {item.book.author}
+                    </p>
+
+                    {/* Availability */}
+                    <span className={`mt-auto w-fit rounded-full px-2 py-0.5 text-[9px] font-bold uppercase ${item.book.is_available ? 'bg-green-500/10 text-green-600 border border-green-500/20' : 'bg-tertiary/10 text-tertiary border border-tertiary/20'}`}>
+                      {item.book.is_available ? '● Còn sách' : '○ Hết sách'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* AI Reason quote */}
+                <div className="mx-4 mb-3 rounded-xl bg-primary/5 border border-primary/10 p-3 relative">
+                  <span className="absolute -top-2 left-3 rounded bg-surface-bright border border-primary/20 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-primary">
+                    Thủ thư khuyên
+                  </span>
+                  <p className="mt-1 text-[11px] italic leading-relaxed text-on-surface-variant line-clamp-3">
+                    "{item.reason.replace(/^[""]|[""]$/g, '').replace(/^"|"$/g, '')}"
+                  </p>
+                </div>
+
+                {/* CTA Button */}
+                <div className="mt-auto border-t border-surface-container-high px-4 py-3">
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/catalog?book=${item.book.id}`)}
+                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary/10 border border-primary/20 px-4 py-2 text-xs font-bold text-primary transition-all duration-200 hover:bg-primary hover:text-white cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-sm">auto_stories</span>
+                    Xem & Mượn ngay
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
       <section className="space-y-6">
@@ -198,7 +397,7 @@ export default function Home() {
             message="Danh mục sẽ xuất hiện khi kết nối được với API thư viện."
           />
         ) : (
-          <div className="grid grid-cols-2 gap-8 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+          <div className="grid grid-cols-2 gap-4 md:gap-8 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {newBooks.map((book) => (
             <div
               key={book.id}
