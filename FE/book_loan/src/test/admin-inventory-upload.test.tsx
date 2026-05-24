@@ -46,9 +46,9 @@ const uploadedBook: FormattedBook = {
   digital_file_name: 'lesson.pdf',
 };
 
-const fetchBooksMock = vi.fn(async () => []);
-const fetchBorrowableBooksMock = vi.fn(async () => [borrowBook]);
-const fetchDigitalResourceBooksMock = vi.fn(async () => []);
+const fetchBooksMock = vi.fn(async () => ({ data: [] }));
+const fetchBorrowableBooksMock = vi.fn(async () => ({ data: [borrowBook] }));
+const fetchDigitalResourceBooksMock = vi.fn(async () => ({ data: [] }));
 const addBookMock = vi.fn(async (_payload: unknown) => uploadedBook);
 const addBorrowableBookMock = vi.fn(async (_payload: unknown) => borrowBook);
 const addDigitalResourceMock = vi.fn(async (_payload: unknown) => uploadedBook);
@@ -74,6 +74,10 @@ vi.mock('../api/bookApi', () => ({
   uploadDigitalFile: (bookId: unknown, file: unknown) => uploadDigitalFileMock(bookId, file),
 }));
 
+vi.mock('../api/aiApi', () => ({
+  generateBookMetadata: vi.fn(),
+}));
+
 function renderAdminInventory() {
   return render(
     <MemoryRouter>
@@ -84,9 +88,9 @@ function renderAdminInventory() {
 
 describe('AdminInventory digital upload', () => {
   beforeEach(() => {
-    fetchBooksMock.mockResolvedValue([]);
-    fetchBorrowableBooksMock.mockResolvedValue([borrowBook]);
-    fetchDigitalResourceBooksMock.mockResolvedValue([]);
+    fetchBooksMock.mockResolvedValue({ data: [] });
+    fetchBorrowableBooksMock.mockResolvedValue({ data: [borrowBook] });
+    fetchDigitalResourceBooksMock.mockResolvedValue({ data: [] });
     addBookMock.mockResolvedValue(uploadedBook);
     addBorrowableBookMock.mockResolvedValue(borrowBook);
     addDigitalResourceMock.mockResolvedValue(uploadedBook);
