@@ -19,6 +19,8 @@ class UpdateProfileRequest extends FormRequest
             'phone_number' => ['nullable', 'string', 'max:15'],
             'current_password' => ['required_with:password', 'nullable', 'string'],
             'password' => ['nullable', 'confirmed', Password::min(8)->letters()->numbers()],
+            'notify_due_soon' => ['sometimes', 'boolean'],
+            'notify_new_books' => ['sometimes', 'boolean'],
         ];
     }
 
