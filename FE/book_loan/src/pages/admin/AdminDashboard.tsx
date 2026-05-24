@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { deleteBook, fetchBooks } from '../../api/bookApi';
+import { API_BASE_URL } from '../../api/client';
 import {
   approveBorrow,
   getAllRequests,
@@ -9,6 +10,7 @@ import {
   type BorrowRequest,
 } from '../../api/borrowApi';
 import { getAllMembers } from '../../api/userApi';
+import { fetchHealthStatus, type HealthStatus } from '../../api/healthApi';
 import EmptyState from '../../components/EmptyState';
 import { applyImageFallback } from '../../lib/display';
 import { getErrorMessage, isUnauthorizedError } from '../../lib/errors';
@@ -95,6 +97,7 @@ export default function AdminDashboard() {
   const [inventoryBooks, setInventoryBooks] = useState<DashboardInventoryBook[]>([]);
   const [allRequests, setAllRequests] = useState<BorrowRequest[]>([]);
   const [stats, setStats] = useState<DashboardStats>(INITIAL_STATS);
+  const [health, setHealth] = useState<HealthStatus | null>(null);
   const [quickForm, setQuickForm] = useState<QuickActionForm>({ memberId: '', bookId: '' });
   const [quickFeedback, setQuickFeedback] = useState<QuickActionFeedback | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -106,14 +109,16 @@ export default function AdminDashboard() {
   const loadDashboard = async () => {
     try {
       setLoadError(null);
-      const [books, requests, members] = await Promise.all([
+      const [books, requests, members, healthStatus] = await Promise.all([
         fetchBooks(),
         getAllRequests(),
         getAllMembers(),
+        fetchHealthStatus().catch(() => null),
       ]);
 
       setAllRequests(requests);
-      setInventoryBooks(books.map(mapInventoryBook));
+      setHealth(healthStatus);
+      setInventoryBooks(books.data.map(mapInventoryBook));
 
       const pending = requests.filter((request) => request.raw_status === 'pending');
       const returned = requests.filter((request) => request.raw_status === 'returned');
@@ -134,8 +139,8 @@ export default function AdminDashboard() {
       setStats({
         requests: pending.length,
         overdue,
-        books: books.length,
-        members: members.length,
+        books: books.meta?.total ?? books.data.length,
+        members: members.meta?.total ?? members.data.length,
       });
     } catch (error: unknown) {
       if (isUnauthorizedError(error)) {
@@ -415,13 +420,16 @@ export default function AdminDashboard() {
     URL.revokeObjectURL(url);
   };
 
+  const healthIsOk = health?.status === 'ok';
+  const apiDocsUrl = `${API_BASE_URL}/docs`;
+
   return (
     <div className="p-8 space-y-8 max-w-7xl mx-auto w-full">
       {loadError ? (
         <EmptyState icon="error" title="Không thể tải đầy đủ dashboard" message={loadError} />
       ) : null}
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-5">
         <div className="bg-surface-bright p-6 rounded-xl scholar-shadow border border-surface-container-low">
           <div className="w-12 h-12 rounded-lg bg-primary/10 text-primary flex items-center justify-center mb-4">
             <span className="material-symbols-outlined">pending_actions</span>
@@ -450,6 +458,24 @@ export default function AdminDashboard() {
           <p className="text-outline text-xs font-bold uppercase tracking-wider">Thành viên</p>
           <h3 className="text-3xl font-bold mt-1">{stats.members.toLocaleString('vi-VN')}</h3>
         </div>
+        <button
+          type="button"
+          onClick={() => window.open(apiDocsUrl, '_blank', 'noopener,noreferrer')}
+          className="bg-surface-bright p-6 rounded-xl scholar-shadow border border-surface-container-low text-left transition-transform hover:-translate-y-1"
+        >
+          <div
+            className={`w-12 h-12 rounded-lg flex items-center justify-center mb-4 ${
+              healthIsOk ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
+            }`}
+          >
+            <span className="material-symbols-outlined">
+              {healthIsOk ? 'monitor_heart' : 'warning'}
+            </span>
+          </div>
+          <p className="text-outline text-xs font-bold uppercase tracking-wider">System health</p>
+          <h3 className="text-3xl font-bold mt-1">{health ? (healthIsOk ? 'OK' : 'DEG') : '...'}</h3>
+          <p className="mt-1 text-[10px] font-medium text-outline">API docs & checks</p>
+        </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
