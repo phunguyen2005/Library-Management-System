@@ -1,3 +1,5 @@
+import i18n, { getIntlLocale } from '../i18n';
+
 export const FALLBACK_COVER_URL =
   'https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&q=80&w=600';
 
@@ -39,7 +41,11 @@ export function formatDisplayDate(value?: string | null, fallback = 'N/A') {
     return fallback;
   }
 
-  return date.toLocaleDateString('vi-VN');
+  return date.toLocaleDateString(getIntlLocale());
+}
+
+export function formatDisplayCurrency(value: string | number) {
+  return `${Number(value || 0).toLocaleString(getIntlLocale())} VND`;
 }
 
 export function getLoanDueLabel(value?: string | null, now = new Date()) {
@@ -47,7 +53,7 @@ export function getLoanDueLabel(value?: string | null, now = new Date()) {
 
   if (!dueDate) {
     return {
-      label: 'Chưa có hạn trả',
+      label: i18n.t('due.none'),
       isWarning: false,
       isOverdue: false,
       daysDelta: 0,
@@ -60,7 +66,7 @@ export function getLoanDueLabel(value?: string | null, now = new Date()) {
 
   if (daysDelta < 0) {
     return {
-      label: `Quá hạn ${Math.abs(daysDelta)} ngày`,
+      label: i18n.t('due.overdue', { count: Math.abs(daysDelta) }),
       isWarning: true,
       isOverdue: true,
       daysDelta,
@@ -69,7 +75,7 @@ export function getLoanDueLabel(value?: string | null, now = new Date()) {
 
   if (daysDelta === 0) {
     return {
-      label: 'Đến hạn hôm nay',
+      label: i18n.t('due.today'),
       isWarning: true,
       isOverdue: false,
       daysDelta,
@@ -77,7 +83,7 @@ export function getLoanDueLabel(value?: string | null, now = new Date()) {
   }
 
   return {
-    label: `Còn ${daysDelta} ngày`,
+    label: i18n.t('due.remaining', { count: daysDelta }),
     isWarning: daysDelta <= 3,
     isOverdue: false,
     daysDelta,
