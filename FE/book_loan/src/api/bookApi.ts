@@ -5,12 +5,10 @@ import type {
   FormattedBook,
 } from '../types/book';
 import { getCoverUrl } from '../lib/display';
+import type { PaginatedResponse } from '../types/pagination';
+import i18n from '../i18n';
 
 export type { DigitalDocument } from '../types/book';
-
-type PaginatedResponse<T> = {
-  data: T[];
-};
 
 export type BookPayload = {
   title: string;
@@ -34,14 +32,10 @@ function toStatusColor(isAvailable: boolean) {
 }
 
 function toStatus(isAvailable: boolean) {
-  return isAvailable ? 'Sẵn có' : 'Hết sách';
+  return isAvailable ? i18n.t('status.available') : i18n.t('status.unavailable');
 }
 
-function unwrapCollection<T>(payload: T[] | PaginatedResponse<T>) {
-  return Array.isArray(payload) ? payload : payload.data;
-}
-
-function normalizeBook(book: BookApiRecord): FormattedBook {
+export function normalizeBook(book: BookApiRecord): FormattedBook {
   const availableQuantity = Number(book.available_quantity ?? 0);
   const totalQuantity = Number(book.total_quantity ?? 0);
   const isAvailable = Boolean(book.is_available) && availableQuantity > 0;
@@ -56,6 +50,7 @@ function normalizeBook(book: BookApiRecord): FormattedBook {
     genre: book.genre || 'Khac',
     location: book.location || 'Khu A',
     status: toStatus(isAvailable),
+    statusKey: isAvailable ? 'available' : 'unavailable',
     statusColor: toStatusColor(isAvailable),
     cover: getCoverUrl(book.cover),
     quantity: totalQuantity || 0,
@@ -69,33 +64,64 @@ function normalizeBook(book: BookApiRecord): FormattedBook {
     has_digital_file: Boolean(book.has_digital_file),
     digital_file_name: book.digital_file_name || null,
     download_count: Number(book.download_count ?? 0),
+    favorite_count: Number(book.favorite_count ?? 0),
+    is_favorite: Boolean(book.is_favorite),
+    avg_rating: Number(book.avg_rating ?? 0),
+    reviews_count: Number(book.reviews_count ?? 0),
+    ai_summary: book.ai_summary || null,
+    ai_tags: Array.isArray(book.ai_tags) ? book.ai_tags : [],
+    ai_summary_generated_at: book.ai_summary_generated_at || null,
   };
 }
 
-export async function fetchBooks() {
-  const data = await apiRequest<BookApiRecord[] | PaginatedResponse<BookApiRecord>>('/books?limit=1000');
-  return unwrapCollection(data).map(normalizeBook);
+export function unwrapCollection<T>(payload: T[] | PaginatedResponse<T>): T[] {
+  if (Array.isArray(payload)) {
+    return payload;
+  }
+  if (payload && 'data' in payload && Array.isArray(payload.data)) {
+    return payload.data;
+  }
+  return [];
 }
 
-export async function fetchBorrowableBooks() {
-  const data = await apiRequest<BookApiRecord[] | PaginatedResponse<BookApiRecord>>(
-    '/books?is_digital=false&limit=1000'
+export async function fetchBooks(page = 1, query = '') {
+  const data = await apiRequest<PaginatedResponse<BookApiRecord>>(
+    `/books?limit=10&page=${page}&query=${encodeURIComponent(query)}`
   );
-  return unwrapCollection(data).map(normalizeBook);
+  return {
+    ...data,
+    data: data.data.map(normalizeBook),
+  };
 }
 
-export async function fetchDigitalResourceBooks() {
-  const data = await apiRequest<BookApiRecord[] | PaginatedResponse<BookApiRecord>>(
-    '/books?is_digital=true&limit=1000'
+export async function fetchBorrowableBooks(page = 1, query = '') {
+  const data = await apiRequest<PaginatedResponse<BookApiRecord>>(
+    `/books?is_digital=false&limit=10&page=${page}&query=${encodeURIComponent(query)}`
   );
-  return unwrapCollection(data).map(normalizeBook);
+  return {
+    ...data,
+    data: data.data.map(normalizeBook),
+  };
 }
 
-export async function searchBooks(query: string) {
-  const data = await apiRequest<BookApiRecord[] | PaginatedResponse<BookApiRecord>>(
-    `/books?query=${encodeURIComponent(query)}&limit=1000`
+export async function fetchDigitalResourceBooks(page = 1, query = '') {
+  const data = await apiRequest<PaginatedResponse<BookApiRecord>>(
+    `/books?is_digital=true&limit=10&page=${page}&query=${encodeURIComponent(query)}`
   );
-  return unwrapCollection(data).map(normalizeBook);
+  return {
+    ...data,
+    data: data.data.map(normalizeBook),
+  };
+}
+
+export async function searchBooks(query: string, page = 1) {
+  const data = await apiRequest<PaginatedResponse<BookApiRecord>>(
+    `/books?query=${encodeURIComponent(query)}&limit=10&page=${page}`
+  );
+  return {
+    ...data,
+    data: data.data.map(normalizeBook),
+  };
 }
 
 export async function addBook(payload: BookPayload) {
@@ -184,11 +210,13 @@ export async function deleteBook(bookId: number) {
 }
 
 export async function fetchDigitalDocuments() {
-  const data = await apiRequest<BookApiRecord[] | PaginatedResponse<BookApiRecord>>(
+  const response = await apiRequest<PaginatedResponse<BookApiRecord> | BookApiRecord[]>(
     '/digital-documents'
   );
 
-  return unwrapCollection(data).map((book) => {
+  const data = unwrapCollection(response);
+
+  return data.map((book) => {
     const format = (book.file_format || 'PDF').toUpperCase();
 
     return {
@@ -213,6 +241,26 @@ export async function fetchDigitalDocuments() {
       openUrl: book.open_url || null,
       downloadUrl: book.download_url || book.open_url || null,
       hasAttachedFile: Boolean(book.has_attached_file),
+      aiSummary: book.ai_summary || null,
+      aiTags: Array.isArray(book.ai_tags) ? book.ai_tags : [],
+      aiSummaryGeneratedAt: book.ai_summary_generated_at || null,
+      readingProgress: null,
     } satisfies DigitalDocumentType;
+  });
+}
+
+export async function autocompleteBooks(q: string) {
+  return apiRequest<BookApiRecord[]>(`/books/autocomplete?q=${encodeURIComponent(q)}`, {
+    auth: false,
+    method: 'GET',
+  }).then(books => books.map(normalizeBook));
+}
+
+export async function importBooks(file: File) {
+  const formData = new FormData();
+  formData.append('file', file);
+  return apiRequest<{ message: string; success_count: number; errors: string[] }>('/books/import', {
+    method: 'POST',
+    body: formData,
   });
 }
