@@ -23,10 +23,13 @@ class DatabaseSeeder extends Seeder
         // ]);
 
         $this->call([
+            RolePermissionSeeder::class,
             LibrarianSeeder::class,
             MemberSeeder::class,
             BookSeeder::class,
             BorrowingSeeder::class,
+            RoomSeeder::class,
+            FineSeeder::class,
         ]);
     }
 }
