@@ -143,7 +143,7 @@ export default function MyBooks() {
   }, []);
 
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       <div className="mb-8 flex flex-col gap-6">
         <div>
           <h2 className="text-3xl font-bold text-on-surface">Sách của tôi</h2>
@@ -242,47 +242,85 @@ export default function MyBooks() {
           )}
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl bg-surface-bright scholar-shadow">
-          <table className="w-full text-left">
-            <thead className="bg-surface-container-low text-xs uppercase tracking-widest text-on-surface-variant">
-              <tr>
-                <th className="px-6 py-4">Tên sách</th>
-                <th className="px-6 py-4">Ngày mượn</th>
-                <th className="px-6 py-4">Ngày trả</th>
-                <th className="px-6 py-4">Trạng thái</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-surface-container-low">
-              {historyBooks.length === 0 ? (
-                <tr>
-                  <td colSpan={4} className="px-6 py-8">
-                    <EmptyState
-                      icon="history_edu"
-                      title="Chưa có lịch sử mượn"
-                      message="Các sách đã trả sẽ được lưu lại tại đây."
-                    />
-                  </td>
-                </tr>
-              ) : (
-                historyBooks.map((book) => (
-                <tr key={book.id} className="transition-colors hover:bg-slate-50">
-                  <td className="px-6 py-4">
-                    <p className="text-sm font-bold">{book.title}</p>
-                    <p className="text-xs text-on-surface-variant">{book.author}</p>
-                  </td>
-                  <td className="px-6 py-4 text-sm font-medium">{book.borrowDate}</td>
-                  <td className="px-6 py-4 text-sm font-medium text-slate-700">{book.returnDate}</td>
-                  <td className="px-6 py-4">
-                    <span className="rounded bg-surface-container px-2 py-1 text-[10px] font-bold uppercase">
+        <>
+          {/* Mobile History Card List */}
+          <div className="block md:hidden space-y-4">
+            {historyBooks.length === 0 ? (
+              <EmptyState
+                icon="history_edu"
+                title="Chưa có lịch sử mượn"
+                message="Các sách đã trả sẽ được lưu lại tại đây."
+              />
+            ) : (
+              historyBooks.map((book) => (
+                <div key={book.id} className="rounded-xl border border-surface-container bg-surface-bright p-4 scholar-shadow">
+                  <div className="flex justify-between items-start gap-2">
+                    <div className="min-w-0">
+                      <h4 className="font-bold text-sm text-on-surface line-clamp-2">{book.title}</h4>
+                      <p className="text-xs text-on-surface-variant mt-0.5">{book.author}</p>
+                    </div>
+                    <span className="shrink-0 rounded bg-surface-container px-2 py-0.5 text-[9px] font-bold uppercase text-on-surface-variant">
                       Đã trả
                     </span>
-                  </td>
+                  </div>
+                  <div className="mt-3 flex justify-between text-[11px] text-on-surface-variant border-t border-outline-variant pt-2">
+                    <div>
+                      <span className="text-outline uppercase text-[9px] font-bold block">Ngày mượn</span>
+                      <span className="font-semibold text-on-surface">{book.borrowDate}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-outline uppercase text-[9px] font-bold block">Ngày trả</span>
+                      <span className="font-semibold text-on-surface">{book.returnDate}</span>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Desktop History Table */}
+          <div className="hidden md:block overflow-hidden rounded-xl bg-surface-bright scholar-shadow">
+            <table className="w-full text-left">
+              <thead className="bg-surface-container-low text-xs uppercase tracking-widest text-on-surface-variant">
+                <tr>
+                  <th className="px-6 py-4">Tên sách</th>
+                  <th className="px-6 py-4">Ngày mượn</th>
+                  <th className="px-6 py-4">Ngày trả</th>
+                  <th className="px-6 py-4">Trạng thái</th>
                 </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-surface-container-low">
+                {historyBooks.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="px-6 py-8">
+                      <EmptyState
+                        icon="history_edu"
+                        title="Chưa có lịch sử mượn"
+                        message="Các sách đã trả sẽ được lưu lại tại đây."
+                      />
+                    </td>
+                  </tr>
+                ) : (
+                  historyBooks.map((book) => (
+                  <tr key={book.id} className="transition-colors hover:bg-slate-50">
+                    <td className="px-6 py-4">
+                      <p className="text-sm font-bold">{book.title}</p>
+                      <p className="text-xs text-on-surface-variant">{book.author}</p>
+                    </td>
+                    <td className="px-6 py-4 text-sm font-medium">{book.borrowDate}</td>
+                    <td className="px-6 py-4 text-sm font-medium text-slate-700">{book.returnDate}</td>
+                    <td className="px-6 py-4">
+                      <span className="rounded bg-surface-container px-2 py-1 text-[10px] font-bold uppercase">
+                        Đã trả
+                      </span>
+                    </td>
+                  </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
     </div>
   );
