@@ -1,4 +1,4 @@
-# 📚 Book Loan Midterm — Enterprise Digital Library & Co-Working Ecosystem
+# 📚 Library-Management-System — Enterprise Digital Library & Co-Working Ecosystem
 
 [![Laravel Version](https://img.shields.io/badge/Laravel-12.x-red.svg?style=flat-round&logo=laravel)](https://laravel.com)
 [![React Version](https://img.shields.io/badge/React-19.x-blue.svg?style=flat-round&logo=react)](https://react.dev)
