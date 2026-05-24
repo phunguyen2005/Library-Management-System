@@ -21,6 +21,7 @@ type AuthContextValue = {
   setSession: (session: AuthSession) => void;
   updateUser: (user: AuthUser) => void;
   logout: () => Promise<void>;
+  hasPermission: (permission: string) => boolean;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -132,6 +133,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsAuthReady(true);
     }
   };
+  
+  const hasPermission = React.useCallback(
+    (permission: string) => {
+      if (session?.role === 'admin') return true;
+      if (!session?.user?.permissions) return false;
+      return session.user.permissions.includes(permission);
+    },
+    [session]
+  );
 
   const value = useMemo<AuthContextValue>(
     () => ({
@@ -143,8 +153,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession,
       updateUser,
       logout,
+      hasPermission,
     }),
-    [isAuthReady, session]
+    [isAuthReady, session, hasPermission]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
