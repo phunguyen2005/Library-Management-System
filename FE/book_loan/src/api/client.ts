@@ -1,6 +1,7 @@
 import { getStoredToken } from '../auth/storage';
 import { emitAuthExpired, emitToast } from '../notifications/events';
 import { ApiError } from '../lib/errors';
+import i18n, { getCurrentLanguage } from '../i18n';
 
 const DEFAULT_API_BASE_URL = 'http://localhost:8000/api';
 const GET_CACHE_TTL_MS = 15_000;
@@ -58,7 +59,7 @@ async function performRequest<T>(
     : await response.text().catch(() => null);
 
   if (!response.ok) {
-    const fallbackMessage = `Yêu cầu thất bại với mã trạng thái ${response.status}`;
+    const fallbackMessage = i18n.t('api.requestFailed', { status: response.status });
     const message =
       typeof payload === 'object' && payload && 'message' in payload
         ? String(payload.message)
@@ -69,10 +70,10 @@ async function performRequest<T>(
     if (response.status === 401 && token) {
       emitToast({
         tone: 'error',
-        title: 'Phiên đăng nhập đã hết hạn',
-        message: 'Vui lòng đăng nhập lại để tiếp tục sử dụng hệ thống.',
+        title: i18n.t('api.sessionExpiredTitle'),
+        message: i18n.t('api.sessionExpiredMessage'),
       });
-      emitAuthExpired(message || 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+      emitAuthExpired(message || i18n.t('api.sessionExpiredFallback'));
     }
 
     throw new ApiError(message, { status: response.status, details: payload });
@@ -92,6 +93,9 @@ export async function apiRequest<T>(path: string, options: ApiOptions = {}): Pro
     headers.set('Accept', 'application/json');
   }
 
+  const language = getCurrentLanguage();
+  headers.set('Accept-Language', language);
+
   const isFormData = typeof FormData !== 'undefined' && requestOptions.body instanceof FormData;
 
   if (requestOptions.body !== undefined && !isFormData) {
@@ -103,7 +107,7 @@ export async function apiRequest<T>(path: string, options: ApiOptions = {}): Pro
   }
 
   if (method === 'GET' && !requestOptions.signal) {
-    const cacheKey = `${token ?? 'guest'}:${url}`;
+    const cacheKey = `${language}:${token ?? 'guest'}:${url}`;
     const cached = responseCache.get(cacheKey);
 
     if (cached && cached.expiresAt > Date.now()) {
