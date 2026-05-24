@@ -14,6 +14,8 @@ function toneStyles(tone: ToastTone) {
       return 'border-emerald-200 bg-emerald-50 text-emerald-900';
     case 'error':
       return 'border-rose-200 bg-rose-50 text-rose-900';
+    case 'warning':
+      return 'border-amber-200 bg-amber-50 text-amber-900';
     default:
       return 'border-sky-200 bg-sky-50 text-sky-900';
   }
@@ -70,7 +72,13 @@ export default function ToastViewport() {
         >
           <div className="flex items-start gap-3">
             <span className="material-symbols-outlined mt-0.5 text-[20px]">
-              {toast.tone === 'success' ? 'task_alt' : toast.tone === 'error' ? 'error' : 'info'}
+              {toast.tone === 'success'
+                ? 'task_alt'
+                : toast.tone === 'error'
+                  ? 'error'
+                  : toast.tone === 'warning'
+                    ? 'warning'
+                    : 'info'}
             </span>
             <div className="min-w-0 flex-1">
               {toast.title ? <p className="text-sm font-semibold">{toast.title}</p> : null}
