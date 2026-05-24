@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { fetchLibrarySettings, updateLibrarySettings, type LibrarySettings } from '../../api/librarySettingsApi';
+import { getActiveDevices, revokeDevice, type DeviceSession } from '../../api/authApi';
 import { updateMyProfile } from '../../api/userApi';
 import { useAuth } from '../../auth/AuthContext';
 import { getErrorMessage, isUnauthorizedError } from '../../lib/errors';
@@ -8,6 +9,18 @@ import { emitToast } from '../../notifications/events';
 const defaultSettings: LibrarySettings = {
   loan_period_days: 14,
   max_active_loans: 5,
+  fine_per_day: 5000,
+  max_fine_per_loan: 200000,
+  grace_period_days: 0,
+  room_max_hours_per_booking: 3,
+  room_max_bookings_per_day: 2,
+  room_advance_booking_days: 7,
+  room_min_group_size: 2,
+  room_checkin_window_minutes: 15,
+  room_booking_requires_approval: false,
+  room_open_time: '07:00',
+  room_close_time: '21:00',
+  room_cancel_deadline_hours: 2,
 };
 
 type ProfileForm = {
@@ -38,6 +51,30 @@ export default function AdminSettings() {
   const [settingsFeedback, setSettingsFeedback] = useState<string | null>(null);
   const [settingsError, setSettingsError] = useState<string | null>(null);
   const [profileFeedback, setProfileFeedback] = useState<string | null>(null);
+  const [devices, setDevices] = useState<DeviceSession[]>([]);
+  const [loadingDevices, setLoadingDevices] = useState(true);
+
+  const fetchDevices = async () => {
+    try {
+      setLoadingDevices(true);
+      const res = await getActiveDevices();
+      setDevices(res);
+    } catch (e) {
+      // Ignore
+    } finally {
+      setLoadingDevices(false);
+    }
+  };
+
+  const handleRevoke = async (tokenId: string) => {
+    try {
+      await revokeDevice(tokenId);
+      emitToast({ tone: 'success', title: 'Thành công', message: 'Đã hủy phiên làm việc của thiết bị thành công.' });
+      setDevices((prev) => prev.filter((d) => d.token_id !== tokenId));
+    } catch (error: any) {
+      emitToast({ tone: 'error', title: 'Thất bại', message: error?.message || 'Không thể hủy phiên đăng nhập.' });
+    }
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -55,6 +92,18 @@ export default function AdminSettings() {
           ...defaultSettings,
           loan_period_days: data.loan_period_days,
           max_active_loans: data.max_active_loans,
+          fine_per_day: data.fine_per_day ?? 5000,
+          max_fine_per_loan: data.max_fine_per_loan ?? 200000,
+          grace_period_days: data.grace_period_days ?? 0,
+          room_max_hours_per_booking: data.room_max_hours_per_booking ?? 3,
+          room_max_bookings_per_day: data.room_max_bookings_per_day ?? 2,
+          room_advance_booking_days: data.room_advance_booking_days ?? 7,
+          room_min_group_size: data.room_min_group_size ?? 2,
+          room_checkin_window_minutes: data.room_checkin_window_minutes ?? 15,
+          room_booking_requires_approval: data.room_booking_requires_approval ?? false,
+          room_open_time: data.room_open_time ?? '07:00',
+          room_close_time: data.room_close_time ?? '21:00',
+          room_cancel_deadline_hours: data.room_cancel_deadline_hours ?? 2,
         });
       })
       .catch((error: unknown) => {
@@ -71,6 +120,8 @@ export default function AdminSettings() {
           setIsLoadingSettings(false);
         }
       });
+
+    fetchDevices();
 
     return () => {
       isMounted = false;
@@ -138,12 +189,36 @@ export default function AdminSettings() {
       const response = await updateLibrarySettings({
         loan_period_days: settings.loan_period_days,
         max_active_loans: settings.max_active_loans,
+        fine_per_day: settings.fine_per_day,
+        max_fine_per_loan: settings.max_fine_per_loan,
+        grace_period_days: settings.grace_period_days,
+        room_max_hours_per_booking: settings.room_max_hours_per_booking,
+        room_max_bookings_per_day: settings.room_max_bookings_per_day,
+        room_advance_booking_days: settings.room_advance_booking_days,
+        room_min_group_size: settings.room_min_group_size,
+        room_checkin_window_minutes: settings.room_checkin_window_minutes,
+        room_booking_requires_approval: settings.room_booking_requires_approval,
+        room_open_time: settings.room_open_time,
+        room_close_time: settings.room_close_time,
+        room_cancel_deadline_hours: settings.room_cancel_deadline_hours,
       });
 
       setSettings({
         ...settings,
         loan_period_days: response.loan_period_days,
         max_active_loans: response.max_active_loans,
+        fine_per_day: response.fine_per_day,
+        max_fine_per_loan: response.max_fine_per_loan,
+        grace_period_days: response.grace_period_days,
+        room_max_hours_per_booking: response.room_max_hours_per_booking,
+        room_max_bookings_per_day: response.room_max_bookings_per_day,
+        room_advance_booking_days: response.room_advance_booking_days,
+        room_min_group_size: response.room_min_group_size,
+        room_checkin_window_minutes: response.room_checkin_window_minutes,
+        room_booking_requires_approval: response.room_booking_requires_approval,
+        room_open_time: response.room_open_time,
+        room_close_time: response.room_close_time,
+        room_cancel_deadline_hours: response.room_cancel_deadline_hours,
       });
 
       const message = 'Đã cập nhật quy tắc mượn sách.';
@@ -425,11 +500,336 @@ export default function AdminSettings() {
                     className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-slate-50"
                   />
                 </label>
+                <label className="space-y-2 md:col-span-2">
+                  <span className="block text-xs font-bold uppercase tracking-widest text-slate-500">
+                    Phí phạt trễ hạn mỗi ngày (VND)
+                  </span>
+                  <input
+                    aria-label="Phí phạt trễ hạn mỗi ngày"
+                    data-testid="fine-per-day"
+                    type="number"
+                    min={0}
+                    max={1000000}
+                    value={settings.fine_per_day}
+                    onChange={(event) =>
+                      setSettings({
+                        ...settings,
+                        fine_per_day: Number(event.target.value) || 0,
+                      })
+                    }
+                    disabled={isSavingSettings}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-slate-50"
+                  />
+                </label>
+                <label className="space-y-2">
+                  <span className="block text-xs font-bold uppercase tracking-widest text-slate-500">
+                    Trần phạt tối đa mỗi phiếu (VND)
+                  </span>
+                  <input
+                    aria-label="Trần phạt tối đa mỗi phiếu"
+                    data-testid="max-fine-per-loan"
+                    type="number"
+                    min={0}
+                    max={10000000}
+                    value={settings.max_fine_per_loan}
+                    onChange={(event) =>
+                      setSettings({
+                        ...settings,
+                        max_fine_per_loan: Number(event.target.value) || 0,
+                      })
+                    }
+                    disabled={isSavingSettings}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-slate-50"
+                  />
+                </label>
+                <label className="space-y-2">
+                  <span className="block text-xs font-bold uppercase tracking-widest text-slate-500">
+                    Số ngày ân hạn trước khi tính phạt
+                  </span>
+                  <input
+                    aria-label="Số ngày ân hạn trước khi tính phạt"
+                    data-testid="grace-period-days"
+                    type="number"
+                    min={0}
+                    max={30}
+                    value={settings.grace_period_days}
+                    onChange={(event) =>
+                      setSettings({
+                        ...settings,
+                        grace_period_days: Number(event.target.value) || 0,
+                      })
+                    }
+                    disabled={isSavingSettings}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-slate-50"
+                  />
+                </label>
+              </div>
+            )}
+          </section>
+
+          <hr className="border-slate-100" />
+
+          <section>
+            <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <h4 className="flex items-center gap-2 text-lg font-bold text-slate-800">
+                <span className="material-symbols-outlined filled text-[20px] text-primary">
+                  meeting_room
+                </span>
+                Quy tắc đặt phòng học nhóm
+              </h4>
+            </div>
+
+            {isLoadingSettings ? (
+              <div className="rounded-xl border border-dashed border-surface-container-high bg-surface-container-low px-4 py-6 text-center text-sm text-on-surface-variant">
+                Đang tải quy tắc đặt phòng...
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                <label className="space-y-2">
+                  <span className="block text-xs font-bold uppercase tracking-widest text-slate-500">
+                    Thời gian sử dụng tối đa/lần đặt (tiếng)
+                  </span>
+                  <input
+                    aria-label="Thời gian đặt tối đa"
+                    type="number"
+                    min={1}
+                    max={12}
+                    value={settings.room_max_hours_per_booking}
+                    onChange={(event) =>
+                      setSettings({
+                        ...settings,
+                        room_max_hours_per_booking: Number(event.target.value) || 0,
+                      })
+                    }
+                    disabled={isSavingSettings}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-slate-50"
+                  />
+                </label>
+                <label className="space-y-2">
+                  <span className="block text-xs font-bold uppercase tracking-widest text-slate-500">
+                    Số lượt đặt tối đa mỗi sinh viên/ngày
+                  </span>
+                  <input
+                    aria-label="Lượt đặt tối đa ngày"
+                    type="number"
+                    min={1}
+                    max={10}
+                    value={settings.room_max_bookings_per_day}
+                    onChange={(event) =>
+                      setSettings({
+                        ...settings,
+                        room_max_bookings_per_day: Number(event.target.value) || 0,
+                      })
+                    }
+                    disabled={isSavingSettings}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-slate-50"
+                  />
+                </label>
+                <label className="space-y-2">
+                  <span className="block text-xs font-bold uppercase tracking-widest text-slate-500">
+                    Được đặt trước tối đa bao nhiêu ngày
+                  </span>
+                  <input
+                    aria-label="Đặt trước tối đa"
+                    type="number"
+                    min={1}
+                    max={30}
+                    value={settings.room_advance_booking_days}
+                    onChange={(event) =>
+                      setSettings({
+                        ...settings,
+                        room_advance_booking_days: Number(event.target.value) || 0,
+                      })
+                    }
+                    disabled={isSavingSettings}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-slate-50"
+                  />
+                </label>
+                <label className="space-y-2">
+                  <span className="block text-xs font-bold uppercase tracking-widest text-slate-500">
+                    Số người tối thiểu để đặt phòng nhóm
+                  </span>
+                  <input
+                    aria-label="Số người tối thiểu"
+                    type="number"
+                    min={1}
+                    max={20}
+                    value={settings.room_min_group_size}
+                    onChange={(event) =>
+                      setSettings({
+                        ...settings,
+                        room_min_group_size: Number(event.target.value) || 0,
+                      })
+                    }
+                    disabled={isSavingSettings}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-slate-50"
+                  />
+                </label>
+                <label className="space-y-2">
+                  <span className="block text-xs font-bold uppercase tracking-widest text-slate-500">
+                    Cửa sổ thời gian check-in trễ (phút)
+                  </span>
+                  <input
+                    aria-label="Cửa sổ check-in"
+                    type="number"
+                    min={5}
+                    max={60}
+                    value={settings.room_checkin_window_minutes}
+                    onChange={(event) =>
+                      setSettings({
+                        ...settings,
+                        room_checkin_window_minutes: Number(event.target.value) || 0,
+                      })
+                    }
+                    disabled={isSavingSettings}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-slate-50"
+                  />
+                </label>
+                <label className="space-y-2">
+                  <span className="block text-xs font-bold uppercase tracking-widest text-slate-500">
+                    Hạn hủy lịch đặt miễn phạt (tiếng trước giờ đặt)
+                  </span>
+                  <input
+                    aria-label="Hạn hủy miễn phạt"
+                    type="number"
+                    min={0}
+                    max={24}
+                    value={settings.room_cancel_deadline_hours}
+                    onChange={(event) =>
+                      setSettings({
+                        ...settings,
+                        room_cancel_deadline_hours: Number(event.target.value) || 0,
+                      })
+                    }
+                    disabled={isSavingSettings}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-slate-50"
+                  />
+                </label>
+                <label className="space-y-2">
+                  <span className="block text-xs font-bold uppercase tracking-widest text-slate-500">
+                    Giờ mở cửa đặt phòng
+                  </span>
+                  <input
+                    aria-label="Giờ mở cửa phòng"
+                    type="text"
+                    placeholder="07:00"
+                    value={settings.room_open_time}
+                    onChange={(event) =>
+                      setSettings({
+                        ...settings,
+                        room_open_time: event.target.value,
+                      })
+                    }
+                    disabled={isSavingSettings}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-slate-50"
+                  />
+                </label>
+                <label className="space-y-2">
+                  <span className="block text-xs font-bold uppercase tracking-widest text-slate-500">
+                    Giờ đóng cửa đặt phòng
+                  </span>
+                  <input
+                    aria-label="Giờ đóng cửa phòng"
+                    type="text"
+                    placeholder="21:00"
+                    value={settings.room_close_time}
+                    onChange={(event) =>
+                      setSettings({
+                        ...settings,
+                        room_close_time: event.target.value,
+                      })
+                    }
+                    disabled={isSavingSettings}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-slate-50"
+                  />
+                </label>
+                <div className="flex items-center gap-3 pt-6 md:col-span-2">
+                  <input
+                    type="checkbox"
+                    id="room_booking_requires_approval"
+                    checked={settings.room_booking_requires_approval}
+                    onChange={(event) =>
+                      setSettings({
+                        ...settings,
+                        room_booking_requires_approval: event.target.checked,
+                      })
+                    }
+                    disabled={isSavingSettings}
+                    className="h-5 w-5 rounded-md border-slate-300 text-primary focus:ring-primary/20"
+                  />
+                  <label htmlFor="room_booking_requires_approval" className="text-sm font-semibold text-slate-700">
+                    Yêu cầu thủ thư phê duyệt trước khi đặt phòng thành công (Manual Approve)
+                  </label>
+                </div>
               </div>
             )}
           </section>
         </div>
       </form>
+
+      <section className="space-y-6 rounded-2xl border border-surface-container-low bg-surface-bright p-8 scholar-shadow">
+        <div>
+          <h3 className="text-xl font-bold text-on-surface flex items-center gap-2">
+            <span className="material-symbols-outlined filled text-[20px] text-blue-500">
+              devices
+            </span>
+            Thiết bị đang hoạt động
+          </h3>
+          <p className="mt-1 text-sm text-on-surface-variant">
+            Danh sách các thiết bị hiện đang đăng nhập vào bảng quản trị của bạn. Bạn có thể đăng xuất khỏi các thiết bị khác từ xa nếu phát hiện truy cập đáng ngờ.
+          </p>
+        </div>
+
+        {loadingDevices ? (
+          <div className="text-xs text-slate-400 py-4 flex items-center gap-2">
+            <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+            Đang tải danh sách thiết bị...
+          </div>
+        ) : devices.length === 0 ? (
+          <div className="text-xs text-slate-400 py-4">Không tìm thấy thông tin thiết bị hoạt động.</div>
+        ) : (
+          <div className="space-y-4">
+            {devices.map((device) => (
+              <div key={device.history_id} className="flex items-center justify-between border border-slate-100 rounded-xl p-4 bg-slate-50/50 hover:bg-slate-50 transition-colors">
+                <div className="flex items-center gap-4">
+                  <div className="text-slate-500 bg-white border border-slate-200 p-2.5 rounded-lg flex items-center justify-center shrink-0 shadow-sm">
+                    <span className="material-symbols-outlined">
+                      {device.device_type === 'Mobile' ? 'smartphone' : device.device_type === 'Tablet' ? 'tablet' : 'desktop_windows'}
+                    </span>
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-slate-800 text-sm">
+                        {device.platform} - {device.browser}
+                      </span>
+                      {device.is_current ? (
+                        <span className="bg-green-100 text-green-800 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                          Thiết bị này
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="text-xs text-slate-500 mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+                      <span>IP: {device.ip_address}</span>
+                      <span className="w-1.5 h-1.5 bg-slate-300 rounded-full shrink-0" />
+                      <span>Đăng nhập lúc: {new Date(device.created_at).toLocaleString('vi-VN')}</span>
+                    </div>
+                  </div>
+                </div>
+                
+                {!device.is_current && (
+                  <button
+                    type="button"
+                    onClick={() => handleRevoke(device.token_id)}
+                    className="text-xs font-bold text-red-600 hover:text-red-700 bg-white border border-red-200 hover:bg-red-50 px-3 py-1.5 rounded-lg transition-all shadow-sm cursor-pointer"
+                  >
+                    Đăng xuất
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   );
 }
