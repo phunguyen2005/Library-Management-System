@@ -3,12 +3,17 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import Digital from '../pages/student/Digital';
 
-const { fetchDigitalDocumentsMock } = vi.hoisted(() => ({
+const { fetchDigitalDocumentsMock, fetchReadingProgressMock } = vi.hoisted(() => ({
   fetchDigitalDocumentsMock: vi.fn(),
+  fetchReadingProgressMock: vi.fn(),
 }));
 
 vi.mock('../api/bookApi', () => ({
   fetchDigitalDocuments: () => fetchDigitalDocumentsMock(),
+}));
+
+vi.mock('../api/readingProgressApi', () => ({
+  fetchReadingProgress: () => fetchReadingProgressMock(),
 }));
 
 describe('Digital page', () => {
@@ -29,6 +34,7 @@ describe('Digital page', () => {
         hasAttachedFile: true,
       },
     ]);
+    fetchReadingProgressMock.mockResolvedValueOnce([]);
 
     render(<Digital />);
 
