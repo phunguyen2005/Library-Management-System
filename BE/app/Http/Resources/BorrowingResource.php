@@ -22,12 +22,22 @@ class BorrowingResource extends JsonResource
             'borrow_date' => $this->borrow_date?->toDateString(),
             'due_date' => $this->due_date?->toDateString(),
             'return_date' => $this->return_date?->toDateString(),
+            'is_reviewed' => (bool) $this->review()->exists(),
             'is_overdue' => $overdue['is_overdue'],
             'days_overdue' => $overdue['days_overdue'],
             'due_status' => $overdue['due_status'],
             'book' => $this->relationLoaded('book') ? BookResource::make($this->book) : null,
             'member' => $this->relationLoaded('member') ? MemberResource::make($this->member) : null,
             'librarian' => $this->relationLoaded('librarian') ? LibrarianResource::make($this->librarian) : null,
+            'fine' => $this->fine ? [
+                'fine_id' => $this->fine->fine_id,
+                'amount' => (float) $this->fine->amount,
+                'reason' => $this->fine->reason,
+                'status' => $this->fine->status,
+                'paid_at' => $this->fine->paid_at?->toISOString(),
+                'waived_by' => $this->fine->waived_by,
+                'waived_reason' => $this->fine->waived_reason,
+            ] : null,
         ];
     }
 
