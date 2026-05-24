@@ -1,5 +1,7 @@
-import React, { startTransition, useDeferredValue, useEffect, useMemo, useState } from 'react';
+import React, { startTransition, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { Scanner } from '@yudiel/react-qr-scanner';
+import { generateBookMetadata } from '../../api/aiApi';
 import {
   addBorrowableBook,
   addDigitalResource,
@@ -9,9 +11,14 @@ import {
   updateBorrowableBook,
   updateDigitalResource,
   uploadDigitalFile,
+  importBooks,
   type BookPayload,
 } from '../../api/bookApi';
 import EmptyState from '../../components/EmptyState';
+import ConfirmDialog from '../../components/ConfirmDialog';
+import Pagination from '../../components/Pagination';
+import { SHELF_LABELS } from '../../components/LibraryMapModal';
+import { useDebounce } from '../../hooks/useDebounce';
 import { applyImageFallback } from '../../lib/display';
 import { getErrorMessage, isUnauthorizedError } from '../../lib/errors';
 import { emitToast } from '../../notifications/events';
@@ -49,18 +56,16 @@ const EMPTY_FORM: InventoryFormData = {
   has_digital_file: false,
 };
 
-const PAGE_SIZE = 6;
-
-function getPageWindow(currentPage: number, totalPages: number) {
-  const start = Math.max(1, currentPage - 1);
-  const end = Math.min(totalPages, start + 2);
-  const adjustedStart = Math.max(1, end - 2);
-
-  return Array.from({ length: end - adjustedStart + 1 }, (_, index) => adjustedStart + index);
-}
-
 function formatFileSize(file: File) {
   return `${Math.max(1, Math.ceil(file.size / 1024))} KB`;
+}
+
+function determineCategory(fileName: string): string {
+  const ext = fileName.split('.').pop()?.toLowerCase();
+  if (ext === 'pdf') return 'PDF';
+  if (ext === 'epub') return 'EPUB';
+  if (ext === 'ppt' || ext === 'pptx') return 'SLIDES';
+  return 'PDF';
 }
 
 function escapeHtml(value: string) {
@@ -116,13 +121,76 @@ export default function AdminInventory() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [isFiltering, setIsFiltering] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
   const [formData, setFormData] = useState<InventoryFormData>(EMPTY_FORM);
   const [selectedDigitalFile, setSelectedDigitalFile] = useState<File | null>(null);
+  const [bookToDelete, setBookToDelete] = useState<FormattedBook | null>(null);
+  const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
+  const [aiActionId, setAiActionId] = useState<number | null>(null);
 
-  const deferredSearchTerm = useDeferredValue(searchTerm);
+  // --- CSV Import state ---
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importErrors, setImportErrors] = useState<string[]>([]);
+
+  const handleImportSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!importFile) return;
+
+    setIsImporting(true);
+    setImportErrors([]);
+
+    try {
+      const response = await importBooks(importFile);
+      emitToast({
+        tone: 'success',
+        title: 'Nhập dữ liệu thành công',
+        message: response.message,
+      });
+      setIsImportModalOpen(false);
+      setImportFile(null);
+      await loadBooks(false);
+    } catch (error: unknown) {
+      if (isUnauthorizedError(error)) {
+        return;
+      }
+      const errDetails = (error as any).details;
+      if (errDetails && Array.isArray(errDetails.errors)) {
+        setImportErrors(errDetails.errors);
+      } else {
+        const message = getErrorMessage(error, 'Không thể nhập dữ liệu sách.');
+        emitToast({ tone: 'error', title: 'Lỗi nhập dữ liệu', message });
+      }
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  const downloadTemplate = () => {
+    // Generate appropriate headers based on current active tab
+    const isDigital = activeTab === 'digital';
+    const csvContent = isDigital
+      ? "\uFEFFten_sach,tac_gia,the_loai,nam_xuat_ban,vi_tri,so_luong,sach_so\nGiáo trình Triết học Mác - Lênin,Bộ Giáo dục và Đào tạo,Giáo trình,2021,,0,1\nBáo cáo Phát triển Bền vững,Tổng cục Thống kê,Báo cáo,2025,,0,1"
+      : "\uFEFFten_sach,tac_gia,the_loai,nam_xuat_ban,vi_tri,so_luong,sach_so\nĐắc Nhân Tâm,Dale Carnegie,Kỹ năng sống,2020,Kệ A1,5,0\nLược sử thời gian,Stephen Hawking,Khoa học,2018,Kệ B2,3,0";
+      
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", isDigital ? "mau_nhap_tai_nguyen_so.csv" : "mau_nhap_sach_muon.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalRecords, setTotalRecords] = useState(0);
+  const debouncedSearchTerm = useDebounce(searchTerm, 300);
+
   const books = activeTab === 'borrow' ? borrowBooks : digitalBooks;
   const isDigitalTab = activeTab === 'digital';
 
@@ -133,12 +201,21 @@ export default function AdminInventory() {
 
     try {
       setLoadError(null);
-      const [borrowable, digital] = await Promise.all([
-        fetchBorrowableBooks(),
-        fetchDigitalResourceBooks(),
-      ]);
-      setBorrowBooks(borrowable);
-      setDigitalBooks(digital);
+      if (activeTab === 'digital') {
+        const digital = await fetchDigitalResourceBooks(page, debouncedSearchTerm);
+        setDigitalBooks(digital.data);
+        if (digital.meta) {
+          setTotalPages(digital.meta.last_page);
+          setTotalRecords(digital.meta.total);
+        }
+      } else {
+        const borrowable = await fetchBorrowableBooks(page, debouncedSearchTerm);
+        setBorrowBooks(borrowable.data);
+        if (borrowable.meta) {
+          setTotalPages(borrowable.meta.last_page);
+          setTotalRecords(borrowable.meta.total);
+        }
+      }
     } catch (error: unknown) {
       if (isUnauthorizedError(error)) {
         return;
@@ -156,7 +233,7 @@ export default function AdminInventory() {
 
   useEffect(() => {
     void loadBooks();
-  }, []);
+  }, [activeTab, page, debouncedSearchTerm]);
 
   useEffect(() => {
     setSearchTerm(searchParams.get('search') || '');
@@ -164,33 +241,9 @@ export default function AdminInventory() {
     setPage(1);
   }, [searchParams]);
 
-  const filteredBooks = useMemo(() => {
-    const normalizedQuery = deferredSearchTerm.trim().toLowerCase();
-
-    if (!normalizedQuery) {
-      return books;
-    }
-
-    return books.filter((book) =>
-      [book.title, book.author, book.category, book.location, book.isbn, book.file_format]
-        .join(' ')
-        .toLowerCase()
-        .includes(normalizedQuery),
-    );
-  }, [books, deferredSearchTerm]);
-
-  const totalPages = Math.max(1, Math.ceil(filteredBooks.length / PAGE_SIZE));
-  const visibleBooks = useMemo(() => {
-    const startIndex = (page - 1) * PAGE_SIZE;
-    return filteredBooks.slice(startIndex, startIndex + PAGE_SIZE);
-  }, [filteredBooks, page]);
-  const pageNumbers = useMemo(() => getPageWindow(page, totalPages), [page, totalPages]);
-  const startItem = filteredBooks.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
-  const endItem = Math.min(filteredBooks.length, page * PAGE_SIZE);
-
-  useEffect(() => {
-    setPage((currentPage) => Math.min(currentPage, totalPages));
-  }, [totalPages]);
+  const handlePageChange = (newPage: number) => {
+    setPage(newPage);
+  };
 
   const updateTab = (tab: InventoryTab) => {
     const nextParams = new URLSearchParams(searchParams);
@@ -245,10 +298,21 @@ export default function AdminInventory() {
     setSelectedDigitalFile(null);
   };
 
-  const handleDelete = async (book: FormattedBook) => {
-    if (!confirm(`Xóa "${book.title}"?`)) {
-      return;
-    }
+  const promptDelete = (book: FormattedBook) => {
+    setBookToDelete(book);
+    setIsConfirmDeleteOpen(true);
+  };
+
+  const cancelDelete = () => {
+    setIsConfirmDeleteOpen(false);
+    setBookToDelete(null);
+  };
+
+  const handleDelete = async () => {
+    const book = bookToDelete;
+    if (!book) return;
+
+    cancelDelete();
 
     try {
       await deleteBook(book.id);
@@ -268,6 +332,33 @@ export default function AdminInventory() {
     }
   };
 
+  const handleGenerateAiMetadata = async (book: FormattedBook) => {
+    setAiActionId(book.id);
+
+    try {
+      const response = await generateBookMetadata(book.id);
+      const updateList = (items: FormattedBook[]) =>
+        items.map((item) => (item.id === response.book.id ? { ...item, ...response.book } : item));
+
+      setBorrowBooks(updateList);
+      setDigitalBooks(updateList);
+      emitToast({
+        tone: 'success',
+        title: 'Đã tạo metadata AI',
+        message: response.message,
+      });
+    } catch (error: unknown) {
+      if (isUnauthorizedError(error)) {
+        return;
+      }
+
+      const message = getErrorMessage(error, 'Không thể tạo metadata AI cho tài liệu này.');
+      emitToast({ tone: 'error', title: 'Không thể tạo metadata AI', message });
+    } finally {
+      setAiActionId(null);
+    }
+  };
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
 
@@ -275,7 +366,7 @@ export default function AdminInventory() {
       emitToast({
         tone: 'error',
         title: 'Cần tệp số',
-        message: 'Hãy chọn tệp PDF, âm thanh, EPUB hoặc slide trước khi lưu tài nguyên số này.',
+        message: 'Hãy chọn tệp PDF, EPUB hoặc slide trước khi lưu tài nguyên số này.',
       });
       return;
     }
@@ -316,11 +407,11 @@ export default function AdminInventory() {
   };
 
   const handlePrintBarcodes = () => {
-    if (filteredBooks.length === 0) {
+    if (books.length === 0) {
       emitToast({
         tone: 'info',
         title: 'Không có gì để in',
-        message: 'Bộ lọc sách mượn hiện tại không có dữ liệu.',
+        message: 'Trang hiện tại không có dữ liệu.',
       });
       return;
     }
@@ -336,7 +427,7 @@ export default function AdminInventory() {
       return;
     }
 
-    const labels = filteredBooks
+    const labels = books
       .map((book) => {
         const code = `SACH-${String(book.id).padStart(5, '0')}`;
         const bars = String(book.id)
@@ -399,15 +490,33 @@ export default function AdminInventory() {
         </div>
         <div className="flex gap-3">
           {activeTab === 'borrow' ? (
-            <button
-              type="button"
-              onClick={handlePrintBarcodes}
-              className="flex items-center gap-2 rounded-xl bg-surface-container px-5 py-2.5 font-medium text-on-surface transition-all hover:bg-surface-container-high"
-            >
-              <span className="material-symbols-outlined text-sm">print</span>
-              In mã vạch
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={() => setShowScanner(true)}
+                className="flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 font-medium text-white transition-all hover:bg-indigo-700 shadow-md shadow-indigo-600/20 hover:-translate-y-0.5"
+              >
+                <span className="material-symbols-outlined text-sm">qr_code_scanner</span>
+                Quét mã vạch
+              </button>
+              <button
+                type="button"
+                onClick={handlePrintBarcodes}
+                className="flex items-center gap-2 rounded-xl bg-surface-container px-5 py-2.5 font-medium text-on-surface transition-all hover:bg-surface-container-high"
+              >
+                <span className="material-symbols-outlined text-sm">print</span>
+                In mã vạch
+              </button>
+            </>
           ) : null}
+          <button
+            type="button"
+            onClick={() => setIsImportModalOpen(true)}
+            className="flex items-center gap-2 rounded-xl bg-surface-container-high px-5 py-2.5 font-medium text-slate-700 transition-all hover:bg-slate-200 hover:-translate-y-0.5"
+          >
+            <span aria-hidden="true" className="material-symbols-outlined text-sm">upload_file</span>
+            Nhập từ CSV
+          </button>
           <button
             type="button"
             aria-label={isDigitalTab ? 'Thêm tài nguyên số' : 'Thêm sách mượn'}
@@ -472,7 +581,7 @@ export default function AdminInventory() {
             />
           </div>
           <div className="flex items-center gap-3 text-xs font-semibold text-outline">
-            {isFiltering ? 'Đang lọc...' : `${filteredBooks.length} bản ghi`}
+            {isFiltering ? 'Đang tải...' : `${totalRecords} bản ghi`}
           </div>
         </div>
 
@@ -501,7 +610,7 @@ export default function AdminInventory() {
                     <EmptyState icon="error" title="Không thể tải dữ liệu" message={loadError} />
                   </td>
                 </tr>
-              ) : visibleBooks.length === 0 ? (
+              ) : books.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-8">
                     <EmptyState
@@ -516,7 +625,7 @@ export default function AdminInventory() {
                   </td>
                 </tr>
               ) : (
-                visibleBooks.map((book) => (
+                books.map((book) => (
                   <tr key={book.id} className="transition-all hover:bg-slate-50/50">
                     <td className="px-6 py-4">
                       <div className="h-16 w-12 overflow-hidden rounded-lg border border-surface-container bg-surface-container-high shadow-sm">
@@ -539,6 +648,18 @@ export default function AdminInventory() {
                         <p className="mt-1 inline-block rounded bg-primary/5 px-2 py-0.5 font-mono text-[10px] text-primary">
                           Mã: {book.id}
                         </p>
+                        {(book.ai_tags?.length ?? 0) > 0 ? (
+                          <div className="mt-2 flex flex-wrap gap-1">
+                            {book.ai_tags?.slice(0, 3).map((tag) => (
+                              <span
+                                key={tag}
+                                className="rounded-md bg-primary/5 px-2 py-0.5 text-[10px] font-semibold text-primary"
+                              >
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        ) : null}
                       </div>
                     </td>
                     <td className="px-6 py-4">
@@ -581,6 +702,17 @@ export default function AdminInventory() {
                       <div className="flex items-center justify-end gap-1">
                         <button
                           type="button"
+                          onClick={() => handleGenerateAiMetadata(book)}
+                          disabled={aiActionId === book.id}
+                          className="rounded-lg p-2 text-purple-600 transition-all hover:bg-purple-50 disabled:cursor-wait disabled:opacity-60"
+                          title="Tạo metadata AI"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">
+                            {aiActionId === book.id ? 'progress_activity' : 'auto_awesome'}
+                          </span>
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => openEditModal(book)}
                           className="rounded-lg p-2 text-primary transition-all hover:bg-primary-container"
                           title="Sửa"
@@ -589,7 +721,7 @@ export default function AdminInventory() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => handleDelete(book)}
+                          onClick={() => promptDelete(book)}
                           className="rounded-lg p-2 text-red-500 transition-all hover:bg-red-50"
                           title="Xóa"
                         >
@@ -606,42 +738,27 @@ export default function AdminInventory() {
 
         <div className="flex items-center justify-between border-t border-surface-container bg-white p-4">
           <p className="text-xs font-medium text-outline">
-            Đang hiển thị {startItem} - {endItem} trên tổng số {filteredBooks.length} bản ghi
+            Tổng cộng: {totalRecords} bản ghi
           </p>
           <div className="flex gap-1">
-            <button
-              type="button"
-              onClick={() => setPage((currentPage) => Math.max(1, currentPage - 1))}
-              disabled={page === 1}
-              className="flex h-8 w-8 items-center justify-center rounded-lg border border-surface-container transition-all hover:bg-surface-container disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <span className="material-symbols-outlined text-sm">chevron_left</span>
-            </button>
-            {pageNumbers.map((pageNumber) => (
-              <button
-                key={pageNumber}
-                type="button"
-                onClick={() => setPage(pageNumber)}
-                className={`flex h-8 w-8 items-center justify-center rounded-lg text-xs font-bold ${
-                  pageNumber === page
-                    ? 'bg-primary text-white'
-                    : 'border border-surface-container text-on-surface transition-all hover:bg-surface-container'
-                }`}
-              >
-                {pageNumber}
-              </button>
-            ))}
-            <button
-              type="button"
-              onClick={() => setPage((currentPage) => Math.min(totalPages, currentPage + 1))}
-              disabled={page === totalPages}
-              className="flex h-8 w-8 items-center justify-center rounded-lg border border-surface-container transition-all hover:bg-surface-container disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <span className="material-symbols-outlined text-sm">chevron_right</span>
-            </button>
+            <Pagination
+              currentPage={page}
+              totalPages={totalPages}
+              onPageChange={handlePageChange}
+            />
           </div>
         </div>
       </section>
+
+      <ConfirmDialog
+        isOpen={isConfirmDeleteOpen}
+        title="Xác nhận xóa"
+        message={`Bạn có chắc chắn muốn xóa sách "${bookToDelete?.title}" không? Hành động này không thể hoàn tác.`}
+        confirmLabel="Xóa sách"
+        isDestructive={true}
+        onConfirm={handleDelete}
+        onCancel={cancelDelete}
+      />
 
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
@@ -698,17 +815,23 @@ export default function AdminInventory() {
 
                 <div className="col-span-1">
                   <label htmlFor="book-category" className="mb-1 block text-xs font-bold text-slate-600">
-                    {isDigitalTab ? 'Loại tài nguyên' : 'Danh mục'} <span className="text-red-500">*</span>
+                    {isDigitalTab ? 'Loại tài nguyên (Tự động)' : 'Danh mục'} <span className="text-red-500">*</span>
                   </label>
                   <input
                     id="book-category"
                     required
                     type="text"
+                    disabled={isDigitalTab}
+                    placeholder={isDigitalTab ? 'Tự động từ định dạng tệp' : ''}
                     value={formData.category}
                     onChange={(event) =>
                       setFormData({ ...formData, category: event.target.value })
                     }
-                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
+                    className={`w-full rounded-lg border border-slate-200 px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20 ${
+                      isDigitalTab
+                        ? 'bg-slate-100 text-slate-500 cursor-not-allowed font-medium'
+                        : 'bg-slate-50'
+                    }`}
                   />
                 </div>
 
@@ -718,16 +841,30 @@ export default function AdminInventory() {
                       <label htmlFor="book-location" className="mb-1 block text-xs font-bold text-slate-600">
                         Vị trí kệ
                       </label>
-                      <input
+                      <select
                         id="book-location"
                         aria-label="Vị trí sách"
-                        type="text"
                         value={formData.location}
                         onChange={(event) =>
                           setFormData({ ...formData, location: event.target.value })
                         }
-                        className="w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
-                      />
+                        className="w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20 text-sm"
+                      >
+                        <option value="">Chọn kệ...</option>
+                        {Object.entries(SHELF_LABELS).map(([code, label]) => {
+                          const shelfVal = `Kệ ${code}`;
+                          return (
+                            <option key={code} value={shelfVal}>
+                              {shelfVal} ({label})
+                            </option>
+                          );
+                        })}
+                        {formData.location && !Object.keys(SHELF_LABELS).some(code => `Kệ ${code}` === formData.location) && (
+                          <option value={formData.location}>
+                            {formData.location} (Hiện tại)
+                          </option>
+                        )}
+                      </select>
                     </div>
                     <div className="col-span-1">
                       <label htmlFor="book-quantity" className="mb-1 block text-xs font-bold text-slate-600">
@@ -793,9 +930,30 @@ export default function AdminInventory() {
                       id="book-digital-file"
                       aria-label="Tệp số"
                       type="file"
-                      accept=".pdf,.epub,.mp3,.wav,.m4a,.ppt,.pptx,application/pdf,audio/*"
-                      onChange={(event) => setSelectedDigitalFile(event.target.files?.[0] || null)}
-                      className="w-full text-sm text-slate-700 file:mr-4 file:rounded-lg file:border-0 file:bg-primary file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:opacity-90"
+                      accept=".pdf,.epub,.ppt,.pptx"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0] || null;
+                        if (file) {
+                          const ext = file.name.split('.').pop()?.toLowerCase();
+                          const allowedExtensions = ['pdf', 'epub', 'ppt', 'pptx'];
+                          if (!ext || !allowedExtensions.includes(ext)) {
+                            emitToast({
+                              tone: 'error',
+                              title: 'Định dạng tệp không hỗ trợ',
+                              message: 'Hệ thống chỉ chấp nhận tệp tài liệu dạng PDF, EPUB hoặc Slides (PPT/PPTX). Không hỗ trợ tệp âm thanh (Audio).',
+                            });
+                            event.target.value = ''; // Reset file input
+                            setSelectedDigitalFile(null);
+                            return;
+                          }
+                          setSelectedDigitalFile(file);
+                          const cat = determineCategory(file.name);
+                          setFormData((prev) => ({ ...prev, category: cat }));
+                        } else {
+                          setSelectedDigitalFile(null);
+                        }
+                      }}
+                      className="w-full text-sm text-slate-700 file:mr-4 file:rounded-lg file:border-0 file:bg-primary file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:opacity-90 cursor-pointer"
                     />
                     <div className="mt-3 rounded-lg bg-white px-3 py-2 text-xs text-slate-600">
                       {selectedDigitalFile ? (
@@ -833,6 +991,178 @@ export default function AdminInventory() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {isImportModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-surface-container bg-slate-50 p-6">
+              <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                <span className="material-symbols-outlined text-primary">upload_file</span>
+                Nhập danh sách sách từ CSV ({activeTab === 'digital' ? 'Tài nguyên số' : 'Sách mượn'})
+              </h3>
+              <button
+                type="button"
+                onClick={() => { setIsImportModalOpen(false); setImportErrors([]); setImportFile(null); }}
+                className="text-slate-400 hover:text-slate-600 transition-colors"
+                aria-label="Đóng"
+              >
+                <span aria-hidden="true" className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            
+            <form onSubmit={handleImportSubmit} className="p-6 space-y-6">
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+                <p className="text-xs font-bold text-slate-700 uppercase tracking-wider">Cấu trúc cột tệp CSV mẫu:</p>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-200 text-slate-500 font-bold">
+                        <th className="pb-2">Tên sách *</th>
+                        <th className="pb-2">Tác giả *</th>
+                        <th className="pb-2">Thể loại</th>
+                        <th className="pb-2">Năm XB</th>
+                        <th className="pb-2">Vị trí kệ</th>
+                        <th className="pb-2">Số lượng</th>
+                        <th className="pb-2">Sách số</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr className="text-slate-600">
+                        <td className="pt-2 font-mono">ten_sach / title</td>
+                        <td className="pt-2 font-mono">tac_gia / author</td>
+                        <td className="pt-2 font-mono">the_loai / genre</td>
+                        <td className="pt-2 font-mono">nam_xuat_ban / published_year</td>
+                        <td className="pt-2 font-mono">vi_tri / location</td>
+                        <td className="pt-2 font-mono">so_luong / quantity</td>
+                        <td className="pt-2 font-mono">sach_so / is_digital</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div className="flex justify-between items-center pt-2">
+                  <span className="text-[10px] text-slate-500">
+                    * Bắt buộc. Để `sach_so` là 1 nếu là tài nguyên số, 0 nếu là sách mượn.
+                  </span>
+                  <button
+                    type="button"
+                    onClick={downloadTemplate}
+                    className="text-xs font-bold text-primary hover:text-primary-hover flex items-center gap-1 transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-[14px]">download</span>
+                    Tải file mẫu
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-slate-600">Chọn tệp tin CSV (.csv):</label>
+                <div className="border-2 border-dashed border-slate-200 hover:border-primary/50 transition-colors rounded-xl p-6 text-center cursor-pointer relative group">
+                  <input
+                    type="file"
+                    accept=".csv,text/csv"
+                    required
+                    onChange={(e) => setImportFile(e.target.files?.[0] || null)}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  />
+                  <div className="space-y-2 pointer-events-none">
+                    <span className="material-symbols-outlined text-4xl text-slate-400 group-hover:text-primary transition-colors">
+                      cloud_upload
+                    </span>
+                    <p className="text-sm font-semibold text-slate-700">
+                      {importFile ? importFile.name : 'Kéo thả tệp tin hoặc nhấp vào đây để chọn'}
+                    </p>
+                    <p className="text-xs text-slate-400">Chỉ chấp nhận tệp tin định dạng .csv tối đa 4MB</p>
+                  </div>
+                </div>
+              </div>
+
+              {importErrors.length > 0 && (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-4 max-h-40 overflow-y-auto space-y-1">
+                  <p className="text-xs font-bold text-red-800 flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[16px]">error</span>
+                    Dữ liệu không hợp lệ. Vui lòng sửa các lỗi sau:
+                  </p>
+                  <ul className="list-disc pl-5 text-xs text-red-700 space-y-0.5">
+                    {importErrors.map((err, i) => (
+                      <li key={i}>{err}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => { setIsImportModalOpen(false); setImportErrors([]); setImportFile(null); }}
+                  disabled={isImporting}
+                  className="rounded-xl bg-slate-100 px-5 py-2.5 font-bold text-slate-600 transition-colors hover:bg-slate-200 disabled:opacity-50"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={isImporting || !importFile}
+                  className="rounded-xl bg-primary px-5 py-2.5 font-bold text-white shadow-md shadow-primary/20 transition-opacity hover:opacity-90 disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {isImporting ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      Đang xử lý...
+                    </>
+                  ) : (
+                    <>
+                      <span className="material-symbols-outlined text-[16px]">check_circle</span>
+                      Bắt đầu Nhập
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showScanner && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/80 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+              <h3 className="text-lg font-bold text-slate-900">Quét mã vạch sách vật lý</h3>
+              <button type="button" onClick={() => setShowScanner(false)} className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+                <span className="material-symbols-outlined text-[20px]">close</span>
+              </button>
+            </div>
+            <div className="relative aspect-square w-full bg-black">
+              <Scanner
+                onScan={(result) => {
+                  if (result && result.length > 0) {
+                    const scannedValue = result[0].rawValue.trim();
+                    if (scannedValue.toUpperCase().startsWith('SACH-') || !isNaN(Number(scannedValue))) {
+                      const searchVal = scannedValue.toUpperCase().startsWith('SACH-') ? scannedValue : `SACH-${scannedValue.padStart(5, '0')}`;
+                      setShowScanner(false);
+                      handleSearchChange(searchVal);
+                      emitToast({
+                        tone: 'success',
+                        title: 'Đã nhận diện mã vạch',
+                        message: `Đang lọc sách theo mã: ${searchVal}`,
+                      });
+                    } else {
+                      emitToast({
+                        tone: 'error',
+                        title: 'Mã không hợp lệ',
+                        message: 'Mã quét không khớp định dạng mã sách thư viện.',
+                      });
+                    }
+                  }
+                }}
+                components={{ finder: true }}
+              />
+            </div>
+            <div className="bg-slate-50 p-4 text-center text-sm text-slate-500">
+              Đưa mã vạch in trên nhãn sách (SACH-XXXXX) vào khung camera để tìm nhanh trong danh mục.
+            </div>
           </div>
         </div>
       )}
