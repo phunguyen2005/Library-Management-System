@@ -1,4 +1,4 @@
-export type UserRole = 'student' | 'admin';
+export type UserRole = 'student' | 'admin' | 'librarian';
 
 export type AuthUser = {
   member_id?: number;
@@ -9,6 +9,9 @@ export type AuthUser = {
   phone_number?: string | null;
   join_date?: string | null;
   hire_date?: string | null;
+  notify_due_soon?: boolean;
+  notify_new_books?: boolean;
+  permissions?: string[];
 };
 
 export type AuthSession = {
