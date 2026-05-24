@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
@@ -8,7 +8,7 @@ import type { MemberApiRecord, MemberPayload } from '../types/member';
 
 let membersState: MemberApiRecord[] = [];
 
-const getAllMembersMock = vi.fn(async () => membersState);
+const getAllMembersMock = vi.fn(async () => ({ data: membersState }));
 
 const createMemberMock = vi.fn(async (payload: MemberPayload) => {
   const member: MemberApiRecord = {
@@ -71,12 +71,24 @@ describe('AdminMembers', () => {
 
     await screen.findByText('Không tìm thấy thành viên phù hợp');
     await user.click(screen.getByRole('button', { name: 'Thêm thành viên' }));
-    await user.type(screen.getByLabelText(/Họ và tên/), 'Nguyen New Member');
-    await user.type(screen.getByLabelText(/Email/), 'new.member@student.hcmue.edu.vn');
-    await user.type(screen.getByLabelText(/Số điện thoại/), '0901777777');
-    await user.type(screen.getByLabelText(/Ngày tham gia/), '2026-04-19');
-    await user.type(screen.getByLabelText(/^Mật khẩu/), 'Student123');
-    await user.type(screen.getByLabelText(/Xác nhận mật khẩu/), 'Student123');
+    fireEvent.change(screen.getByLabelText(/Họ và tên/), {
+      target: { value: 'Nguyen New Member' },
+    });
+    fireEvent.change(screen.getByLabelText(/Email/), {
+      target: { value: 'new.member@student.hcmue.edu.vn' },
+    });
+    fireEvent.change(screen.getByLabelText(/Số điện thoại/), {
+      target: { value: '0901777777' },
+    });
+    fireEvent.change(screen.getByLabelText(/Ngày tham gia/), {
+      target: { value: '2026-04-19' },
+    });
+    fireEvent.change(screen.getByLabelText(/^Mật khẩu/), {
+      target: { value: 'Student123' },
+    });
+    fireEvent.change(screen.getByLabelText(/Xác nhận mật khẩu/), {
+      target: { value: 'Student123' },
+    });
     await user.click(screen.getByRole('button', { name: 'Lưu thay đổi' }));
 
     await waitFor(() => {
@@ -108,10 +120,12 @@ describe('AdminMembers', () => {
 
     expect(await screen.findByText('Old Member')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Chỉnh sửa Old Member' }));
-    await user.clear(screen.getByLabelText(/Họ và tên/));
-    await user.type(screen.getByLabelText(/Họ và tên/), 'Updated Member');
-    await user.clear(screen.getByLabelText(/Số điện thoại/));
-    await user.type(screen.getByLabelText(/Số điện thoại/), '0901888888');
+    fireEvent.change(screen.getByLabelText(/Họ và tên/), {
+      target: { value: 'Updated Member' },
+    });
+    fireEvent.change(screen.getByLabelText(/Số điện thoại/), {
+      target: { value: '0901888888' },
+    });
     await user.click(screen.getByRole('button', { name: 'Lưu thay đổi' }));
 
     await waitFor(() => {
@@ -135,13 +149,13 @@ describe('AdminMembers', () => {
         join_date: '2026-03-17',
       },
     ];
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
     const user = userEvent.setup();
 
     renderAdminMembers();
 
     expect(await screen.findByText('Delete Member')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Xóa Delete Member' }));
+    await user.click(screen.getByRole('button', { name: 'Xóa thành viên' }));
 
     await waitFor(() => {
       expect(deleteMemberMock).toHaveBeenCalledWith(4);
