@@ -119,9 +119,8 @@ class BorrowWorkflowTest extends TestCase
         $this->withToken($token->plainTextToken)
             ->postJson('/api/requests/2/approve')
             ->assertOk()
-            ->assertJsonPath('loan.status', 'borrowed')
-            ->assertJsonPath('loan.librarian_id', 1)
-            ->assertJsonPath('loan.due_date', today()->addDays(14)->toDateString());
+            ->assertJsonPath('loan.status', 'approved')
+            ->assertJsonPath('loan.librarian_id', 1);
 
         $this->assertDatabaseHas('books', [
             'book_id' => 2,
@@ -130,11 +129,16 @@ class BorrowWorkflowTest extends TestCase
         ]);
 
         $this->withToken($token->plainTextToken)
+            ->postJson('/api/requests/2/confirm-pickup')
+            ->assertOk()
+            ->assertJsonPath('loan.status', 'borrowed')
+            ->assertJsonPath('loan.due_date', today()->addDays(14)->toDateString());
+
+        $this->withToken($token->plainTextToken)
             ->postJson('/api/requests/2/return')
             ->assertOk()
             ->assertJsonPath('loan.status', 'returned')
             ->assertJsonPath('loan.return_date', today()->toDateString());
-
         $this->assertDatabaseHas('books', [
             'book_id' => 2,
             'available_quantity' => 1,
