@@ -1,27 +1,39 @@
 import React, { useEffect, useState } from 'react';
 import { fetchDigitalDocuments, type DigitalDocument } from '../../api/bookApi';
+import { fetchReadingProgress } from '../../api/readingProgressApi';
 import EmptyState from '../../components/EmptyState';
+import ReadingRoom from '../../components/ReadingRoom';
 import { applyImageFallback, getCoverUrl } from '../../lib/display';
 import { getErrorMessage } from '../../lib/errors';
 import { emitToast } from '../../notifications/events';
 
 export default function Digital() {
-  const [activeFilter, setActiveFilter] = useState('ALL');
   const [isLoading, setIsLoading] = useState(true);
   const [documents, setDocuments] = useState<DigitalDocument[]>([]);
+  const [readingDoc, setReadingDoc] = useState<DigitalDocument | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const displayDocuments =
-    activeFilter === 'ALL'
-      ? documents
-      : documents.filter((doc) => doc.format === activeFilter);
+  const displayDocuments = documents;
 
   useEffect(() => {
     setIsLoading(true);
     setError(null);
 
-    fetchDigitalDocuments()
-      .then(setDocuments)
+    Promise.all([
+      fetchDigitalDocuments(),
+      fetchReadingProgress().catch(() => []),
+    ])
+      .then(([digitalDocuments, readingProgress]) => {
+        const progressByBook = new Map<number, import('../../types/book').ReadingProgressRecord>(
+          readingProgress.map((item) => [item.book_id, item] as [number, import('../../types/book').ReadingProgressRecord]),
+        );
+        setDocuments(
+          digitalDocuments.map((document) => ({
+            ...document,
+            readingProgress: progressByBook.get(document.id) ?? null,
+          })),
+        );
+      })
       .catch((error: unknown) => {
         const message = getErrorMessage(error, 'Không thể tải tài liệu số.');
         setError(message);
@@ -31,7 +43,7 @@ export default function Digital() {
   }, []);
 
   return (
-    <div className="flex h-full flex-col space-y-8 p-8">
+    <div className="flex h-full flex-col space-y-6 p-4 md:p-8">
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
         <div>
           <h2 className="text-3xl font-bold text-on-surface">Tài liệu số</h2>
@@ -41,23 +53,7 @@ export default function Digital() {
         </div>
       </div>
 
-      <div className="custom-scrollbar flex w-fit shrink-0 gap-2 overflow-x-auto rounded-xl bg-surface-container-low p-1">
-        {['ALL', 'PDF', 'EPUB', 'AUDIO', 'SLIDES'].map((filter) => (
-          <button
-            key={filter}
-            onClick={() => setActiveFilter(filter)}
-            className={`whitespace-nowrap rounded-lg px-6 py-2.5 text-sm font-semibold transition-all ${
-              activeFilter === filter
-                ? 'bg-surface-bright text-primary scholar-shadow'
-                : 'text-on-surface-variant hover:text-on-surface'
-            }`}
-          >
-            {filter === 'ALL' ? 'Tất cả định dạng' : filter}
-          </button>
-        ))}
-      </div>
-
-      <div className="grid auto-rows-max grid-cols-1 gap-6 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+      <div className="grid auto-rows-max grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
         {isLoading ? (
           <div className="col-span-full py-12 text-center font-medium text-on-surface-variant">
             Đang tải tài liệu...
@@ -114,18 +110,14 @@ export default function Digital() {
                   </div>
                 </div>
 
-                <div className="mt-4 grid grid-cols-2 gap-2">
+                <div className="mt-4 grid grid-cols-2 gap-1.5">
                   <button
                     type="button"
                     disabled={!resource.openUrl}
-                    onClick={() => {
-                      if (resource.openUrl) {
-                        window.open(resource.openUrl, '_blank', 'noopener,noreferrer');
-                      }
-                    }}
-                    className="rounded-lg bg-primary px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-surface-container-high disabled:text-outline"
+                    onClick={() => setReadingDoc(resource)}
+                    className="rounded-lg bg-primary px-2 py-2 text-[11px] font-bold text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-surface-container-high disabled:text-outline"
                   >
-                    Mở tệp
+                    Mở đọc
                   </button>
                   <button
                     type="button"
@@ -135,7 +127,7 @@ export default function Digital() {
                         window.open(resource.downloadUrl, '_blank', 'noopener,noreferrer');
                       }
                     }}
-                    className="rounded-lg border border-surface-container-high px-3 py-2 text-xs font-bold text-on-surface transition-colors hover:bg-surface-container-low disabled:cursor-not-allowed disabled:text-outline"
+                    className="rounded-lg border border-surface-container-high px-2 py-2 text-[11px] font-bold text-on-surface transition-colors hover:bg-surface-container-low disabled:cursor-not-allowed disabled:text-outline"
                   >
                     Tải về
                   </button>
@@ -145,11 +137,57 @@ export default function Digital() {
                     Bản ghi này đang dùng tệp xem trước cho đến khi thủ thư gắn tài liệu thật.
                   </p>
                 ) : null}
+                {(resource.aiTags?.length ?? 0) > 0 ? (
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {resource.aiTags?.slice(0, 3).map((tag) => (
+                      <span
+                        key={tag}
+                        className="rounded-md bg-primary/5 px-2 py-0.5 text-[10px] font-semibold text-primary"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+                {resource.readingProgress ? (
+                  <div className="mt-3 space-y-1">
+                    <div className="h-1.5 overflow-hidden rounded-full bg-surface-container-high">
+                      <div
+                        className="h-full rounded-full bg-primary"
+                        style={{ width: `${Math.min(100, resource.readingProgress.progress_percent)}%` }}
+                      />
+                    </div>
+                    <p className="text-[10px] font-semibold text-on-surface-variant">
+                      Tiếp tục: trang {resource.readingProgress.current_page}/{resource.readingProgress.total_pages}
+                    </p>
+                  </div>
+                ) : null}
               </div>
             </div>
           ))
         )}
       </div>
+
+      {readingDoc && (
+        <ReadingRoom
+          document={readingDoc}
+          onClose={() => setReadingDoc(null)}
+          onProgressSaved={(progress) => {
+            setDocuments((current) =>
+              current.map((document) =>
+                document.id === progress.book_id
+                  ? { ...document, readingProgress: progress }
+                  : document,
+              ),
+            );
+            setReadingDoc((current) =>
+              current && current.id === progress.book_id
+                ? { ...current, readingProgress: progress }
+                : current,
+            );
+          }}
+        />
+      )}
     </div>
   );
 }
