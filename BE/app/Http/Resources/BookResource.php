@@ -22,10 +22,19 @@ class BookResource extends JsonResource
             'file_format' => $this->file_format,
             'file_size' => $this->file_size,
             'file_url' => $this->file_url,
+            'has_digital_file' => filled($this->file_path),
+            'digital_file_name' => $this->file_path ? basename($this->file_path) : null,
+            'ai_summary' => $this->ai_summary,
+            'ai_tags' => $this->ai_tags ?? [],
+            'ai_summary_generated_at' => $this->ai_summary_generated_at?->toISOString(),
             'download_count' => $this->download_count,
             'total_quantity' => $this->total_quantity,
             'available_quantity' => $this->available_quantity,
             'is_available' => (bool) $this->is_available,
+            'favorite_count' => (int) ($this->favorite_count ?? $this->favoritedBy()->count()),
+            'is_favorite' => (bool) ($this->is_favorite ?? false),
+            'avg_rating' => (float) round($this->reviews()->avg('rating') ?? 0, 1),
+            'reviews_count' => (int) $this->reviews()->count(),
         ];
     }
 }

@@ -1,18 +1,16 @@
 import type { AuthUser, UserRole } from '../auth/storage';
 import { apiRequest } from './client';
 import type { MemberApiRecord, MemberPayload } from '../types/member';
-
-type PaginatedResponse<T> = {
-  data: T[];
-};
+import type { PaginatedResponse } from '../types/pagination';
 
 type UpdateProfilePayload = {
   name: string;
-  email?: string | null;
   phone_number?: string | null;
   current_password?: string;
   password?: string;
   password_confirmation?: string;
+  notify_due_soon?: boolean;
+  notify_new_books?: boolean;
 };
 
 type MeResponse = {
@@ -26,16 +24,10 @@ type UpdateProfileResponse = {
   role: UserRole;
 };
 
-function unwrapCollection<T>(payload: T[] | PaginatedResponse<T>) {
-  return Array.isArray(payload) ? payload : payload.data;
-}
-
-export async function getAllMembers() {
-  const data = await apiRequest<MemberApiRecord[] | PaginatedResponse<MemberApiRecord>>(
-    '/members?limit=1000'
+export async function getAllMembers(page = 1, query = '') {
+  return apiRequest<PaginatedResponse<MemberApiRecord>>(
+    `/members?limit=10&page=${page}&query=${encodeURIComponent(query)}`
   );
-
-  return unwrapCollection(data);
 }
 
 export async function createMember(payload: MemberPayload) {
@@ -68,3 +60,13 @@ export async function updateMyProfile(payload: UpdateProfilePayload) {
     body: payload,
   });
 }
+
+export async function importMembers(file: File) {
+  const formData = new FormData();
+  formData.append('file', file);
+  return apiRequest<{ message: string; success_count: number; errors: string[] }>('/members/import', {
+    method: 'POST',
+    body: formData,
+  });
+}
+

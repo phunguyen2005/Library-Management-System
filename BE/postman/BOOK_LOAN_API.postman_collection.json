@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "e2f40d3b-5c9f-4f01-b9ac-4e0f5e74ac10",
     "name": "BOOK_LOAN_MIDTERM API",
-    "description": "Collection for BOOK_LOAN_MIDTERM backend API. Generated from current BE routes.",
+    "description": "Current Laravel Sanctum API collection for the Book Loan Midterm project.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -11,19 +11,35 @@
       "value": "http://localhost:8000/api"
     },
     {
-      "key": "member_id",
-      "value": "1"
+      "key": "student_identifier",
+      "value": "4801104101@student.hcmue.edu.vn"
     },
     {
-      "key": "librarian_id",
-      "value": "1"
+      "key": "admin_identifier",
+      "value": "nguyen.van.an@hcmue.edu.vn"
+    },
+    {
+      "key": "demo_password",
+      "value": "Library@2026"
+    },
+    {
+      "key": "student_token",
+      "value": ""
+    },
+    {
+      "key": "admin_token",
+      "value": ""
     },
     {
       "key": "book_id",
-      "value": "101"
+      "value": "2"
     },
     {
       "key": "loan_id",
+      "value": "2"
+    },
+    {
+      "key": "member_id",
       "value": "1"
     }
   ],
@@ -32,7 +48,19 @@
       "name": "Auth",
       "item": [
         {
-          "name": "Login",
+          "name": "Login Student",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const data = pm.response.json();",
+                  "if (data.token) pm.collectionVariables.set('student_token', data.token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [
@@ -43,21 +71,55 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"role\": \"student\",\n  \"identifier\": \"4801104101@student.hcmue.edu.vn\",\n  \"password\": \"123456\"\n}"
+              "raw": "{\n  \"role\": \"student\",\n  \"identifier\": \"{{student_identifier}}\",\n  \"password\": \"{{demo_password}}\"\n}"
             },
-            "url": {
-              "raw": "{{base_url}}/login",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "login"
-              ]
+            "url": "{{base_url}}/login"
+          }
+        },
+        {
+          "name": "Login Admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const data = pm.response.json();",
+                  "if (data.token) pm.collectionVariables.set('admin_token', data.token);"
+                ],
+                "type": "text/javascript"
+              }
             }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"admin\",\n  \"identifier\": \"{{admin_identifier}}\",\n  \"password\": \"{{demo_password}}\"\n}"
+            },
+            "url": "{{base_url}}/login"
           }
         },
         {
           "name": "Register Student",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const data = pm.response.json();",
+                  "if (data.token) pm.collectionVariables.set('student_token', data.token);",
+                  "if (data.user?.member_id) pm.collectionVariables.set('member_id', data.user.member_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [
@@ -68,55 +130,70 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"New Student\",\n  \"email\": \"newstudent@hcmue.edu.vn\",\n  \"password\": \"123456\",\n  \"phone_number\": \"0900000000\"\n}"
+              "raw": "{\n  \"name\": \"Postman Student\",\n  \"email\": \"postman.student{{$timestamp}}@student.hcmue.edu.vn\",\n  \"phone_number\": \"0900000000\",\n  \"password\": \"Student123\",\n  \"password_confirmation\": \"Student123\"\n}"
             },
-            "url": {
-              "raw": "{{base_url}}/register",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "register"
-              ]
-            }
+            "url": "{{base_url}}/register"
           }
         },
         {
-          "name": "Get User (student only)",
+          "name": "Get My Profile",
           "request": {
-            "method": "GET",
-            "url": {
-              "raw": "{{base_url}}/users/{{member_id}}?role=student",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "users",
-                "{{member_id}}"
-              ],
-              "query": [
+            "auth": {
+              "type": "bearer",
+              "bearer": [
                 {
-                  "key": "role",
-                  "value": "student"
+                  "key": "token",
+                  "value": "{{student_token}}",
+                  "type": "string"
                 }
               ]
-            }
+            },
+            "method": "GET",
+            "url": "{{base_url}}/me"
           }
         },
         {
-          "name": "Get All Members",
+          "name": "Update My Profile",
           "request": {
-            "method": "GET",
-            "url": {
-              "raw": "{{base_url}}/admin/members",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "admin",
-                "members"
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{student_token}}",
+                  "type": "string"
+                }
               ]
-            }
+            },
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Student Name\",\n  \"phone_number\": \"0900000001\"\n}"
+            },
+            "url": "{{base_url}}/me"
+          }
+        },
+        {
+          "name": "Logout Current Token",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{student_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "url": "{{base_url}}/logout"
           }
         }
       ]
@@ -125,45 +202,44 @@
       "name": "Books",
       "item": [
         {
-          "name": "Get Books",
+          "name": "List Books",
           "request": {
             "method": "GET",
-            "url": {
-              "raw": "{{base_url}}/books",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "books"
-              ]
-            }
+            "url": "{{base_url}}/books?limit=1000"
           }
         },
         {
           "name": "Search Books",
           "request": {
             "method": "GET",
-            "url": {
-              "raw": "{{base_url}}/books/search?query=web",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "books",
-                "search"
-              ],
-              "query": [
-                {
-                  "key": "query",
-                  "value": "web"
-                }
-              ]
-            }
+            "url": "{{base_url}}/books?query=python&limit=20"
           }
         },
         {
           "name": "Create Book",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const data = pm.response.json();",
+                  "if (data.book_id) pm.collectionVariables.set('book_id', data.book_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
             "method": "POST",
             "header": [
               {
@@ -173,23 +249,24 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"title\": \"Clean Architecture\",\n  \"author\": \"Robert C. Martin\",\n  \"genre\": \"Software Engineering\",\n  \"published_year\": 2018,\n  \"cover\": \"https://example.com/cover.jpg\",\n  \"location\": \"Khu A2\",\n  \"quantity\": 3\n}"
+              "raw": "{\n  \"title\": \"Clean Architecture\",\n  \"author\": \"Robert C. Martin\",\n  \"genre\": \"Software Engineering\",\n  \"published_year\": 2018,\n  \"cover\": \"https://example.com/cover.jpg\",\n  \"location\": \"Shelf A2\",\n  \"quantity\": 3\n}"
             },
-            "url": {
-              "raw": "{{base_url}}/admin/books",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "admin",
-                "books"
-              ]
-            }
+            "url": "{{base_url}}/books"
           }
         },
         {
           "name": "Update Book",
           "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
             "method": "PUT",
             "header": [
               {
@@ -199,46 +276,70 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"title\": \"Clean Architecture (Updated)\",\n  \"quantity\": 5\n}"
+              "raw": "{\n  \"title\": \"Clean Architecture Updated\",\n  \"author\": \"Robert C. Martin\",\n  \"genre\": \"Software Engineering\",\n  \"published_year\": 2018,\n  \"cover\": \"https://example.com/cover.jpg\",\n  \"location\": \"Shelf A3\",\n  \"quantity\": 5\n}"
             },
-            "url": {
-              "raw": "{{base_url}}/admin/books/{{book_id}}",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "admin",
-                "books",
-                "{{book_id}}"
-              ]
-            }
+            "url": "{{base_url}}/books/{{book_id}}"
           }
         },
         {
           "name": "Delete Book",
           "request": {
-            "method": "DELETE",
-            "url": {
-              "raw": "{{base_url}}/admin/books/{{book_id}}",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "admin",
-                "books",
-                "{{book_id}}"
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
               ]
-            }
+            },
+            "method": "DELETE",
+            "url": "{{base_url}}/books/{{book_id}}"
           }
         }
       ]
     },
     {
-      "name": "Borrow",
+      "name": "Digital Documents",
+      "item": [
+        {
+          "name": "List Digital Documents",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/digital-documents"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Borrow Requests",
       "item": [
         {
           "name": "Create Borrow Request",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const data = pm.response.json();",
+                  "if (data.loan?.loan_id) pm.collectionVariables.set('loan_id', data.loan.loan_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{student_token}}",
+                  "type": "string"
+                }
+              ]
+            },
             "method": "POST",
             "header": [
               {
@@ -248,56 +349,180 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"member_id\": {{member_id}},\n  \"book_id\": {{book_id}}\n}"
+              "raw": "{\n  \"book_id\": {{book_id}}\n}"
             },
-            "url": {
-              "raw": "{{base_url}}/borrow/request",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "borrow",
-                "request"
-              ]
-            }
+            "url": "{{base_url}}/requests"
           }
         },
         {
-          "name": "Get Member Requests",
+          "name": "My Requests",
           "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{student_token}}",
+                  "type": "string"
+                }
+              ]
+            },
             "method": "GET",
-            "url": {
-              "raw": "{{base_url}}/borrow/member/{{member_id}}",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "borrow",
-                "member",
-                "{{member_id}}"
-              ]
-            }
+            "url": "{{base_url}}/requests/me?limit=1000"
           }
         },
         {
-          "name": "Get All Borrow Requests",
+          "name": "All Requests",
           "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
             "method": "GET",
-            "url": {
-              "raw": "{{base_url}}/admin/borrow",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "admin",
-                "borrow"
-              ]
-            }
+            "url": "{{base_url}}/requests?limit=1000"
           }
         },
         {
-          "name": "Approve Borrow",
+          "name": "Approve Request",
           "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "url": "{{base_url}}/requests/{{loan_id}}/approve"
+          }
+        },
+        {
+          "name": "Reject Request",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Request rejected from Postman smoke test.\"\n}"
+            },
+            "url": "{{base_url}}/requests/{{loan_id}}/reject"
+          }
+        },
+        {
+          "name": "Return Request",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "url": "{{base_url}}/requests/{{loan_id}}/return"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Members",
+      "item": [
+        {
+          "name": "List Members",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "url": "{{base_url}}/members?limit=1000"
+          }
+        },
+        {
+          "name": "Create Member",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const data = pm.response.json();",
+                  "if (data.member_id) pm.collectionVariables.set('member_id', data.member_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Postman Member\",\n  \"email\": \"postman.member{{$timestamp}}@student.hcmue.edu.vn\",\n  \"phone_number\": \"0900000002\",\n  \"join_date\": \"2026-04-19\",\n  \"password\": \"Student123\",\n  \"password_confirmation\": \"Student123\"\n}"
+            },
+            "url": "{{base_url}}/members"
+          }
+        },
+        {
+          "name": "Update Member",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            },
             "method": "PUT",
             "header": [
               {
@@ -307,48 +532,26 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"librarian_id\": {{librarian_id}}\n}"
+              "raw": "{\n  \"name\": \"Postman Member Updated\",\n  \"email\": \"postman.member.updated{{$timestamp}}@student.hcmue.edu.vn\",\n  \"phone_number\": \"0900000003\",\n  \"join_date\": \"2026-04-20\"\n}"
             },
-            "url": {
-              "raw": "{{base_url}}/admin/borrow/{{loan_id}}/approve",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "admin",
-                "borrow",
-                "{{loan_id}}",
-                "approve"
-              ]
-            }
+            "url": "{{base_url}}/members/{{member_id}}"
           }
         },
         {
-          "name": "Return Book",
+          "name": "Delete Member",
           "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"librarian_id\": {{librarian_id}}\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/admin/borrow/{{loan_id}}/return",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "admin",
-                "borrow",
-                "{{loan_id}}",
-                "return"
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
               ]
-            }
+            },
+            "method": "DELETE",
+            "url": "{{base_url}}/members/{{member_id}}"
           }
         }
       ]

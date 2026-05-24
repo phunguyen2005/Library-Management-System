@@ -17,6 +17,7 @@ class AuthenticatedUserResource extends JsonResource
             return [
                 'librarian_id' => $user->librarian_id,
                 'role' => $user->getRoleName(),
+                'permissions' => $user->getAllPermissions(),
                 'name' => $user->name,
                 'email' => $user->email,
                 'phone_number' => $user->phone_number,
@@ -32,6 +33,8 @@ class AuthenticatedUserResource extends JsonResource
                 'email' => $user->email,
                 'phone_number' => $user->phone_number,
                 'join_date' => $user->join_date?->toDateString(),
+                'notify_due_soon' => $user->notify_due_soon,
+                'notify_new_books' => $user->notify_new_books,
             ];
         }
 

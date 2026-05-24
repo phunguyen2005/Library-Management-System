@@ -15,6 +15,8 @@ class LibrarianResource extends JsonResource
             'email' => $this->email,
             'phone_number' => $this->phone_number,
             'hire_date' => $this->hire_date?->toDateString(),
+            'role' => $this->getRoleName(),
+            'permissions' => $this->permissions->pluck('name')->toArray(),
         ];
     }
 }

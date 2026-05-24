@@ -1,7 +1,7 @@
 export const APP_TOAST_EVENT = 'book-loan:toast';
 export const AUTH_EXPIRED_EVENT = 'book-loan:auth-expired';
 
-export type ToastTone = 'success' | 'error' | 'info';
+export type ToastTone = 'success' | 'error' | 'info' | 'warning';
 
 export type ToastEventDetail = {
   message: string;

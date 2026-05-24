@@ -298,7 +298,7 @@ export async function mockRegisterStudent(
   await wait();
 
   if (members.some((item) => item.email === email)) {
-    throw new Error('Email da ton tai.');
+    throw new Error('Email đã tồn tại.');
   }
 
   const memberId = members.reduce((max, item) => Math.max(max, item.member_id), 2301000) + 1;
@@ -443,7 +443,7 @@ export async function mockRequestBorrow(memberId: number, bookId: number) {
   }
 
   if (Number(book.available_quantity ?? 0) <= 0) {
-    throw new Error('Sach hien khong co san de muon.');
+    throw new Error('Sách hiện không có sẵn để mượn.');
   }
 
   const loan: MockBorrow = {
@@ -519,7 +519,7 @@ export async function mockApproveBorrow(loanId: number, librarianId: number) {
 
   const librarian = librarians.find((item) => item.librarian_id === librarianId);
   if (!librarian) {
-    throw new Error('Librarian khong hop le.');
+    throw new Error('Thủ thư không hợp lệ.');
   }
 
   const loan = borrows.find((item) => item.loan_id === loanId);
@@ -533,7 +533,7 @@ export async function mockApproveBorrow(loanId: number, librarianId: number) {
 
   const book = books.find((item) => item.book_id === loan.book_id);
   if (!book || Number(book.available_quantity ?? 0) <= 0) {
-    throw new Error('Sach hien khong co san.');
+    throw new Error('Sách hiện không có sẵn.');
   }
 
   loan.status = 'borrowed';
@@ -554,7 +554,7 @@ export async function mockReturnBook(loanId: number, librarianId: number) {
 
   const librarian = librarians.find((item) => item.librarian_id === librarianId);
   if (!librarian) {
-    throw new Error('Librarian khong hop le.');
+    throw new Error('Thủ thư không hợp lệ.');
   }
 
   const loan = borrows.find((item) => item.loan_id === loanId);

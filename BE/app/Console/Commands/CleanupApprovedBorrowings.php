@@ -1,0 +1,86 @@
+<?php
+
+namespace App\Console\Commands;
+
+use App\Models\Book;
+use App\Models\Borrowing;
+use App\Models\LibrarySetting;
+use App\Notifications\BorrowingStatusNotification;
+use App\Notifications\BorrowingStatusMailNotification;
+use App\Services\AuditLoggerService;
+use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
+
+class CleanupApprovedBorrowings extends Command
+{
+    protected $signature = 'borrowings:cleanup-approved';
+
+    protected $description = 'Tự động hủy phiếu mượn đã duyệt nhưng sinh viên không đến nhận trong thời hạn cấu hình.';
+
+    public function handle(): int
+    {
+        $settings = LibrarySetting::singleton();
+        $deadlineHours = max(1, (int) ($settings->pickup_deadline_hours ?? LibrarySetting::DEFAULT_PICKUP_DEADLINE_HOURS));
+        $cutoff = now()->subHours($deadlineHours);
+
+        $expiredLoans = Borrowing::query()
+            ->where('status', Borrowing::STATUS_APPROVED)
+            ->where('updated_at', '<=', $cutoff)
+            ->with(['book', 'member'])
+            ->get();
+
+        if ($expiredLoans->isEmpty()) {
+            $this->info('Không có phiếu nào hết hạn nhận sách.');
+            return Command::SUCCESS;
+        }
+
+        $count = 0;
+
+        foreach ($expiredLoans as $loan) {
+            DB::transaction(function () use ($loan, $deadlineHours, &$count) {
+                $fresh = Borrowing::query()->lockForUpdate()->find($loan->loan_id);
+
+                if (! $fresh || $fresh->status !== Borrowing::STATUS_APPROVED) {
+                    return;
+                }
+
+                $fresh->status = Borrowing::STATUS_CANCELLED;
+                $fresh->rejection_reason = "Hết thời hạn {$deadlineHours}h nhận sách — tự động hủy bởi hệ thống";
+                $fresh->rejected_at = now();
+                $fresh->save();
+
+                // Restore inventory (approved had decremented available_quantity)
+                $book = Book::query()->lockForUpdate()->find($fresh->book_id);
+                if ($book) {
+                    $book->available_quantity = min($book->total_quantity, $book->available_quantity + 1);
+                    $book->is_available = $book->available_quantity > 0;
+                    $book->save();
+
+                    // Process next person in the reservation queue for this book
+                    \App\Http\Controllers\BorrowController::processNextInQueue($book->book_id);
+                }
+
+                AuditLoggerService::log(
+                    'borrow_expire',
+                    'Tự động hủy phiếu đã duyệt quá hạn nhận ' . $deadlineHours . 'h: ' .
+                    $loan->book?->title . ' của ' . $loan->member?->name .
+                    ' (Mã phiếu: #' . $fresh->loan_id . ')',
+                    null
+                );
+
+                try {
+                    $fresh->member?->notify(new BorrowingStatusNotification($fresh, 'expired'));
+                    $fresh->member?->notify(new BorrowingStatusMailNotification($fresh, 'expired'));
+                } catch (\Exception $e) {
+                    // Ignore notification failures in local/test
+                }
+
+                $count++;
+            });
+        }
+
+        $this->info("Đã tự động hủy {$count} phiếu mượn đã duyệt quá hạn nhận sách ({$deadlineHours}h).");
+
+        return Command::SUCCESS;
+    }
+}

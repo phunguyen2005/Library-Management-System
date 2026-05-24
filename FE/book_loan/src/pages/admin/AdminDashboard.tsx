@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { deleteBook, fetchBooks } from '../../api/bookApi';
+import { API_BASE_URL } from '../../api/client';
 import {
   approveBorrow,
   getAllRequests,
@@ -9,6 +10,9 @@ import {
   type BorrowRequest,
 } from '../../api/borrowApi';
 import { getAllMembers } from '../../api/userApi';
+import { fetchHealthStatus, type HealthStatus } from '../../api/healthApi';
+import EmptyState from '../../components/EmptyState';
+import { applyImageFallback } from '../../lib/display';
 import { getErrorMessage, isUnauthorizedError } from '../../lib/errors';
 import { emitToast } from '../../notifications/events';
 import type { FormattedBook } from '../../types/book';
@@ -93,8 +97,10 @@ export default function AdminDashboard() {
   const [inventoryBooks, setInventoryBooks] = useState<DashboardInventoryBook[]>([]);
   const [allRequests, setAllRequests] = useState<BorrowRequest[]>([]);
   const [stats, setStats] = useState<DashboardStats>(INITIAL_STATS);
+  const [health, setHealth] = useState<HealthStatus | null>(null);
   const [quickForm, setQuickForm] = useState<QuickActionForm>({ memberId: '', bookId: '' });
   const [quickFeedback, setQuickFeedback] = useState<QuickActionFeedback | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [loadingAction, setLoadingAction] = useState<'borrow' | 'return' | null>(null);
   const [inventoryFilter, setInventoryFilter] = useState<'all' | 'paper' | 'digital' | 'reference'>('all');
   const [inventorySort, setInventorySort] = useState<'newest' | 'title' | 'quantity'>('newest');
@@ -102,31 +108,48 @@ export default function AdminDashboard() {
 
   const loadDashboard = async () => {
     try {
-      const [books, requests, members] = await Promise.all([
+      setLoadError(null);
+      const [books, requests, members, healthStatus] = await Promise.all([
         fetchBooks(),
         getAllRequests(),
         getAllMembers(),
+        fetchHealthStatus().catch(() => null),
       ]);
 
       setAllRequests(requests);
-      setInventoryBooks(books.map(mapInventoryBook));
+      setHealth(healthStatus);
+      setInventoryBooks(books.data.map(mapInventoryBook));
 
       const pending = requests.filter((request) => request.raw_status === 'pending');
       const returned = requests.filter((request) => request.raw_status === 'returned');
-      const overdue = requests.filter(
-        (request) => request.raw_status === 'borrowed' && Boolean(request.due_date),
-      ).filter((request) => new Date(request.due_date as string) < new Date()).length;
+      const overdue = requests.filter((request) => {
+        if (request.raw_status !== 'borrowed') {
+          return false;
+        }
+
+        if (typeof request.is_overdue === 'boolean') {
+          return request.is_overdue;
+        }
+
+        return Boolean(request.due_date) && new Date(request.due_date as string) < new Date();
+      }).length;
 
       setPendingRequests(pending.slice(0, 5));
       setRecentReturns(returned.slice(0, 5));
       setStats({
         requests: pending.length,
         overdue,
-        books: books.length,
-        members: members.length,
+        books: books.meta?.total ?? books.data.length,
+        members: members.meta?.total ?? members.data.length,
       });
-    } catch (error) {
-      console.error(error);
+    } catch (error: unknown) {
+      if (isUnauthorizedError(error)) {
+        return;
+      }
+
+      const message = getErrorMessage(error, 'Không thể tải dữ liệu dashboard.');
+      setLoadError(message);
+      emitToast({ tone: 'error', title: 'Không thể tải dashboard', message });
     }
   };
 
@@ -305,8 +328,13 @@ export default function AdminDashboard() {
       await approveBorrow(loanId);
       emitToast({ tone: 'success', title: 'Đã duyệt yêu cầu', message: `Phiếu #${loanId} đã được chuyển sang trạng thái mượn.` });
       await loadDashboard();
-    } catch (error) {
-      console.error(error);
+    } catch (error: unknown) {
+      if (isUnauthorizedError(error)) {
+        return;
+      }
+
+      const message = getErrorMessage(error, 'Không thể duyệt yêu cầu lúc này.');
+      emitToast({ tone: 'error', title: 'Không thể duyệt yêu cầu', message });
     }
   };
 
@@ -392,9 +420,16 @@ export default function AdminDashboard() {
     URL.revokeObjectURL(url);
   };
 
+  const healthIsOk = health?.status === 'ok';
+  const apiDocsUrl = `${API_BASE_URL}/docs`;
+
   return (
     <div className="p-8 space-y-8 max-w-7xl mx-auto w-full">
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      {loadError ? (
+        <EmptyState icon="error" title="Không thể tải đầy đủ dashboard" message={loadError} />
+      ) : null}
+
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-5">
         <div className="bg-surface-bright p-6 rounded-xl scholar-shadow border border-surface-container-low">
           <div className="w-12 h-12 rounded-lg bg-primary/10 text-primary flex items-center justify-center mb-4">
             <span className="material-symbols-outlined">pending_actions</span>
@@ -423,6 +458,24 @@ export default function AdminDashboard() {
           <p className="text-outline text-xs font-bold uppercase tracking-wider">Thành viên</p>
           <h3 className="text-3xl font-bold mt-1">{stats.members.toLocaleString('vi-VN')}</h3>
         </div>
+        <button
+          type="button"
+          onClick={() => window.open(apiDocsUrl, '_blank', 'noopener,noreferrer')}
+          className="bg-surface-bright p-6 rounded-xl scholar-shadow border border-surface-container-low text-left transition-transform hover:-translate-y-1"
+        >
+          <div
+            className={`w-12 h-12 rounded-lg flex items-center justify-center mb-4 ${
+              healthIsOk ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
+            }`}
+          >
+            <span className="material-symbols-outlined">
+              {healthIsOk ? 'monitor_heart' : 'warning'}
+            </span>
+          </div>
+          <p className="text-outline text-xs font-bold uppercase tracking-wider">System health</p>
+          <h3 className="text-3xl font-bold mt-1">{health ? (healthIsOk ? 'OK' : 'DEG') : '...'}</h3>
+          <p className="mt-1 text-[10px] font-medium text-outline">API docs & checks</p>
+        </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -537,7 +590,18 @@ export default function AdminDashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-surface-container">
-                  {pendingRequests.map((request) => (
+                  {pendingRequests.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="px-6 py-8">
+                        <EmptyState
+                          icon="assignment_turned_in"
+                          title="Không có yêu cầu chờ duyệt"
+                          message="Yêu cầu mượn mới của sinh viên sẽ xuất hiện tại đây."
+                        />
+                      </td>
+                    </tr>
+                  ) : (
+                    pendingRequests.map((request) => (
                     <tr key={request.id} className="hover:bg-surface-container/50 transition-all group">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
@@ -574,7 +638,8 @@ export default function AdminDashboard() {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -687,7 +752,14 @@ export default function AdminDashboard() {
                     <tr key={book.id} className="hover:bg-surface-container/30 transition-all">
                       <td className="px-6 py-4">
                         <div className="w-12 h-16 rounded-lg bg-surface-container-high overflow-hidden border border-surface-container">
-                          <img src={book.cover} alt={book.title} loading="lazy" decoding="async" className="w-full h-full object-cover" />
+                          <img
+                            src={book.cover}
+                            alt={book.title}
+                            onError={(event) => applyImageFallback(event.currentTarget)}
+                            loading="lazy"
+                            decoding="async"
+                            className="w-full h-full object-cover"
+                          />
                         </div>
                       </td>
                       <td className="px-6 py-4">

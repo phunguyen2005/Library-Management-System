@@ -60,7 +60,7 @@ class AdminMemberCrudTest extends TestCase
             ->deleteJson('/api/members/'.$memberId)
             ->assertOk()
             ->assertJson([
-                'message' => 'Xoa thanh vien thanh cong.',
+                'message' => 'Xóa thành viên thành công.',
             ]);
 
         $this->assertDatabaseMissing('members', [
@@ -77,7 +77,7 @@ class AdminMemberCrudTest extends TestCase
             ->deleteJson('/api/members/1')
             ->assertStatus(422)
             ->assertJson([
-                'message' => 'Khong the xoa thanh vien da co lich su muon.',
+                'message' => 'Không thể xóa thành viên đã có lịch sử mượn.',
             ]);
 
         $this->assertDatabaseHas('members', [
@@ -99,7 +99,7 @@ class AdminMemberCrudTest extends TestCase
             ])
             ->assertForbidden()
             ->assertJson([
-                'message' => 'Forbidden.',
+                'message' => 'Bạn không có quyền thực hiện thao tác này.',
             ]);
     }
 }

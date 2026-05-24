@@ -1,245 +1,472 @@
 import React, { useEffect, useState } from 'react';
-import { fetchBooks, fetchDigitalDocuments } from '../../api/bookApi';
-import { getAllRequests } from '../../api/borrowApi';
-import { getAllMembers } from '../../api/userApi';
+import { motion, AnimatePresence } from 'framer-motion';
+
+import {
+  getReportsData,
+  ReportData,
+  ReportFilter,
+  ReportFilterType,
+} from '../../api/reportApi';
+import EmptyState from '../../components/EmptyState';
 import { getErrorMessage } from '../../lib/errors';
+import { emitToast } from '../../notifications/events';
 
-type ReportStats = {
-  borrows: number;
-  members: number;
-  overdueRate: number;
-  digitalDownloads: number;
-};
+import {
+  DonutChart,
+  TrendLineChart,
+  RevenueTrendChart,
+  PaymentMethodsChart,
+} from './reports/ReportCharts';
+import {
+  StatCard,
+  FinanceCard,
+  TopBooksList,
+  TopMembersList,
+  RecentTransactionsTable,
+} from './reports/ReportWidgets';
 
-type ReportBar = {
-  label: string;
-  value: number;
-};
+// ─── helpers ────────────────────────────────────────────────────────────────
 
-type TopBook = {
-  name: string;
-  author: string;
-  borrowCount: number;
-  percentage: number;
-};
+function todayString() { return new Date().toISOString().slice(0, 10); }
+function currentMonthString() { return new Date().toISOString().slice(0, 7); }
+function currentYearString() { return String(new Date().getFullYear()); }
 
-const INITIAL_STATS: ReportStats = {
-  borrows: 0,
-  members: 0,
-  overdueRate: 0,
-  digitalDownloads: 0,
-};
-
-function getBarHeightClass(value: number) {
-  if (value >= 6) return 'h-44';
-  if (value >= 5) return 'h-40';
-  if (value >= 4) return 'h-36';
-  if (value >= 3) return 'h-32';
-  if (value >= 2) return 'h-28';
-  if (value >= 1) return 'h-24';
-  return 'h-20';
+function formatDateDMY(dateStr: string) {
+  const parts = dateStr.split('-');
+  return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : dateStr;
 }
 
-function getWidthClass(percentage: number) {
-  if (percentage >= 90) return 'w-[90%]';
-  if (percentage >= 75) return 'w-3/4';
-  if (percentage >= 60) return 'w-3/5';
-  if (percentage >= 50) return 'w-1/2';
-  if (percentage >= 40) return 'w-2/5';
-  if (percentage >= 25) return 'w-1/4';
-  return 'w-1/5';
+function filterLabel(filter: ReportFilter): string {
+  if (!filter) return 'Tất cả thời gian';
+  if (filter.filter_type === 'day') return `Ngày ${formatDateDMY(filter.filter_value)}`;
+  if (filter.filter_type === 'range') {
+    const [start, end] = filter.filter_value.split(',');
+    return `Ngày ${formatDateDMY(start)} – ${formatDateDMY(end)}`;
+  }
+  if (filter.filter_type === 'month') {
+    const [y, m] = filter.filter_value.split('-');
+    return `Tháng ${parseInt(m, 10)}/${y}`;
+  }
+  return `Năm ${filter.filter_value}`;
 }
+
+// ─── Tab config ──────────────────────────────────────────────────────────────
+
+type TabKey = 'overview' | 'finance' | 'rankings';
+
+const TABS: { key: TabKey; label: string; icon: string }[] = [
+  { key: 'overview',  label: 'Tổng quan',   icon: 'dashboard' },
+  { key: 'finance',   label: 'Tài chính',   icon: 'payments' },
+  { key: 'rankings',  label: 'Bảng xếp hạng', icon: 'leaderboard' },
+];
+
+// ─── Chart section card wrapper ───────────────────────────────────────────────
+
+function ChartCard({
+  title, description, children, className = '',
+}: {
+  title: string;
+  description: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <section className={`bg-surface border border-border rounded-2xl p-6 shadow-sm flex flex-col gap-4 ${className}`}>
+      <div>
+        <h3 className="text-base font-bold text-foreground">{title}</h3>
+        <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
+      </div>
+      <div className="flex-1 flex items-center justify-center min-h-[200px]">
+        {children}
+      </div>
+    </section>
+  );
+}
+
+// ─── Main component ──────────────────────────────────────────────────────────
 
 export default function AdminReports() {
-  const [stats, setStats] = useState<ReportStats>(INITIAL_STATS);
-  const [bars, setBars] = useState<ReportBar[]>([]);
-  const [topBooks, setTopBooks] = useState<TopBook[]>([]);
+  const [data, setData] = useState<ReportData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<TabKey>('overview');
 
-  useEffect(() => {
-    let isActive = true;
+  // Filter state
+  const [filterType, setFilterType] = useState<ReportFilterType | 'all'>('all');
+  const [startDate, setStartDate] = useState(todayString());
+  const [endDate, setEndDate] = useState(todayString());
+  const [monthValue, setMonthValue] = useState(currentMonthString());
+  const [yearValue, setYearValue] = useState(currentYearString());
+  const [activeFilter, setActiveFilter] = useState<ReportFilter>(null);
 
-    const loadReports = async () => {
-      setIsLoading(true);
-      setError(null);
+  const buildFilter = (): ReportFilter => {
+    if (filterType === 'all') return null;
+    if (filterType === 'range') return { filter_type: 'range', filter_value: `${startDate},${endDate}` };
+    if (filterType === 'month') return { filter_type: 'month', filter_value: monthValue };
+    return { filter_type: 'year', filter_value: yearValue };
+  };
 
-      try {
-        const [books, requests, members, digitalDocuments] = await Promise.all([
-          fetchBooks(),
-          getAllRequests(),
-          getAllMembers(),
-          fetchDigitalDocuments(),
-        ]);
+  const loadReports = async (filter: ReportFilter) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      setData(await getReportsData(filter));
+    } catch (e: unknown) {
+      setError(getErrorMessage(e, 'Không thể tải báo cáo thống kê.'));
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-        const borrowed = requests.filter((request) => request.raw_status === 'borrowed');
-        const overdue = borrowed.filter((request) => {
-          if (!request.due_date) {
-            return false;
-          }
+  useEffect(() => { void loadReports(null); }, []);
 
-          return new Date(request.due_date) < new Date();
-        });
+  const handleApplyFilter = () => {
+    const f = buildFilter();
+    setActiveFilter(f);
+    void loadReports(f);
+  };
 
-        const requestCounts = books
-          .map((book) => ({
-            name: book.title,
-            author: book.author,
-            borrowCount: requests.filter(
-              (request) => Number(request.bookCode) === book.id,
-            ).length,
-          }))
-          .sort((a, b) => b.borrowCount - a.borrowCount);
+  const handleResetFilter = () => {
+    setFilterType('all');
+    setActiveFilter(null);
+    void loadReports(null);
+  };
 
-        const maxBorrowCount = requestCounts[0]?.borrowCount || 1;
+  // ── Export CSV ──────────────────────────────────────────────────────────────
+  const handleExportCSV = () => {
+    const sessionStr = localStorage.getItem('auth_session');
+    if (!sessionStr) return;
+    try {
+      const token = JSON.parse(sessionStr).token;
+      emitToast({ tone: 'info', title: 'Xuất báo cáo', message: 'Đang khởi tạo tải báo cáo offline...' });
 
-        if (!isActive) {
-          return;
-        }
-
-        setStats({
-          borrows: requests.length,
-          members: members.length,
-          overdueRate: borrowed.length ? Math.round((overdue.length / borrowed.length) * 100) : 0,
-          digitalDownloads: digitalDocuments.length,
-        });
-
-        setBars([
-          { label: 'Chờ duyệt', value: requests.filter((request) => request.raw_status === 'pending').length },
-          { label: 'Đang mượn', value: borrowed.length },
-          { label: 'Đã trả', value: requests.filter((request) => request.raw_status === 'returned').length },
-        ]);
-
-        setTopBooks(
-          requestCounts.slice(0, 4).map((book) => ({
-            ...book,
-            percentage: Math.max(10, Math.round((book.borrowCount / maxBorrowCount) * 100)),
-          })),
-        );
-      } catch (loadError: unknown) {
-        if (!isActive) {
-          return;
-        }
-
-        setError(getErrorMessage(loadError, 'Không thể tải báo cáo thống kê.'));
-      } finally {
-        if (isActive) {
-          setIsLoading(false);
-        }
+      let exportUrl = 'http://localhost:8000/api/reports/export';
+      if (activeFilter) {
+        exportUrl += '?' + new URLSearchParams({
+          filter_type: activeFilter.filter_type,
+          filter_value: activeFilter.filter_value,
+        }).toString();
       }
-    };
 
-    void loadReports();
+      fetch(exportUrl, { headers: { Authorization: `Bearer ${token}` } })
+        .then((res) => { if (!res.ok) throw new Error('Yêu cầu xuất báo cáo thất bại.'); return res.blob(); })
+        .then((blob) => {
+          const url = window.URL.createObjectURL(blob);
+          const a = Object.assign(document.createElement('a'), {
+            href: url,
+            download: `bao-cao-he-thong-${new Date().toISOString().slice(0, 10)}.csv`,
+          });
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          window.URL.revokeObjectURL(url);
+          emitToast({ tone: 'success', title: 'Thành công', message: 'Đã tải xuống báo cáo CSV thành công.' });
+        })
+        .catch((err: Error) => emitToast({ tone: 'error', title: 'Thất bại', message: err.message }));
+    } catch {
+      emitToast({ tone: 'error', title: 'Lỗi', message: 'Không thể xác thực để tải báo cáo.' });
+    }
+  };
 
-    return () => {
-      isActive = false;
-    };
-  }, []);
+  // ─── render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-8 p-8">
-      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
+    <div className="mx-auto w-full max-w-7xl space-y-6 p-6 lg:p-8">
+
+      {/* ── Page header ───────────────────────────────────────────────────── */}
+      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
         <div>
-          <h2 className="text-3xl font-bold text-on-surface">Báo cáo thống kê</h2>
-          <p className="mt-1 text-sm text-on-surface-variant">
-            Phân tích dữ liệu sử dụng thư viện và số liệu mượn trả.
+          <h2 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">
+            Báo Cáo &amp; Phân Tích
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Thống kê tình hình mượn trả, chỉ số tài chính và tổng quan hệ thống.
           </p>
         </div>
-      </div>
-
-      {error ? (
-        <div
-          role="alert"
-          className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900"
+        <button
+          type="button"
+          onClick={handleExportCSV}
+          disabled={isLoading || !data}
+          className="flex items-center gap-2 rounded-xl bg-primary hover:bg-primary-hover px-5 py-2.5 font-bold text-white shadow-lg shadow-primary/20 transition-all hover:-translate-y-0.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
         >
-          {error}
-        </div>
-      ) : null}
-
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-4">
-        <div className="rounded-2xl border border-surface-container-low bg-surface-bright p-6 scholar-shadow">
-          <p className="mb-1 text-xs font-bold uppercase tracking-wider text-outline">Lượt mượn / trả</p>
-          <h3 className="text-3xl font-bold text-on-surface">
-            {isLoading ? '—' : stats.borrows}
-          </h3>
-        </div>
-        <div className="rounded-2xl border border-surface-container-low bg-surface-bright p-6 scholar-shadow">
-          <p className="mb-1 text-xs font-bold uppercase tracking-wider text-outline">Thành viên</p>
-          <h3 className="text-3xl font-bold text-on-surface">
-            {isLoading ? '—' : stats.members}
-          </h3>
-        </div>
-        <div className="rounded-2xl border border-surface-container-low bg-surface-bright p-6 scholar-shadow">
-          <p className="mb-1 text-xs font-bold uppercase tracking-wider text-outline">Tỷ lệ quá hạn</p>
-          <h3 className="text-3xl font-bold text-on-surface">
-            {isLoading ? '—' : `${stats.overdueRate}%`}
-          </h3>
-        </div>
-        <div className="rounded-2xl border border-surface-container-low bg-surface-bright p-6 scholar-shadow">
-          <p className="mb-1 text-xs font-bold uppercase tracking-wider text-outline">
-            Tài liệu số
-          </p>
-          <h3 className="text-3xl font-bold text-on-surface">
-            {isLoading ? '—' : stats.digitalDownloads}
-          </h3>
-        </div>
+          <span className="material-symbols-outlined text-[16px]">file_download</span>
+          Xuất CSV
+        </button>
       </div>
 
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-        <section className="flex h-[400px] flex-col rounded-2xl border border-surface-container-low bg-surface-bright p-6 scholar-shadow">
-          <h3 className="mb-6 text-lg font-bold text-on-surface">Phân bố trạng thái phiếu mượn</h3>
-          <div className="flex flex-1 items-end justify-between gap-6 rounded-xl border-b border-l border-surface-container px-4 pb-2">
-            {isLoading ? (
-              <div className="flex h-full w-full items-center justify-center text-sm text-on-surface-variant">
-                Đang tải dữ liệu...
-              </div>
-            ) : (
-              bars.map((bar) => (
-                <div key={bar.label} className="flex flex-1 flex-col items-center justify-end gap-3">
-                  <div
-                    className={`w-full rounded-t border-t-2 border-primary bg-primary/20 transition-all ${getBarHeightClass(
-                      bar.value,
-                    )}`}
-                  />
-                  <div className="text-center">
-                    <p className="text-[10px] font-bold uppercase text-slate-500">{bar.label}</p>
-                    <p className="text-xs text-slate-400">{bar.value}</p>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </section>
-
-        <section className="flex flex-col rounded-2xl border border-surface-container-low bg-surface-bright p-6 scholar-shadow">
-          <h3 className="mb-6 text-lg font-bold text-on-surface">Top sách được mượn</h3>
-          {isLoading ? (
-            <div className="flex flex-1 items-center justify-center text-sm text-on-surface-variant">
-              Đang tải dữ liệu...
+      {/* ── Filter bar ────────────────────────────────────────────────────── */}
+      <motion.section
+        initial={{ opacity: 0, y: -6 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-surface border border-border rounded-2xl p-5 shadow-sm"
+      >
+        <div className="flex flex-wrap items-end gap-4">
+          {/* Filter type selector */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Lọc theo</label>
+            <div className="flex rounded-xl border border-border overflow-hidden">
+              {(['all', 'range', 'month', 'year'] as const).map((t) => {
+                const labels = { all: 'Tất cả', range: 'Ngày', month: 'Tháng', year: 'Năm' };
+                return (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setFilterType(t)}
+                    className={`px-4 py-2 text-sm font-semibold transition-colors ${
+                      filterType === t ? 'bg-primary text-white' : 'bg-transparent text-muted-foreground hover:bg-muted'
+                    }`}
+                  >
+                    {labels[t]}
+                  </button>
+                );
+              })}
             </div>
-          ) : (
-            <div className="space-y-4">
-              {topBooks.map((book, index) => (
-                <div key={book.name} className="flex items-center gap-4">
-                  <div className="w-8 text-lg font-bold text-slate-300">0{index + 1}</div>
-                  <div className="flex-1">
-                    <div className="mb-1 flex justify-between gap-4">
-                      <p className="max-w-[200px] truncate text-sm font-bold text-slate-700">
-                        {book.name}
-                      </p>
-                      <p className="text-xs font-medium text-slate-500">{book.borrowCount} lượt</p>
-                    </div>
-                    <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
-                      <div className={`h-full rounded-full bg-primary ${getWidthClass(book.percentage)}`} />
-                    </div>
-                    <p className="mt-1 text-[10px] text-slate-400">{book.author}</p>
-                  </div>
-                </div>
-              ))}
+          </div>
+
+          {/* Date pickers */}
+          {filterType === 'range' && (
+            <>
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="filter-start-date" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Từ ngày</label>
+                <input id="filter-start-date" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)}
+                  className="rounded-xl border border-border bg-muted px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50" />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="filter-end-date" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Đến ngày</label>
+                <input id="filter-end-date" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)}
+                  className="rounded-xl border border-border bg-muted px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50" />
+              </div>
+            </>
+          )}
+          {filterType === 'month' && (
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="filter-month" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Chọn tháng</label>
+              <input id="filter-month" type="month" value={monthValue} onChange={(e) => setMonthValue(e.target.value)}
+                className="rounded-xl border border-border bg-muted px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50" />
             </div>
           )}
-        </section>
-      </div>
+          {filterType === 'year' && (
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="filter-year" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Chọn năm</label>
+              <input id="filter-year" type="number" min="2000" max="2099" value={yearValue} onChange={(e) => setYearValue(e.target.value)}
+                className="w-28 rounded-xl border border-border bg-muted px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50" />
+            </div>
+          )}
+
+          {/* Action buttons */}
+          <div className="flex gap-2 ml-auto">
+            {activeFilter && (
+              <button type="button" onClick={handleResetFilter}
+                className="flex items-center gap-1.5 rounded-xl border border-border bg-muted px-4 py-2 text-sm font-semibold text-muted-foreground hover:bg-border transition-colors">
+                <span className="material-symbols-outlined text-[15px]">close</span>Xoá lọc
+              </button>
+            )}
+            <button type="button" onClick={handleApplyFilter} disabled={isLoading}
+              className="flex items-center gap-1.5 rounded-xl bg-primary hover:bg-primary-hover px-5 py-2 text-sm font-bold text-white shadow shadow-primary/20 transition-all hover:-translate-y-0.5 disabled:opacity-50">
+              <span className="material-symbols-outlined text-[15px]">filter_alt</span>Áp dụng
+            </button>
+          </div>
+        </div>
+
+        {/* Active filter badge */}
+        {activeFilter && (
+          <div className="mt-3 flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">Đang xem:</span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary text-xs font-bold px-3 py-1">
+              <span className="material-symbols-outlined text-[13px]">calendar_today</span>
+              {filterLabel(activeFilter)}
+            </span>
+          </div>
+        )}
+      </motion.section>
+
+      {/* ── Error banner ──────────────────────────────────────────────────── */}
+      {error && (
+        <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-900 font-semibold shadow-sm">
+          ⚠️ {error}
+        </div>
+      )}
+
+      {/* ── Loading state ─────────────────────────────────────────────────── */}
+      {isLoading ? (
+        <div className="flex flex-col items-center justify-center py-32 gap-3 bg-surface border border-border rounded-2xl shadow-sm">
+          <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm text-muted-foreground animate-pulse">Đang kết xuất báo cáo dữ liệu...</p>
+        </div>
+
+      ) : !data ? (
+        <EmptyState icon="analytics" title="Không có dữ liệu báo cáo" message="Không tìm thấy số liệu tổng hợp trong hệ thống." />
+
+      ) : (
+        <div className="space-y-6">
+
+          {/* ── Tab navigation ──────────────────────────────────────────── */}
+          <div className="flex gap-1 bg-muted/60 border border-border rounded-2xl p-1.5 w-fit">
+            {TABS.map((tab) => (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setActiveTab(tab.key)}
+                className={`flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-semibold transition-all duration-200 ${
+                  activeTab === tab.key
+                    ? 'bg-surface shadow text-primary border border-border'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-surface/50'
+                }`}
+              >
+                <span className="material-symbols-outlined text-[16px]">{tab.icon}</span>
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* ── Tab content ─────────────────────────────────────────────── */}
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.18 }}
+              className="space-y-6"
+            >
+
+              {/* ════════════════════════════════════════════════════════════
+                  TAB 1 — Tổng quan
+              ════════════════════════════════════════════════════════════ */}
+              {activeTab === 'overview' && (
+                <>
+                  {/* KPI counters */}
+                  <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+                    <StatCard label="Lượt mượn trả"  value={data.total_borrowings} icon="swap_horiz" iconColor="text-blue-500"    iconBg="bg-blue-500/10"    delay={0}   />
+                    <StatCard label="Tổng đầu sách"   value={data.total_books}      icon="auto_stories" iconColor="text-green-500" iconBg="bg-green-500/10"   delay={50}  />
+                    <StatCard label="Sinh viên"        value={data.total_members}    icon="group"     iconColor="text-indigo-500"  iconBg="bg-indigo-500/10"  delay={100} />
+                    <StatCard
+                      label="Thực thu phạt"
+                      value={<span className="text-emerald-600">{data.financials.collected.toLocaleString('vi-VN')} đ</span>}
+                      icon="payments"
+                      iconColor="text-emerald-500"
+                      iconBg="bg-emerald-500/10"
+                      delay={150}
+                    />
+                  </div>
+
+                  {/* Borrowing + return-rate charts */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <ChartCard
+                      title={activeFilter ? `Xu hướng mượn sách — ${filterLabel(activeFilter)}` : 'Xu hướng mượn sách 6 tháng qua'}
+                      description="Số lượng phiếu mượn được duyệt qua từng tháng."
+                      className="min-h-[320px]"
+                    >
+                      <TrendLineChart trends={data.monthly_trends} />
+                    </ChartCard>
+
+                    <ChartCard
+                      title="Tình trạng trả ấn phẩm &amp; Quá hạn"
+                      description="Phân tích tính hiệu quả thu hồi sách theo tỷ lệ trễ hạn."
+                      className="min-h-[320px]"
+                    >
+                      <DonutChart rates={data.return_rates} />
+                    </ChartCard>
+                  </div>
+                </>
+              )}
+
+              {/* ════════════════════════════════════════════════════════════
+                  TAB 2 — Tài chính
+              ════════════════════════════════════════════════════════════ */}
+              {activeTab === 'finance' && (
+                <>
+                  {/* Finance KPI cards */}
+                  <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+                    <FinanceCard
+                      label="Thực thu nộp phạt"
+                      hint="Tiền phạt thực tế thu về"
+                      value={`${data.financials.collected.toLocaleString('vi-VN')} đ`}
+                      icon="account_balance_wallet"
+                      accentBorder="border-l-emerald-500"
+                      textColor="text-emerald-600"
+                      iconColor="text-emerald-500"
+                      iconBg="bg-emerald-500/5"
+                    />
+                    <FinanceCard
+                      label="Nợ phạt tồn đọng"
+                      hint="Tiền phạt chưa thu hồi"
+                      value={`${data.financials.unpaid.toLocaleString('vi-VN')} đ`}
+                      icon="credit_card_off"
+                      accentBorder="border-l-rose-500"
+                      textColor="text-rose-600"
+                      iconColor="text-rose-500"
+                      iconBg="bg-rose-500/5"
+                    />
+                    <FinanceCard
+                      label="Phạt đã miễn giảm"
+                      hint="Xoá nợ nộp phạt hợp lệ"
+                      value={`${data.financials.waived.toLocaleString('vi-VN')} đ`}
+                      icon="card_membership"
+                      accentBorder="border-l-blue-500"
+                      textColor="text-blue-600"
+                      iconColor="text-blue-500"
+                      iconBg="bg-blue-500/5"
+                    />
+                  </div>
+
+                  {/* Revenue trend + payment method split */}
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <ChartCard
+                      title="Xu hướng dòng tiền thu nộp phạt"
+                      description="Dòng tiền thực tế thu về qua các ngày."
+                      className="lg:col-span-2 min-h-[320px]"
+                    >
+                      <RevenueTrendChart trends={data.revenue_trends} />
+                    </ChartCard>
+
+                    <ChartCard
+                      title="Phân bổ phương thức thanh toán"
+                      description="Tỷ lệ nguồn doanh thu nộp phạt thực tế."
+                      className="min-h-[320px]"
+                    >
+                      <PaymentMethodsChart byMethod={data.financials.by_method} />
+                    </ChartCard>
+                  </div>
+
+                  {/* Recent transactions */}
+                  <section className="bg-surface border border-border rounded-2xl p-6 shadow-sm space-y-4">
+                    <div>
+                      <h3 className="text-base font-bold text-foreground">Nhật ký giao dịch gần đây</h3>
+                      <p className="text-xs text-muted-foreground mt-0.5">Danh sách các khoản nộp phạt thực tế đã hoàn thành.</p>
+                    </div>
+                    <RecentTransactionsTable transactions={data.recent_transactions} />
+                  </section>
+                </>
+              )}
+
+              {/* ════════════════════════════════════════════════════════════
+                  TAB 3 — Bảng xếp hạng
+              ════════════════════════════════════════════════════════════ */}
+              {activeTab === 'rankings' && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <section className="bg-surface border border-border rounded-2xl p-6 shadow-sm space-y-4">
+                    <div>
+                      <h3 className="text-base font-bold text-foreground">Top 5 sách được mượn nhiều nhất</h3>
+                      <p className="text-xs text-muted-foreground mt-0.5">Những ấn phẩm thu hút lượng độc giả sinh viên nhiều nhất.</p>
+                    </div>
+                    <TopBooksList books={data.top_books} />
+                  </section>
+
+                  <section className="bg-surface border border-border rounded-2xl p-6 shadow-sm space-y-4">
+                    <div>
+                      <h3 className="text-base font-bold text-foreground">Top 5 sinh viên tích cực nhất</h3>
+                      <p className="text-xs text-muted-foreground mt-0.5">Những độc giả chăm chỉ mượn trả tài liệu học tập nhiều nhất.</p>
+                    </div>
+                    <TopMembersList members={data.top_members} />
+                  </section>
+                </div>
+              )}
+
+            </motion.div>
+          </AnimatePresence>
+        </div>
+      )}
     </div>
   );
 }

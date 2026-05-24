@@ -1,83 +1,44 @@
-# BOOK_LOAN_MIDTERM - API Postman Doc
+# Book Loan API Postman Guide
 
-## 1) Muc tieu
-Tai lieu nay dung de handoff phan API cho thanh vien phu trach fetch API o frontend.
-Backend giu nguyen endpoint nhu hien tai, khong doi duong dan.
+Use this collection to exercise the current Laravel API from Postman.
 
-## 2) File Postman
-- Collection: BOOK_LOAN_API.postman_collection.json
-- Duong dan: BE/postman/BOOK_LOAN_API.postman_collection.json
+## Import
 
-## 3) Import vao Postman
-1. Mo Postman.
-2. Chon Import.
-3. Chon file BOOK_LOAN_API.postman_collection.json.
-4. Chinh bien base_url neu can (mac dinh: http://localhost:8000/api).
+1. Start the backend: `php artisan serve --host=127.0.0.1 --port=8000`.
+2. Import `BOOK_LOAN_API.postman_collection.json`.
+3. Confirm the collection variable `base_url` is `http://localhost:8000/api`.
+4. Run `Auth / Login Student` or `Auth / Login Admin` first. The collection stores the returned token in `student_token` or `admin_token`.
 
-## 4) Bien moi truong trong collection
-- base_url: base URL cua API.
-- member_id: id sinh vien mau.
-- librarian_id: id thu thu mau.
-- book_id: id sach mau.
-- loan_id: id phieu muon mau.
+## Seeded Accounts
 
-## 5) Danh sach endpoint
+Default password: `Library@2026`
 
-### Auth
-- POST /login
-  - Body JSON:
-    - role: student | admin
-    - identifier: member_id/librarian_id hoac email
-    - password: mat khau
-- POST /register
-  - Body JSON:
-    - name
-    - email
-    - password (min 6)
-    - phone_number (optional)
-- GET /users/{id}?role=student
-- GET /admin/members
+- Student: `4801104101@student.hcmue.edu.vn`
+- Admin: `nguyen.van.an@hcmue.edu.vn`
 
-### Books
-- GET /books
-- GET /books/search?query=...
-- POST /admin/books
-  - Body JSON:
-    - title (required)
-    - author (required)
-    - genre (optional)
-    - published_year (optional)
-    - cover (optional)
-    - location (optional)
-    - quantity (optional, min 1)
-- PUT /admin/books/{book_id}
-  - Body JSON (optional fields):
-    - title, author, genre, published_year, cover, location, quantity
-- DELETE /admin/books/{book_id}
+## Current Endpoint Groups
 
-### Borrow
-- POST /borrow/request
-  - Body JSON:
-    - member_id
-    - book_id
-- GET /borrow/member/{member_id}
-- GET /admin/borrow
-- PUT /admin/borrow/{loan_id}/approve
-  - Body JSON:
-    - librarian_id
-- PUT /admin/borrow/{loan_id}/return
-  - Body JSON:
-    - librarian_id
+- Auth/profile: `POST /login`, `POST /register`, `POST /verify-otp`, `POST /resend-otp`, `POST /forgot-password`, `POST /verify-forgot-password-otp`, `POST /reset-password`, `GET /me`, `PUT /me`, `GET /me/devices`, `DELETE /me/devices/{id}`, `POST /logout`, `GET /auth/{provider}/redirect`, `GET /auth/{provider}/callback`
+- Books: `GET /books`, `GET /books/autocomplete`, `GET /books/{id}/reviews`, `POST /books`, `PUT /books/{book}`, `POST /books/{book}/digital-file`, `DELETE /books/{book}`
+- Digital documents: `GET /digital-documents`, signed `GET /digital-documents/{book}/download`
+- Student requests: `POST /requests`, `GET /requests/me`
+- Admin requests: `GET /requests`, `POST /requests/{loanId}/approve`, `POST /requests/{loanId}/confirm-pickup`, `POST /requests/{loanId}/reject`, `POST /requests/{loanId}/return`
+- Members CRUD: `GET /members`, `POST /members`, `PUT /members/{member}`, `DELETE /members/{member}`
+- Favorites: `GET /favorites`, `POST /favorites/{book}`, `DELETE /favorites/{book}`
+- Reading Progress: `GET /reading-progress`, `PUT /reading-progress/{book}`
+- Reservations Queue: `GET /reservations/me`, `POST /reservations/{bookId}`, `DELETE /reservations/{id}`
+- Fines & Payments: `GET /fines/me/summary`, `GET /fines/me`, `POST /fines/{id}/momo/pay`, `GET /admin/fines`, `GET /admin/fines/statistics`, `POST /fines/{id}/pay`, `POST /fines/{id}/waive`, `POST /momo/ipn`
+- Settings: `GET /library-settings`, `PUT /library-settings`
+- Reports: `GET /reports`, `GET /reports/export`
+- Audit logs: `GET /audit-logs`
+- Notifications: `GET /notifications`, `PUT /notifications/{id}/read`, `POST /notifications/read-all`
+- AI Assistant: `POST /ai/chat`, `GET /ai/recommendations`
 
-## 6) Luong test de xac minh nhanh
-1. Login (student/admin).
-2. GET /books de lay danh sach.
-3. POST /borrow/request tao request pending.
-4. GET /admin/borrow de thay request.
-5. PUT /admin/borrow/{loan_id}/approve de duyet.
-6. PUT /admin/borrow/{loan_id}/return de tra sach.
+## Recommended Smoke Flow
 
-## 7) Ghi chu handoff
-- FE hien tai da tat luong fetch HTTP va dung mock data o FE/book_loan/src/api.
-- Nguoi tiep nhan fetch API chi can thay mock layer bang goi HTTP theo collection nay.
-- Khong can doi endpoint BE.
+1. Login as a student and an admin.
+2. Get books and choose an available `book_id`.
+3. As student, create `POST /requests`.
+4. Copy the returned `loan.loan_id` into the `loan_id` collection variable.
+5. As admin, approve the request, then mark it returned.
+6. Check `GET /requests/me`, `GET /requests`, and `GET /books` to confirm status and inventory changes.

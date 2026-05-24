@@ -1,5 +1,6 @@
 import { apiRequest } from './client';
-import type { BorrowRequestListItem, MemberBorrowRequest } from '../types/request';
+import type { BorrowRequestListItem, DueStatus, MemberBorrowRequest } from '../types/request';
+import i18n from '../i18n';
 
 export type { BorrowRequestListItem as BorrowRequest, MemberBorrowRequest as MemberRequest } from '../types/request';
 
@@ -18,6 +19,10 @@ type BorrowingResource = {
   borrow_date?: string | null;
   due_date?: string | null;
   return_date?: string | null;
+  is_overdue?: boolean;
+  days_overdue?: number;
+  due_status?: DueStatus;
+  is_reviewed?: boolean;
   book?: {
     book_id: number;
     title: string;
@@ -30,17 +35,36 @@ type BorrowingResource = {
     name: string;
     email?: string | null;
   } | null;
+  fine?: {
+    fine_id: number;
+    amount: number;
+    reason?: string;
+    status: 'unpaid' | 'paid' | 'waived' | 'cancelled';
+    paid_at?: string | null;
+    waived_by?: number | null;
+    waived_reason?: string | null;
+  } | null;
 };
+
+export type AdminRequestFilters = {
+  query?: string;
+  status?: string;
+  member_id?: number;
+};
+
+export type BookCondition = 'good' | 'damaged' | 'lost';
 
 function unwrapCollection<T>(payload: T[] | PaginatedResponse<T>) {
   return Array.isArray(payload) ? payload : payload.data;
 }
 
 function toStatusLabel(status: string) {
-  if (status === 'pending') return 'Chờ duyệt';
-  if (status === 'borrowed') return 'Đang mượn';
-  if (status === 'returned') return 'Đã trả';
-  if (status === 'rejected') return 'Từ chối';
+  if (status === 'pending') return i18n.t('status.pending');
+  if (status === 'approved') return i18n.t('status.approved');
+  if (status === 'borrowed') return i18n.t('status.borrowed');
+  if (status === 'returned') return i18n.t('status.returned');
+  if (status === 'rejected') return i18n.t('status.rejected');
+  if (status === 'cancelled') return i18n.t('status.cancelled');
   return status;
 }
 
@@ -68,13 +92,18 @@ function mapBorrowingToAdminItem(item: BorrowingResource): BorrowRequestListItem
     return_date: item.return_date || null,
     rejected_at: item.rejected_at || null,
     rejection_reason: item.rejection_reason || null,
+    is_overdue: Boolean(item.is_overdue),
+    days_overdue: Number(item.days_overdue ?? 0),
+    due_status: item.due_status,
     raw_status: item.status as BorrowRequestListItem['raw_status'],
+    fine: item.fine || null,
   };
 }
 
 function mapBorrowingToMemberItem(item: BorrowingResource): MemberBorrowRequest {
   return {
     id: item.loan_id,
+    book_id: item.book_id,
     bookTitle: item.book?.title || 'Không rõ',
     author: item.book?.author || 'Không rõ',
     cover: item.book?.cover || null,
@@ -85,6 +114,11 @@ function mapBorrowingToMemberItem(item: BorrowingResource): MemberBorrowRequest 
     return_date: item.return_date || null,
     rejected_at: item.rejected_at || null,
     rejection_reason: item.rejection_reason || null,
+    is_overdue: Boolean(item.is_overdue),
+    days_overdue: Number(item.days_overdue ?? 0),
+    due_status: item.due_status,
+    is_reviewed: Boolean(item.is_reviewed),
+    fine: item.fine || null,
   };
 }
 
@@ -103,9 +137,14 @@ export async function getMyRequests() {
   return unwrapCollection(data).map(mapBorrowingToMemberItem);
 }
 
-export async function getAllRequests() {
+export async function getAllRequests(filters?: AdminRequestFilters) {
+  const params = new URLSearchParams({ limit: '1000' });
+  if (filters?.query) params.set('query', filters.query);
+  if (filters?.status) params.set('status', filters.status);
+  if (filters?.member_id) params.set('member_id', String(filters.member_id));
+
   const data = await apiRequest<PaginatedResponse<BorrowingResource> | BorrowingResource[]>(
-    '/requests?limit=1000',
+    `/requests?${params.toString()}`,
   );
 
   return unwrapCollection(data).map(mapBorrowingToAdminItem);
@@ -114,6 +153,15 @@ export async function getAllRequests() {
 export async function approveBorrow(loanId: number) {
   return apiRequest<{ message: string; loan: BorrowingResource }>(
     `/requests/${loanId}/approve`,
+    {
+      method: 'POST',
+    },
+  );
+}
+
+export async function confirmPickup(loanId: number) {
+  return apiRequest<{ message: string; loan: BorrowingResource }>(
+    `/requests/${loanId}/confirm-pickup`,
     {
       method: 'POST',
     },
@@ -130,11 +178,31 @@ export async function rejectBorrow(loanId: number, reason: string) {
   );
 }
 
-export async function returnBook(loanId: number) {
+export async function cancelBorrow(loanId: number) {
+  return apiRequest<{ message: string; loan: BorrowingResource }>(
+    `/requests/${loanId}/cancel`,
+    {
+      method: 'DELETE',
+    },
+  );
+}
+
+export async function returnBook(loanId: number, condition: BookCondition = 'good', conditionNote?: string) {
   return apiRequest<{ message: string; loan: BorrowingResource }>(
     `/requests/${loanId}/return`,
     {
       method: 'POST',
+      body: { condition, condition_note: conditionNote ?? null },
+    },
+  );
+}
+
+export async function extendLoan(loanId: number, extraDays: number) {
+  return apiRequest<{ message: string; loan: BorrowingResource; new_due_date: string }>(
+    `/requests/${loanId}/extend`,
+    {
+      method: 'PATCH',
+      body: { extra_days: extraDays },
     },
   );
 }

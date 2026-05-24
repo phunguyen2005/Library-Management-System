@@ -1,0 +1,492 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\Borrowing;
+use App\Models\Fine;
+use App\Models\Librarian;
+use App\Models\LibrarySetting;
+use App\Models\Member;
+use Carbon\Carbon;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Schema;
+use Tests\TestCase;
+
+class FinePaymentWorkflowTest extends TestCase
+{
+    use RefreshDatabase;
+
+    protected bool $seed = true;
+
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+
+        parent::tearDown();
+    }
+
+    public function test_database_schema_supports_fine_payments_waivers_and_fine_settings(): void
+    {
+        $this->assertTrue(Schema::hasColumns('fines', [
+            'reason',
+            'waived_by',
+            'waived_reason',
+        ]));
+        $this->assertTrue(Schema::hasTable('fine_payments'));
+        $this->assertTrue(Schema::hasColumns('fine_payments', [
+            'payment_id',
+            'fine_id',
+            'amount_paid',
+            'method',
+            'transaction_ref',
+            'status',
+            'collected_by',
+            'gateway_response',
+            'created_at',
+        ]));
+        $this->assertTrue(Schema::hasColumns('library_settings', [
+            'fine_per_day',
+            'max_fine_per_loan',
+            'grace_period_days',
+        ]));
+    }
+
+    public function test_daily_command_calculates_overdue_fine_with_grace_period_and_cap(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-05-23 00:05:00', 'Asia/Ho_Chi_Minh'));
+
+        LibrarySetting::singleton()->forceFill([
+            'fine_per_day' => 5000,
+            'max_fine_per_loan' => 200000,
+            'grace_period_days' => 1,
+        ])->save();
+
+        $loan = Borrowing::query()->create([
+            'book_id' => 12,
+            'member_id' => 3,
+            'librarian_id' => 1,
+            'status' => Borrowing::STATUS_BORROWED,
+            'borrow_date' => '2026-03-29',
+            'due_date' => '2026-04-12',
+            'return_date' => null,
+        ]);
+
+        $this->artisan('borrowings:calculate-fines')->assertExitCode(0);
+
+        $fine = Fine::query()->where('loan_id', $loan->loan_id)->firstOrFail();
+
+        $this->assertSame(3, $fine->member_id);
+        $this->assertSame('overdue', $fine->reason);
+        $this->assertSame('unpaid', $fine->status);
+        $this->assertSame(200000.0, (float) $fine->amount);
+    }
+
+    public function test_student_can_view_fine_summary_and_detail_payload(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-05-23 09:00:00', 'Asia/Ho_Chi_Minh'));
+
+        $member = Member::query()->findOrFail(1);
+        $token = $member->createToken('student-fines', ['role:student']);
+
+        Fine::query()->create([
+            'loan_id' => 1,
+            'member_id' => $member->member_id,
+            'amount' => 65000,
+            'reason' => 'overdue',
+            'status' => 'unpaid',
+        ]);
+
+        $this->withToken($token->plainTextToken)
+            ->getJson('/api/fines/me/summary')
+            ->assertOk()
+            ->assertJson([
+                'has_unpaid' => true,
+                'total_unpaid' => 65000,
+                'count' => 1,
+            ]);
+
+        $this->withToken($token->plainTextToken)
+            ->getJson('/api/fines/me')
+            ->assertOk()
+            ->assertJsonPath('total_unpaid', 65000)
+            ->assertJsonPath('fines.0.loan_id', 1)
+            ->assertJsonPath('fines.0.book_title', 'Giáo trình Tâm lý học Đại cương')
+            ->assertJsonPath('fines.0.days_overdue', 38)
+            ->assertJsonPath('fines.0.amount', 65000)
+            ->assertJsonPath('fines.0.status', 'unpaid');
+    }
+
+    public function test_admin_can_filter_fines_and_read_statistics(): void
+    {
+        $librarian = Librarian::query()->findOrFail(1);
+        $token = $librarian->createToken('admin-fines-index', ['role:admin']);
+
+        Fine::query()->create([
+            'loan_id' => 1,
+            'member_id' => 1,
+            'amount' => 40000,
+            'reason' => 'overdue',
+            'status' => 'unpaid',
+        ]);
+        Fine::query()->create([
+            'loan_id' => 2,
+            'member_id' => 2,
+            'amount' => 15000,
+            'reason' => 'damaged',
+            'status' => 'paid',
+            'paid_at' => now(),
+        ]);
+        Fine::query()->create([
+            'loan_id' => 3,
+            'member_id' => 1,
+            'amount' => 10000,
+            'reason' => 'lost',
+            'status' => 'waived',
+        ]);
+
+        $this->withToken($token->plainTextToken)
+            ->getJson('/api/admin/fines?status=unpaid&member_id=1')
+            ->assertOk()
+            ->assertJsonPath('data.0.status', 'unpaid')
+            ->assertJsonPath('data.0.member.member_id', 1)
+            ->assertJsonCount(1, 'data');
+
+        $this->withToken($token->plainTextToken)
+            ->getJson('/api/admin/fines/statistics')
+            ->assertOk()
+            ->assertJsonPath('total_collected', 15000)
+            ->assertJsonPath('total_unpaid', 40000)
+            ->assertJsonPath('total_waived', 10000)
+            ->assertJsonStructure([
+                'total_collected',
+                'total_unpaid',
+                'total_waived',
+                'this_month_collected',
+                'by_month' => [
+                    '*' => ['month', 'collected', 'unpaid', 'waived'],
+                ],
+            ]);
+    }
+
+    public function test_admin_can_pay_unpaid_fine_and_create_payment_audit_trail(): void
+    {
+        $librarian = Librarian::query()->findOrFail(1);
+        $token = $librarian->createToken('admin-fines-pay', ['role:admin']);
+
+        $fine = Fine::query()->create([
+            'loan_id' => 1,
+            'member_id' => 1,
+            'amount' => 40000,
+            'reason' => 'overdue',
+            'status' => 'unpaid',
+        ]);
+
+        $this->withToken($token->plainTextToken)
+            ->postJson("/api/fines/{$fine->fine_id}/pay", [
+                'method' => 'cash',
+                'note' => 'Thu tai quay sang 23/05',
+            ])
+            ->assertOk()
+            ->assertJsonPath('fine.status', 'paid')
+            ->assertJsonPath('fine.payments.0.method', 'cash')
+            ->assertJsonPath('fine.payments.0.status', 'completed');
+
+        $this->assertDatabaseHas('fines', [
+            'fine_id' => $fine->fine_id,
+            'status' => 'paid',
+        ]);
+        $this->assertDatabaseHas('fine_payments', [
+            'fine_id' => $fine->fine_id,
+            'amount_paid' => 40000,
+            'method' => 'cash',
+            'status' => 'completed',
+            'collected_by' => $librarian->librarian_id,
+        ]);
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => 'collect_fine',
+            'user_id' => $librarian->librarian_id,
+            'user_type' => 'admin',
+        ]);
+    }
+
+    public function test_admin_can_waive_unpaid_fine_with_required_reason(): void
+    {
+        $librarian = Librarian::query()->findOrFail(1);
+        $token = $librarian->createToken('admin-fines-waive', ['role:admin']);
+
+        $fine = Fine::query()->create([
+            'loan_id' => 1,
+            'member_id' => 1,
+            'amount' => 40000,
+            'reason' => 'overdue',
+            'status' => 'unpaid',
+        ]);
+
+        $this->withToken($token->plainTextToken)
+            ->postJson("/api/fines/{$fine->fine_id}/waive", [
+                'reason' => 'Sinh vien co xac nhan ly do chinh dang',
+            ])
+            ->assertOk()
+            ->assertJsonPath('fine.status', 'waived')
+            ->assertJsonPath('fine.waived_by', $librarian->librarian_id)
+            ->assertJsonPath('fine.waived_reason', 'Sinh vien co xac nhan ly do chinh dang');
+
+        $this->assertDatabaseHas('fines', [
+            'fine_id' => $fine->fine_id,
+            'status' => 'waived',
+            'waived_by' => $librarian->librarian_id,
+            'waived_reason' => 'Sinh vien co xac nhan ly do chinh dang',
+        ]);
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => 'waive_fine',
+            'user_id' => $librarian->librarian_id,
+            'user_type' => 'admin',
+        ]);
+    }
+
+    public function test_admin_cannot_waive_paid_fine(): void
+    {
+        $librarian = Librarian::query()->findOrFail(1);
+        $token = $librarian->createToken('admin-fines-waive-paid', ['role:admin']);
+
+        $fine = Fine::query()->create([
+            'loan_id' => 1,
+            'member_id' => 1,
+            'amount' => 40000,
+            'reason' => 'overdue',
+            'status' => 'paid',
+            'paid_at' => now(),
+        ]);
+
+        $this->withToken($token->plainTextToken)
+            ->postJson("/api/fines/{$fine->fine_id}/waive", [
+                'reason' => 'Khong the mien khoan da thu tien',
+            ])
+            ->assertStatus(422)
+            ->assertJson([
+                'message' => 'Không thể miễn khoản phạt đã thanh toán.',
+            ]);
+    }
+
+    public function test_unpaid_fine_blocks_new_borrow_requests(): void
+    {
+        $member = Member::query()->findOrFail(3);
+        $token = $member->createToken('student-fine-block', ['role:student']);
+
+        $loan = Borrowing::query()->create([
+            'book_id' => 12,
+            'member_id' => $member->member_id,
+            'librarian_id' => 1,
+            'status' => Borrowing::STATUS_RETURNED,
+            'borrow_date' => '2026-05-01',
+            'due_date' => '2026-05-15',
+            'return_date' => '2026-05-20',
+        ]);
+
+        Fine::query()->create([
+            'loan_id' => $loan->loan_id,
+            'member_id' => $member->member_id,
+            'amount' => 25000,
+            'reason' => 'overdue',
+            'status' => 'unpaid',
+        ]);
+
+        $this->withToken($token->plainTextToken)
+            ->postJson('/api/requests', ['book_id' => 15])
+            ->assertStatus(422)
+            ->assertJson([
+                'message' => 'Bạn cần thanh toán các khoản phí phạt còn nợ trước khi mượn sách mới.',
+            ]);
+    }
+
+    public function test_student_can_confirm_momo_transfer(): void
+    {
+        $student = Member::query()->findOrFail(1);
+        $studentToken = $student->createToken('student-momo', ['role:student']);
+
+        $fine = Fine::query()->create([
+            'loan_id' => 1,
+            'member_id' => $student->member_id,
+            'amount' => 50000,
+            'reason' => 'overdue',
+            'status' => 'unpaid',
+        ]);
+
+        $payment = \App\Models\FinePayment::query()->create([
+            'fine_id' => $fine->fine_id,
+            'amount_paid' => 50000,
+            'method' => \App\Models\FinePayment::METHOD_MOMO,
+            'transaction_ref' => 'FINE_PAY_' . $fine->fine_id . '_123456',
+            'status' => \App\Models\FinePayment::STATUS_PENDING,
+        ]);
+
+        $this->withToken($studentToken->plainTextToken)
+            ->postJson("/api/fines/payments/{$payment->payment_id}/confirm-transfer")
+            ->assertOk()
+            ->assertJsonPath('status', 'pending_verification');
+
+        $this->assertDatabaseHas('fine_payments', [
+            'payment_id' => $payment->payment_id,
+            'status' => 'pending_verification',
+        ]);
+    }
+
+    public function test_admin_can_retrieve_approve_and_reject_momo_transfers(): void
+    {
+        $student = Member::query()->findOrFail(1);
+        $librarian = Librarian::query()->findOrFail(1);
+        $adminToken = $librarian->createToken('admin-momo', ['role:admin']);
+
+        $fine = Fine::query()->create([
+            'loan_id' => 1,
+            'member_id' => $student->member_id,
+            'amount' => 50000,
+            'reason' => 'overdue',
+            'status' => 'unpaid',
+        ]);
+
+        $payment = \App\Models\FinePayment::query()->create([
+            'fine_id' => $fine->fine_id,
+            'amount_paid' => 50000,
+            'method' => \App\Models\FinePayment::METHOD_MOMO,
+            'transaction_ref' => 'FINE_PAY_' . $fine->fine_id . '_123456',
+            'status' => 'pending_verification',
+        ]);
+
+        // 1. Admin retrieves pending transfers
+        $this->withToken($adminToken->plainTextToken)
+            ->getJson('/api/admin/momo-pending')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.payment_id', $payment->payment_id)
+            ->assertJsonPath('data.0.student_name', $student->name);
+
+        // 2. Admin rejects first (for testing)
+        $this->withToken($adminToken->plainTextToken)
+            ->postJson("/api/admin/momo-payments/{$payment->payment_id}/reject")
+            ->assertOk();
+
+        $this->assertDatabaseHas('fine_payments', [
+            'payment_id' => $payment->payment_id,
+            'status' => 'failed',
+        ]);
+        
+        $this->assertDatabaseHas('fines', [
+            'fine_id' => $fine->fine_id,
+            'status' => 'unpaid',
+        ]);
+
+        // Reset to pending_verification to test approval
+        \App\Models\FinePayment::where('payment_id', $payment->payment_id)->update(['status' => 'pending_verification']);
+
+        // 3. Admin approves transfer
+        $this->withToken($adminToken->plainTextToken)
+            ->postJson("/api/admin/momo-payments/{$payment->payment_id}/approve")
+            ->assertOk();
+
+        $this->assertDatabaseHas('fine_payments', [
+            'payment_id' => $payment->payment_id,
+            'status' => 'completed',
+            'collected_by' => $librarian->librarian_id,
+        ]);
+
+        $this->assertDatabaseHas('fines', [
+            'fine_id' => $fine->fine_id,
+            'status' => 'paid',
+        ]);
+
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => 'collect_fine',
+            'user_id' => $librarian->librarian_id,
+        ]);
+    }
+
+    public function test_admin_can_manually_create_fine(): void
+    {
+        $librarian = Librarian::query()->findOrFail(1);
+        $adminToken = $librarian->createToken('admin-create-fine', ['role:admin']);
+        
+        $student = Member::query()->findOrFail(1);
+        
+        // 1. Create manual fine without loan
+        $this->withToken($adminToken->plainTextToken)
+            ->postJson('/api/admin/fines', [
+                'member_id' => $student->member_id,
+                'amount' => 150000,
+                'reason' => 'damaged',
+                'notes' => 'Rách bìa sách giáo trình',
+            ])
+            ->assertStatus(201)
+            ->assertJsonPath('fine.amount', 150000)
+            ->assertJsonPath('fine.reason', 'damaged')
+            ->assertJsonPath('fine.notes', 'Rách bìa sách giáo trình')
+            ->assertJsonPath('fine.loan_id', null);
+
+        $this->assertDatabaseHas('fines', [
+            'member_id' => $student->member_id,
+            'amount' => 150000,
+            'reason' => 'damaged',
+            'notes' => 'Rách bìa sách giáo trình',
+            'loan_id' => null,
+            'status' => 'unpaid',
+        ]);
+
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => 'create_fine',
+            'user_id' => $librarian->librarian_id,
+        ]);
+
+        // 2. Create manual fine with loan
+        $loan = Borrowing::query()->create([
+            'book_id' => 3,
+            'member_id' => $student->member_id,
+            'status' => Borrowing::STATUS_RETURNED,
+            'borrow_date' => '2026-05-01',
+        ]);
+
+        $this->withToken($adminToken->plainTextToken)
+            ->postJson('/api/admin/fines', [
+                'member_id' => $student->member_id,
+                'loan_id' => $loan->loan_id,
+                'amount' => 75000,
+                'reason' => 'lost',
+                'notes' => 'Mất đĩa DVD đi kèm sách',
+            ])
+            ->assertStatus(201)
+            ->assertJsonPath('fine.loan_id', $loan->loan_id);
+
+        $this->assertDatabaseHas('fines', [
+            'loan_id' => $loan->loan_id,
+            'amount' => 75000,
+            'notes' => 'Mất đĩa DVD đi kèm sách',
+        ]);
+
+        // 3. Prevent mismatched loan_id and member_id
+        $otherStudent = Member::query()->findOrFail(2);
+        $this->withToken($adminToken->plainTextToken)
+            ->postJson('/api/admin/fines', [
+                'member_id' => $otherStudent->member_id,
+                'loan_id' => $loan->loan_id, // Belongs to student 1, not student 2
+                'amount' => 20000,
+                'reason' => 'damaged',
+            ])
+            ->assertStatus(422)
+            ->assertJson([
+                'message' => 'Phiếu mượn không thuộc về thành viên được chọn.',
+            ]);
+    }
+
+    public function test_student_cannot_manually_create_fine(): void
+    {
+        $student = Member::query()->findOrFail(1);
+        $studentToken = $student->createToken('student-fines', ['role:student']);
+
+        $this->withToken($studentToken->plainTextToken)
+            ->postJson('/api/admin/fines', [
+                'member_id' => $student->member_id,
+                'amount' => 50000,
+                'reason' => 'damaged',
+            ])
+            ->assertStatus(403);
+    }
+}

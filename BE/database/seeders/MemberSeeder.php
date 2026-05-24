@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\Member;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -94,5 +95,10 @@ class MemberSeeder extends Seeder
                 'join_date' => '2026-03-17',
             ],
         ], ['member_id'], ['name', 'email', 'password', 'phone_number', 'join_date']);
+
+        // Gán vai trò student cho tất cả sinh viên
+        Member::all()->each(function ($member) {
+            $member->assignRole('student');
+        });
     }
 }

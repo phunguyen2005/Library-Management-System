@@ -1,181 +1,835 @@
 import React, { useEffect, useState } from 'react';
+import { fetchLibrarySettings, updateLibrarySettings, type LibrarySettings } from '../../api/librarySettingsApi';
+import { getActiveDevices, revokeDevice, type DeviceSession } from '../../api/authApi';
+import { updateMyProfile } from '../../api/userApi';
+import { useAuth } from '../../auth/AuthContext';
+import { getErrorMessage, isUnauthorizedError } from '../../lib/errors';
 import { emitToast } from '../../notifications/events';
 
-const STORAGE_KEY = 'admin-library-settings';
-
-const defaultSettings = {
-  studentDays: 14,
-  lecturerDays: 60,
-  maxBooks: 5,
-  renewalDays: 7,
-  finePerDay: 5000,
-  suspendAfterDays: 30,
+const defaultSettings: LibrarySettings = {
+  loan_period_days: 14,
+  max_active_loans: 5,
+  fine_per_day: 5000,
+  max_fine_per_loan: 200000,
+  grace_period_days: 0,
+  room_max_hours_per_booking: 3,
+  room_max_bookings_per_day: 2,
+  room_advance_booking_days: 7,
+  room_min_group_size: 2,
+  room_checkin_window_minutes: 15,
+  room_booking_requires_approval: false,
+  room_open_time: '07:00',
+  room_close_time: '21:00',
+  room_cancel_deadline_hours: 2,
 };
 
-type Settings = typeof defaultSettings;
+type ProfileForm = {
+  name: string;
+  email: string;
+  phone_number: string;
+  current_password: string;
+  password: string;
+  password_confirmation: string;
+};
+
+const emptyProfileForm: ProfileForm = {
+  name: '',
+  email: '',
+  phone_number: '',
+  current_password: '',
+  password: '',
+  password_confirmation: '',
+};
 
 export default function AdminSettings() {
-  const [settings, setSettings] = useState<Settings>(defaultSettings);
-  const [isSaving, setIsSaving] = useState(false);
-  const [feedback, setFeedback] = useState<string | null>(null);
+  const { user, updateUser } = useAuth();
+  const [settings, setSettings] = useState<LibrarySettings>(defaultSettings);
+  const [profileForm, setProfileForm] = useState<ProfileForm>(emptyProfileForm);
+  const [isLoadingSettings, setIsLoadingSettings] = useState(true);
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [settingsFeedback, setSettingsFeedback] = useState<string | null>(null);
+  const [settingsError, setSettingsError] = useState<string | null>(null);
+  const [profileFeedback, setProfileFeedback] = useState<string | null>(null);
+  const [devices, setDevices] = useState<DeviceSession[]>([]);
+  const [loadingDevices, setLoadingDevices] = useState(true);
+
+  const fetchDevices = async () => {
+    try {
+      setLoadingDevices(true);
+      const res = await getActiveDevices();
+      setDevices(res);
+    } catch (e) {
+      // Ignore
+    } finally {
+      setLoadingDevices(false);
+    }
+  };
+
+  const handleRevoke = async (tokenId: string) => {
+    try {
+      await revokeDevice(tokenId);
+      emitToast({ tone: 'success', title: 'Thành công', message: 'Đã hủy phiên làm việc của thiết bị thành công.' });
+      setDevices((prev) => prev.filter((d) => d.token_id !== tokenId));
+    } catch (error: any) {
+      emitToast({ tone: 'error', title: 'Thất bại', message: error?.message || 'Không thể hủy phiên đăng nhập.' });
+    }
+  };
 
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (!stored) {
-      return;
-    }
+    let isMounted = true;
 
-    try {
-      setSettings({ ...defaultSettings, ...JSON.parse(stored) });
-    } catch {
-      localStorage.removeItem(STORAGE_KEY);
-    }
+    setIsLoadingSettings(true);
+    setSettingsError(null);
+
+    fetchLibrarySettings()
+      .then((data) => {
+        if (!isMounted) {
+          return;
+        }
+
+        setSettings({
+          ...defaultSettings,
+          loan_period_days: data.loan_period_days,
+          max_active_loans: data.max_active_loans,
+          fine_per_day: data.fine_per_day ?? 5000,
+          max_fine_per_loan: data.max_fine_per_loan ?? 200000,
+          grace_period_days: data.grace_period_days ?? 0,
+          room_max_hours_per_booking: data.room_max_hours_per_booking ?? 3,
+          room_max_bookings_per_day: data.room_max_bookings_per_day ?? 2,
+          room_advance_booking_days: data.room_advance_booking_days ?? 7,
+          room_min_group_size: data.room_min_group_size ?? 2,
+          room_checkin_window_minutes: data.room_checkin_window_minutes ?? 15,
+          room_booking_requires_approval: data.room_booking_requires_approval ?? false,
+          room_open_time: data.room_open_time ?? '07:00',
+          room_close_time: data.room_close_time ?? '21:00',
+          room_cancel_deadline_hours: data.room_cancel_deadline_hours ?? 2,
+        });
+      })
+      .catch((error: unknown) => {
+        if (!isMounted || isUnauthorizedError(error)) {
+          return;
+        }
+
+        const message = getErrorMessage(error, 'Không thể tải quy tắc mượn sách.');
+        setSettingsError(message);
+        emitToast({ tone: 'error', title: 'Không thể tải quy tắc mượn sách', message });
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsLoadingSettings(false);
+        }
+      });
+
+    fetchDevices();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  const handleSubmit = (event: React.FormEvent) => {
-    event.preventDefault();
-    setIsSaving(true);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+  useEffect(() => {
+    setProfileForm((current) => ({
+      ...current,
+      name: user?.name || '',
+      email: user?.email || '',
+      phone_number: user?.phone_number || '',
+    }));
+  }, [user?.email, user?.name, user?.phone_number]);
 
-    window.setTimeout(() => {
-      setIsSaving(false);
-      const message = 'Đã lưu cấu hình hệ thống trên trình duyệt hiện tại.';
-      setFeedback(message);
-      emitToast({ tone: 'success', title: 'Đã lưu cấu hình', message });
-    }, 250);
+  const handleProfileSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setIsSavingProfile(true);
+    setProfileFeedback(null);
+
+    const isChangingPassword = Boolean(
+      profileForm.current_password || profileForm.password || profileForm.password_confirmation,
+    );
+
+    try {
+      const response = await updateMyProfile({
+        name: profileForm.name.trim(),
+        phone_number: profileForm.phone_number.trim() || null,
+        current_password: isChangingPassword ? profileForm.current_password : undefined,
+        password: isChangingPassword ? profileForm.password : undefined,
+        password_confirmation: isChangingPassword ? profileForm.password_confirmation : undefined,
+      });
+
+      updateUser(response.user);
+      setProfileForm((current) => ({
+        ...current,
+        current_password: '',
+        password: '',
+        password_confirmation: '',
+      }));
+
+      const message = response.message || 'Đã cập nhật hồ sơ quản trị.';
+      setProfileFeedback(message);
+      emitToast({ tone: 'success', title: 'Đã cập nhật hồ sơ', message });
+    } catch (error: unknown) {
+      if (isUnauthorizedError(error)) {
+        return;
+      }
+
+      const message = getErrorMessage(error, 'Không thể cập nhật hồ sơ quản trị.');
+      setProfileFeedback(message);
+      emitToast({ tone: 'error', title: 'Không thể cập nhật hồ sơ', message });
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
+
+  const handleSettingsSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setIsSavingSettings(true);
+    setSettingsFeedback(null);
+    setSettingsError(null);
+
+    try {
+      const response = await updateLibrarySettings({
+        loan_period_days: settings.loan_period_days,
+        max_active_loans: settings.max_active_loans,
+        fine_per_day: settings.fine_per_day,
+        max_fine_per_loan: settings.max_fine_per_loan,
+        grace_period_days: settings.grace_period_days,
+        room_max_hours_per_booking: settings.room_max_hours_per_booking,
+        room_max_bookings_per_day: settings.room_max_bookings_per_day,
+        room_advance_booking_days: settings.room_advance_booking_days,
+        room_min_group_size: settings.room_min_group_size,
+        room_checkin_window_minutes: settings.room_checkin_window_minutes,
+        room_booking_requires_approval: settings.room_booking_requires_approval,
+        room_open_time: settings.room_open_time,
+        room_close_time: settings.room_close_time,
+        room_cancel_deadline_hours: settings.room_cancel_deadline_hours,
+      });
+
+      setSettings({
+        ...settings,
+        loan_period_days: response.loan_period_days,
+        max_active_loans: response.max_active_loans,
+        fine_per_day: response.fine_per_day,
+        max_fine_per_loan: response.max_fine_per_loan,
+        grace_period_days: response.grace_period_days,
+        room_max_hours_per_booking: response.room_max_hours_per_booking,
+        room_max_bookings_per_day: response.room_max_bookings_per_day,
+        room_advance_booking_days: response.room_advance_booking_days,
+        room_min_group_size: response.room_min_group_size,
+        room_checkin_window_minutes: response.room_checkin_window_minutes,
+        room_booking_requires_approval: response.room_booking_requires_approval,
+        room_open_time: response.room_open_time,
+        room_close_time: response.room_close_time,
+        room_cancel_deadline_hours: response.room_cancel_deadline_hours,
+      });
+
+      const message = 'Đã cập nhật quy tắc mượn sách.';
+      setSettingsFeedback(message);
+      emitToast({ tone: 'success', title: 'Đã lưu quy tắc mượn sách', message });
+    } catch (error: unknown) {
+      if (isUnauthorizedError(error)) {
+        return;
+      }
+
+      const message = getErrorMessage(error, 'Không thể lưu quy tắc mượn sách.');
+      setSettingsError(message);
+      emitToast({ tone: 'error', title: 'Không thể lưu quy tắc mượn sách', message });
+    } finally {
+      setIsSavingSettings(false);
+    }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="mx-auto w-full max-w-5xl space-y-8 p-8">
+    <div className="mx-auto w-full max-w-5xl space-y-8 p-8">
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
         <div>
-          <h2 className="text-3xl font-bold text-on-surface">Cài đặt hệ thống</h2>
+          <h2 className="text-3xl font-bold text-on-surface">Cài đặt quản trị</h2>
           <p className="mt-1 text-sm text-on-surface-variant">
-            Các tham số này được lưu trên trình duyệt hiện tại để hỗ trợ thao tác demo.
+            Quản lý hồ sơ thủ thư và quy tắc mượn sách.
           </p>
         </div>
-        <button
-          type="submit"
-          className="flex items-center gap-2 rounded-xl bg-primary px-6 py-2.5 font-medium text-white shadow-lg shadow-primary/20 transition-all hover:-translate-y-0.5"
-        >
-          <span className="material-symbols-outlined text-sm">save</span>
-          {isSaving ? 'Đang lưu...' : 'Lưu thay đổi'}
-        </button>
       </div>
 
-      <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-        {/* Cấu hình ở trang này chưa được đồng bộ toàn hệ thống. Quy tắc nghiệp vụ thật vẫn do Laravel API xử lý. */}
-      </div>
-
-      {feedback ? (
-        <div
-          role="status"
-          aria-live="polite"
-          className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900"
-        >
-          {feedback}
+      <form
+        onSubmit={handleProfileSubmit}
+        className="space-y-6 rounded-2xl border border-surface-container-low bg-surface-bright p-8 scholar-shadow"
+      >
+        <div>
+          <h3 className="text-xl font-bold text-on-surface">Thông tin cá nhân</h3>
+          <p className="mt-1 text-sm text-on-surface-variant">
+            Các thông tin này được lưu qua API hồ sơ Laravel.
+          </p>
         </div>
-      ) : null}
 
-      <div className="space-y-10 overflow-hidden rounded-2xl border border-surface-container-low bg-surface-bright p-8 scholar-shadow">
-        <section>
-          <h4 className="mb-6 flex items-center gap-2 text-lg font-bold text-slate-800">
-            <span className="material-symbols-outlined filled text-[20px] text-primary">
-              timelapse
-            </span>
-            Thời lượng mượn sách
-          </h4>
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-            <label className="space-y-2">
-              <span className="block text-xs font-bold uppercase tracking-widest text-slate-500">
-                Tối đa cho sinh viên (ngày)
-              </span>
-              <input
-                type="number"
-                value={settings.studentDays}
-                onChange={(e) =>
-                  setSettings({ ...settings, studentDays: Number(e.target.value) })
-                }
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/20"
-              />
-            </label>
-            <label className="space-y-2">
-              <span className="block text-xs font-bold uppercase tracking-widest text-slate-500">
-                Tối đa cho giảng viên (ngày)
-              </span>
-              <input
-                type="number"
-                value={settings.lecturerDays}
-                onChange={(e) =>
-                  setSettings({ ...settings, lecturerDays: Number(e.target.value) })
-                }
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/20"
-              />
-            </label>
-            <label className="space-y-2">
-              <span className="block text-xs font-bold uppercase tracking-widest text-slate-500">
-                Số lượng mượn tối đa (cuốn)
-              </span>
-              <input
-                type="number"
-                value={settings.maxBooks}
-                onChange={(e) => setSettings({ ...settings, maxBooks: Number(e.target.value) })}
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/20"
-              />
-            </label>
-            <label className="space-y-2">
-              <span className="block text-xs font-bold uppercase tracking-widest text-slate-500">
-                Thời hạn gia hạn tối đa (ngày)
-              </span>
-              <input
-                type="number"
-                value={settings.renewalDays}
-                onChange={(e) =>
-                  setSettings({ ...settings, renewalDays: Number(e.target.value) })
-                }
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/20"
-              />
-            </label>
+        {profileFeedback ? (
+          <div
+            role="status"
+            aria-live="polite"
+            className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900"
+          >
+            {profileFeedback}
           </div>
-        </section>
+        ) : null}
 
-        <section>
-          <h4 className="mb-6 flex items-center gap-2 text-lg font-bold text-slate-800">
-            <span className="material-symbols-outlined filled text-[20px] text-red-500">
-              gavel
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          <label className="space-y-2">
+            <span className="block text-xs font-bold uppercase tracking-widest text-slate-500">
+              Họ và tên
             </span>
-            Mức phạt quá hạn
-          </h4>
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-            <label className="space-y-2">
-              <span className="block text-xs font-bold uppercase tracking-widest text-slate-500">
-                Phạt theo ngày (VND)
-              </span>
-              <input
-                type="number"
-                value={settings.finePerDay}
-                onChange={(e) =>
-                  setSettings({ ...settings, finePerDay: Number(e.target.value) })
-                }
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/20"
-              />
-            </label>
-            <label className="space-y-2">
-              <span className="block text-xs font-bold uppercase tracking-widest text-slate-500">
-                Tự động khóa thẻ sau (ngày)
-              </span>
-              <input
-                type="number"
-                value={settings.suspendAfterDays}
-                onChange={(e) =>
-                  setSettings({ ...settings, suspendAfterDays: Number(e.target.value) })
-                }
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/20"
-              />
-            </label>
+            <input
+              aria-label="Họ tên quản trị"
+              data-testid="admin-name"
+              required
+              type="text"
+              value={profileForm.name}
+              onChange={(event) =>
+                setProfileForm((current) => ({ ...current, name: event.target.value }))
+              }
+              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+            />
+          </label>
+
+          <label className="space-y-2">
+            <span className="block text-xs font-bold uppercase tracking-widest text-slate-500">
+              Mã thủ thư
+            </span>
+            <input
+              aria-label="Mã thủ thư"
+              data-testid="admin-librarian-id"
+              type="text"
+              value={user?.librarian_id ?? ''}
+              readOnly
+              className="w-full cursor-not-allowed rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500 outline-none"
+            />
+          </label>
+
+          <label className="space-y-2">
+            <span className="block text-xs font-bold uppercase tracking-widest text-slate-500">
+              Email
+            </span>
+            <input
+              aria-label="Email quản trị"
+              data-testid="admin-email"
+              type="email"
+              value={profileForm.email}
+              readOnly
+              className="w-full cursor-not-allowed rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500 outline-none"
+            />
+          </label>
+
+          <label className="space-y-2">
+            <span className="block text-xs font-bold uppercase tracking-widest text-slate-500">
+              Số điện thoại
+            </span>
+            <input
+              aria-label="Số điện thoại quản trị"
+              data-testid="admin-phone"
+              type="tel"
+              value={profileForm.phone_number}
+              onChange={(event) =>
+                setProfileForm((current) => ({ ...current, phone_number: event.target.value }))
+              }
+              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+            />
+          </label>
+
+          <label className="space-y-2">
+            <span className="block text-xs font-bold uppercase tracking-widest text-slate-500">
+              Mật khẩu hiện tại
+            </span>
+            <input
+              aria-label="Mật khẩu hiện tại"
+              type="password"
+              value={profileForm.current_password}
+              onChange={(event) =>
+                setProfileForm((current) => ({
+                  ...current,
+                  current_password: event.target.value,
+                }))
+              }
+              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+              autoComplete="current-password"
+            />
+          </label>
+
+          <label className="space-y-2">
+            <span className="block text-xs font-bold uppercase tracking-widest text-slate-500">
+              Mật khẩu mới
+            </span>
+            <input
+              aria-label="Mật khẩu mới"
+              type="password"
+              value={profileForm.password}
+              onChange={(event) =>
+                setProfileForm((current) => ({ ...current, password: event.target.value }))
+              }
+              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+              autoComplete="new-password"
+            />
+          </label>
+
+          <label className="space-y-2 md:col-span-2">
+            <span className="block text-xs font-bold uppercase tracking-widest text-slate-500">
+              Xác nhận mật khẩu mới
+            </span>
+            <input
+              aria-label="Xác nhận mật khẩu mới"
+              type="password"
+              value={profileForm.password_confirmation}
+              onChange={(event) =>
+                setProfileForm((current) => ({
+                  ...current,
+                  password_confirmation: event.target.value,
+                }))
+              }
+              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+              autoComplete="new-password"
+            />
+          </label>
+        </div>
+
+        <div className="flex justify-end">
+          <button
+            type="submit"
+            aria-label="Lưu hồ sơ quản trị"
+            data-testid="save-admin-profile"
+            disabled={isSavingProfile}
+            className="flex items-center gap-2 rounded-xl bg-primary px-6 py-2.5 font-medium text-white shadow-lg shadow-primary/20 transition-all hover:-translate-y-0.5 disabled:cursor-wait disabled:opacity-60"
+          >
+            <span className="material-symbols-outlined text-sm" aria-hidden="true">save</span>
+            {isSavingProfile ? 'Đang lưu...' : 'Lưu hồ sơ quản trị'}
+          </button>
+        </div>
+      </form>
+
+      <form onSubmit={handleSettingsSubmit} className="space-y-8">
+        <div
+          data-testid="borrow-settings-note"
+          className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900"
+        >
+          <p className="font-semibold">Quy tắc mượn sách được lưu trên hệ thống.</p>
+          <p className="mt-1">
+            Thời hạn mượn mới chỉ áp dụng cho các yêu cầu được duyệt sau khi lưu. Các sách đã mượn
+            giữ nguyên ngày đến hạn hiện tại.
+          </p>
+        </div>
+
+        {settingsError ? (
+          <div
+            role="status"
+            aria-live="polite"
+            className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900"
+          >
+            {settingsError}
           </div>
-        </section>
-      </div>
-    </form>
+        ) : null}
+
+        {settingsFeedback ? (
+          <div
+            role="status"
+            aria-live="polite"
+            className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900"
+          >
+            {settingsFeedback}
+          </div>
+        ) : null}
+
+        <div className="space-y-10 overflow-hidden rounded-2xl border border-surface-container-low bg-surface-bright p-8 scholar-shadow">
+          <section>
+            <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <h4 className="flex items-center gap-2 text-lg font-bold text-slate-800">
+                <span className="material-symbols-outlined filled text-[20px] text-primary">
+                  timelapse
+                </span>
+                Quy tắc mượn sách
+              </h4>
+              <button
+                type="submit"
+                disabled={isSavingSettings || isLoadingSettings}
+                data-testid="save-borrow-settings"
+                className="flex items-center gap-2 rounded-xl bg-surface-container px-5 py-2.5 font-medium text-on-surface transition-all hover:bg-surface-container-high disabled:cursor-wait disabled:opacity-60"
+              >
+                <span className="material-symbols-outlined text-sm">save</span>
+                {isSavingSettings ? 'Đang lưu...' : 'Lưu quy tắc mượn sách'}
+              </button>
+            </div>
+
+            {isLoadingSettings ? (
+              <div className="rounded-xl border border-dashed border-surface-container-high bg-surface-container-low px-4 py-6 text-center text-sm text-on-surface-variant">
+                Đang tải quy tắc mượn sách...
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                <label className="space-y-2">
+                  <span className="block text-xs font-bold uppercase tracking-widest text-slate-500">
+                    Thời hạn mượn trước khi quá hạn (ngày)
+                  </span>
+                  <input
+                    aria-label="Thời hạn mượn trước khi quá hạn"
+                    data-testid="loan-period-days"
+                    type="number"
+                    min={1}
+                    max={365}
+                    value={settings.loan_period_days}
+                    onChange={(event) =>
+                      setSettings({
+                        ...settings,
+                        loan_period_days: Number(event.target.value) || 0,
+                      })
+                    }
+                    disabled={isSavingSettings}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-slate-50"
+                  />
+                </label>
+                <label className="space-y-2">
+                  <span className="block text-xs font-bold uppercase tracking-widest text-slate-500">
+                    Số lượng mượn tối đa đang hoạt động
+                  </span>
+                  <input
+                    aria-label="Số lượng mượn tối đa đang hoạt động"
+                    data-testid="max-active-loans"
+                    type="number"
+                    min={1}
+                    max={50}
+                    value={settings.max_active_loans}
+                    onChange={(event) =>
+                      setSettings({
+                        ...settings,
+                        max_active_loans: Number(event.target.value) || 0,
+                      })
+                    }
+                    disabled={isSavingSettings}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-slate-50"
+                  />
+                </label>
+                <label className="space-y-2 md:col-span-2">
+                  <span className="block text-xs font-bold uppercase tracking-widest text-slate-500">
+                    Phí phạt trễ hạn mỗi ngày (VND)
+                  </span>
+                  <input
+                    aria-label="Phí phạt trễ hạn mỗi ngày"
+                    data-testid="fine-per-day"
+                    type="number"
+                    min={0}
+                    max={1000000}
+                    value={settings.fine_per_day}
+                    onChange={(event) =>
+                      setSettings({
+                        ...settings,
+                        fine_per_day: Number(event.target.value) || 0,
+                      })
+                    }
+                    disabled={isSavingSettings}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-slate-50"
+                  />
+                </label>
+                <label className="space-y-2">
+                  <span className="block text-xs font-bold uppercase tracking-widest text-slate-500">
+                    Trần phạt tối đa mỗi phiếu (VND)
+                  </span>
+                  <input
+                    aria-label="Trần phạt tối đa mỗi phiếu"
+                    data-testid="max-fine-per-loan"
+                    type="number"
+                    min={0}
+                    max={10000000}
+                    value={settings.max_fine_per_loan}
+                    onChange={(event) =>
+                      setSettings({
+                        ...settings,
+                        max_fine_per_loan: Number(event.target.value) || 0,
+                      })
+                    }
+                    disabled={isSavingSettings}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-slate-50"
+                  />
+                </label>
+                <label className="space-y-2">
+                  <span className="block text-xs font-bold uppercase tracking-widest text-slate-500">
+                    Số ngày ân hạn trước khi tính phạt
+                  </span>
+                  <input
+                    aria-label="Số ngày ân hạn trước khi tính phạt"
+                    data-testid="grace-period-days"
+                    type="number"
+                    min={0}
+                    max={30}
+                    value={settings.grace_period_days}
+                    onChange={(event) =>
+                      setSettings({
+                        ...settings,
+                        grace_period_days: Number(event.target.value) || 0,
+                      })
+                    }
+                    disabled={isSavingSettings}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-slate-50"
+                  />
+                </label>
+              </div>
+            )}
+          </section>
+
+          <hr className="border-slate-100" />
+
+          <section>
+            <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <h4 className="flex items-center gap-2 text-lg font-bold text-slate-800">
+                <span className="material-symbols-outlined filled text-[20px] text-primary">
+                  meeting_room
+                </span>
+                Quy tắc đặt phòng học nhóm
+              </h4>
+            </div>
+
+            {isLoadingSettings ? (
+              <div className="rounded-xl border border-dashed border-surface-container-high bg-surface-container-low px-4 py-6 text-center text-sm text-on-surface-variant">
+                Đang tải quy tắc đặt phòng...
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                <label className="space-y-2">
+                  <span className="block text-xs font-bold uppercase tracking-widest text-slate-500">
+                    Thời gian sử dụng tối đa/lần đặt (tiếng)
+                  </span>
+                  <input
+                    aria-label="Thời gian đặt tối đa"
+                    type="number"
+                    min={1}
+                    max={12}
+                    value={settings.room_max_hours_per_booking}
+                    onChange={(event) =>
+                      setSettings({
+                        ...settings,
+                        room_max_hours_per_booking: Number(event.target.value) || 0,
+                      })
+                    }
+                    disabled={isSavingSettings}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-slate-50"
+                  />
+                </label>
+                <label className="space-y-2">
+                  <span className="block text-xs font-bold uppercase tracking-widest text-slate-500">
+                    Số lượt đặt tối đa mỗi sinh viên/ngày
+                  </span>
+                  <input
+                    aria-label="Lượt đặt tối đa ngày"
+                    type="number"
+                    min={1}
+                    max={10}
+                    value={settings.room_max_bookings_per_day}
+                    onChange={(event) =>
+                      setSettings({
+                        ...settings,
+                        room_max_bookings_per_day: Number(event.target.value) || 0,
+                      })
+                    }
+                    disabled={isSavingSettings}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-slate-50"
+                  />
+                </label>
+                <label className="space-y-2">
+                  <span className="block text-xs font-bold uppercase tracking-widest text-slate-500">
+                    Được đặt trước tối đa bao nhiêu ngày
+                  </span>
+                  <input
+                    aria-label="Đặt trước tối đa"
+                    type="number"
+                    min={1}
+                    max={30}
+                    value={settings.room_advance_booking_days}
+                    onChange={(event) =>
+                      setSettings({
+                        ...settings,
+                        room_advance_booking_days: Number(event.target.value) || 0,
+                      })
+                    }
+                    disabled={isSavingSettings}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-slate-50"
+                  />
+                </label>
+                <label className="space-y-2">
+                  <span className="block text-xs font-bold uppercase tracking-widest text-slate-500">
+                    Số người tối thiểu để đặt phòng nhóm
+                  </span>
+                  <input
+                    aria-label="Số người tối thiểu"
+                    type="number"
+                    min={1}
+                    max={20}
+                    value={settings.room_min_group_size}
+                    onChange={(event) =>
+                      setSettings({
+                        ...settings,
+                        room_min_group_size: Number(event.target.value) || 0,
+                      })
+                    }
+                    disabled={isSavingSettings}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-slate-50"
+                  />
+                </label>
+                <label className="space-y-2">
+                  <span className="block text-xs font-bold uppercase tracking-widest text-slate-500">
+                    Cửa sổ thời gian check-in trễ (phút)
+                  </span>
+                  <input
+                    aria-label="Cửa sổ check-in"
+                    type="number"
+                    min={5}
+                    max={60}
+                    value={settings.room_checkin_window_minutes}
+                    onChange={(event) =>
+                      setSettings({
+                        ...settings,
+                        room_checkin_window_minutes: Number(event.target.value) || 0,
+                      })
+                    }
+                    disabled={isSavingSettings}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-slate-50"
+                  />
+                </label>
+                <label className="space-y-2">
+                  <span className="block text-xs font-bold uppercase tracking-widest text-slate-500">
+                    Hạn hủy lịch đặt miễn phạt (tiếng trước giờ đặt)
+                  </span>
+                  <input
+                    aria-label="Hạn hủy miễn phạt"
+                    type="number"
+                    min={0}
+                    max={24}
+                    value={settings.room_cancel_deadline_hours}
+                    onChange={(event) =>
+                      setSettings({
+                        ...settings,
+                        room_cancel_deadline_hours: Number(event.target.value) || 0,
+                      })
+                    }
+                    disabled={isSavingSettings}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-slate-50"
+                  />
+                </label>
+                <label className="space-y-2">
+                  <span className="block text-xs font-bold uppercase tracking-widest text-slate-500">
+                    Giờ mở cửa đặt phòng
+                  </span>
+                  <input
+                    aria-label="Giờ mở cửa phòng"
+                    type="text"
+                    placeholder="07:00"
+                    value={settings.room_open_time}
+                    onChange={(event) =>
+                      setSettings({
+                        ...settings,
+                        room_open_time: event.target.value,
+                      })
+                    }
+                    disabled={isSavingSettings}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-slate-50"
+                  />
+                </label>
+                <label className="space-y-2">
+                  <span className="block text-xs font-bold uppercase tracking-widest text-slate-500">
+                    Giờ đóng cửa đặt phòng
+                  </span>
+                  <input
+                    aria-label="Giờ đóng cửa phòng"
+                    type="text"
+                    placeholder="21:00"
+                    value={settings.room_close_time}
+                    onChange={(event) =>
+                      setSettings({
+                        ...settings,
+                        room_close_time: event.target.value,
+                      })
+                    }
+                    disabled={isSavingSettings}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-slate-50"
+                  />
+                </label>
+                <div className="flex items-center gap-3 pt-6 md:col-span-2">
+                  <input
+                    type="checkbox"
+                    id="room_booking_requires_approval"
+                    checked={settings.room_booking_requires_approval}
+                    onChange={(event) =>
+                      setSettings({
+                        ...settings,
+                        room_booking_requires_approval: event.target.checked,
+                      })
+                    }
+                    disabled={isSavingSettings}
+                    className="h-5 w-5 rounded-md border-slate-300 text-primary focus:ring-primary/20"
+                  />
+                  <label htmlFor="room_booking_requires_approval" className="text-sm font-semibold text-slate-700">
+                    Yêu cầu thủ thư phê duyệt trước khi đặt phòng thành công (Manual Approve)
+                  </label>
+                </div>
+              </div>
+            )}
+          </section>
+        </div>
+      </form>
+
+      <section className="space-y-6 rounded-2xl border border-surface-container-low bg-surface-bright p-8 scholar-shadow">
+        <div>
+          <h3 className="text-xl font-bold text-on-surface flex items-center gap-2">
+            <span className="material-symbols-outlined filled text-[20px] text-blue-500">
+              devices
+            </span>
+            Thiết bị đang hoạt động
+          </h3>
+          <p className="mt-1 text-sm text-on-surface-variant">
+            Danh sách các thiết bị hiện đang đăng nhập vào bảng quản trị của bạn. Bạn có thể đăng xuất khỏi các thiết bị khác từ xa nếu phát hiện truy cập đáng ngờ.
+          </p>
+        </div>
+
+        {loadingDevices ? (
+          <div className="text-xs text-slate-400 py-4 flex items-center gap-2">
+            <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+            Đang tải danh sách thiết bị...
+          </div>
+        ) : devices.length === 0 ? (
+          <div className="text-xs text-slate-400 py-4">Không tìm thấy thông tin thiết bị hoạt động.</div>
+        ) : (
+          <div className="space-y-4">
+            {devices.map((device) => (
+              <div key={device.history_id} className="flex items-center justify-between border border-slate-100 rounded-xl p-4 bg-slate-50/50 hover:bg-slate-50 transition-colors">
+                <div className="flex items-center gap-4">
+                  <div className="text-slate-500 bg-white border border-slate-200 p-2.5 rounded-lg flex items-center justify-center shrink-0 shadow-sm">
+                    <span className="material-symbols-outlined">
+                      {device.device_type === 'Mobile' ? 'smartphone' : device.device_type === 'Tablet' ? 'tablet' : 'desktop_windows'}
+                    </span>
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-slate-800 text-sm">
+                        {device.platform} - {device.browser}
+                      </span>
+                      {device.is_current ? (
+                        <span className="bg-green-100 text-green-800 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                          Thiết bị này
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="text-xs text-slate-500 mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+                      <span>IP: {device.ip_address}</span>
+                      <span className="w-1.5 h-1.5 bg-slate-300 rounded-full shrink-0" />
+                      <span>Đăng nhập lúc: {new Date(device.created_at).toLocaleString('vi-VN')}</span>
+                    </div>
+                  </div>
+                </div>
+                
+                {!device.is_current && (
+                  <button
+                    type="button"
+                    onClick={() => handleRevoke(device.token_id)}
+                    className="text-xs font-bold text-red-600 hover:text-red-700 bg-white border border-red-200 hover:bg-red-50 px-3 py-1.5 rounded-lg transition-all shadow-sm cursor-pointer"
+                  >
+                    Đăng xuất
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+    </div>
   );
 }

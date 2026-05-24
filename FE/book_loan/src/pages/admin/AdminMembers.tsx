@@ -1,11 +1,17 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   createMember,
   deleteMember,
   getAllMembers,
   updateMember,
+  importMembers,
 } from '../../api/userApi';
+import EmptyState from '../../components/EmptyState';
+import ConfirmDialog from '../../components/ConfirmDialog';
+import Pagination from '../../components/Pagination';
+import { useDebounce } from '../../hooks/useDebounce';
+import { formatDisplayDate } from '../../lib/display';
 import { getErrorMessage, isUnauthorizedError } from '../../lib/errors';
 import { emitToast } from '../../notifications/events';
 import type { MemberApiRecord, MemberListItem, MemberPayload } from '../../types/member';
@@ -32,20 +38,6 @@ const EMPTY_FORM: MemberFormData = {
   password: '',
   password_confirmation: '',
 };
-
-function formatDate(value: string) {
-  if (!value) {
-    return 'Chưa cập nhật';
-  }
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return date.toLocaleDateString('vi-VN');
-}
 
 function mapMember(member: MemberApiRecord): MemberListItem {
   return {
@@ -89,15 +81,15 @@ function getValidationMessage(formData: MemberFormData, mode: ModalMode) {
 
   if (mode === 'add' || hasPasswordInput) {
     if (!password) {
-      return 'Vui long nhap mat khau cho thanh vien.';
+      return 'Vui lòng nhập mật khẩu cho thành viên.';
     }
 
     if (password !== confirmation) {
-      return 'Mat khau xac nhan khong khop.';
+      return 'Mật khẩu xác nhận không khớp.';
     }
 
     if (password.length < 8 || !/[A-Za-z]/.test(password) || !/\d/.test(password)) {
-      return 'Mat khau can co toi thieu 8 ky tu, gom chu cai va so.';
+      return 'Mật khẩu cần có tối thiểu 8 ký tự, gồm chữ cái và số.';
     }
   }
 
@@ -112,7 +104,64 @@ export default function AdminMembers() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<ModalMode>('add');
   const [formData, setFormData] = useState<MemberFormData>(EMPTY_FORM);
+  const [memberToDelete, setMemberToDelete] = useState<MemberListItem | null>(null);
+  const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
+
+  // --- CSV Import state ---
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importErrors, setImportErrors] = useState<string[]>([]);
+
+  const handleImportSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!importFile) return;
+
+    setIsImporting(true);
+    setImportErrors([]);
+
+    try {
+      const response = await importMembers(importFile);
+      emitToast({
+        tone: 'success',
+        title: 'Nhập dữ liệu thành công',
+        message: response.message,
+      });
+      setIsImportModalOpen(false);
+      setImportFile(null);
+      await loadMembers(false);
+    } catch (error: unknown) {
+      if (isUnauthorizedError(error)) {
+        return;
+      }
+      const errDetails = (error as any).details;
+      if (errDetails && Array.isArray(errDetails.errors)) {
+        setImportErrors(errDetails.errors);
+      } else {
+        const message = getErrorMessage(error, 'Không thể nhập dữ liệu thành viên.');
+        emitToast({ tone: 'error', title: 'Lỗi nhập dữ liệu', message });
+      }
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  const downloadTemplate = () => {
+    const csvContent = "\uFEFFho_ten,email,so_dien_thoai,mat_khau,ngay_tham_gia\nNguyễn Văn A,vana@gmail.com,0987654321,Student123,2026-05-23\nTrần Thị B,thib@gmail.com,0912345678,Student123,2026-05-23";
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", "mau_nhap_thanh_vien.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const searchTerm = searchParams.get('search') || '';
+  const currentPage = parseInt(searchParams.get('page') || '1', 10);
+  const [totalPages, setTotalPages] = useState(1);
+  const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
   const loadMembers = async (showLoader = true) => {
     if (showLoader) {
@@ -120,8 +169,11 @@ export default function AdminMembers() {
     }
 
     try {
-      const data = await getAllMembers();
-      setMembers(data.map(mapMember));
+      const response = await getAllMembers(currentPage, debouncedSearchTerm);
+      setMembers(response.data.map(mapMember));
+      if (response.meta) {
+        setTotalPages(response.meta.last_page);
+      }
     } catch (error: unknown) {
       if (isUnauthorizedError(error)) {
         return;
@@ -138,30 +190,7 @@ export default function AdminMembers() {
 
   useEffect(() => {
     void loadMembers();
-  }, []);
-
-  const filteredMembers = useMemo(() => {
-    const normalizedQuery = searchTerm.trim().toLowerCase();
-
-    if (!normalizedQuery) {
-      return members;
-    }
-
-    return members.filter((member) =>
-      [
-        member.id,
-        member.name,
-        member.email,
-        member.phoneNumber,
-        member.joinDate,
-        member.dept,
-        member.type,
-      ]
-        .join(' ')
-        .toLowerCase()
-        .includes(normalizedQuery),
-    );
-  }, [members, searchTerm]);
+  }, [currentPage, debouncedSearchTerm]);
 
   const updateSearch = (value: string) => {
     const nextParams = new URLSearchParams(searchParams);
@@ -171,8 +200,17 @@ export default function AdminMembers() {
     } else {
       nextParams.delete('search');
     }
+    
+    // Reset to page 1 when search changes
+    nextParams.set('page', '1');
 
     setSearchParams(nextParams, { replace: true });
+  };
+
+  const handlePageChange = (page: number) => {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set('page', page.toString());
+    setSearchParams(nextParams);
   };
 
   const openAddModal = () => {
@@ -203,10 +241,21 @@ export default function AdminMembers() {
     setIsModalOpen(false);
   };
 
-  const handleDelete = async (member: MemberListItem) => {
-    if (!confirm(`Bạn có chắc chắn muốn xóa thành viên "${member.name}"?`)) {
-      return;
-    }
+  const promptDelete = (member: MemberListItem) => {
+    setMemberToDelete(member);
+    setIsConfirmDeleteOpen(true);
+  };
+
+  const cancelDelete = () => {
+    setIsConfirmDeleteOpen(false);
+    setMemberToDelete(null);
+  };
+
+  const handleDelete = async () => {
+    const member = memberToDelete;
+    if (!member) return;
+
+    cancelDelete();
 
     try {
       await deleteMember(member.id);
@@ -232,7 +281,7 @@ export default function AdminMembers() {
     const validationMessage = getValidationMessage(formData, modalMode);
 
     if (validationMessage) {
-      emitToast({ tone: 'error', title: 'Khong the luu thanh vien', message: validationMessage });
+      emitToast({ tone: 'error', title: 'Không thể lưu thành viên', message: validationMessage });
       return;
     }
 
@@ -278,14 +327,24 @@ export default function AdminMembers() {
             Tạo tài khoản, cập nhật hồ sơ và quản lý thông tin liên hệ của độc giả.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={openAddModal}
-          className="flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 font-medium text-white shadow-lg shadow-primary/20 transition-all hover:-translate-y-0.5"
-        >
-          <span aria-hidden="true" className="material-symbols-outlined text-sm">person_add</span>
-          Thêm thành viên
-        </button>
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={() => setIsImportModalOpen(true)}
+            className="flex items-center gap-2 rounded-xl bg-surface-container-high px-5 py-2.5 font-medium text-slate-700 transition-all hover:bg-slate-200 hover:-translate-y-0.5"
+          >
+            <span aria-hidden="true" className="material-symbols-outlined text-sm">upload_file</span>
+            Nhập từ CSV
+          </button>
+          <button
+            type="button"
+            onClick={openAddModal}
+            className="flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 font-medium text-white shadow-lg shadow-primary/20 transition-all hover:-translate-y-0.5"
+          >
+            <span aria-hidden="true" className="material-symbols-outlined text-sm">person_add</span>
+            Thêm thành viên
+          </button>
+        </div>
       </div>
 
       <section className="overflow-hidden rounded-2xl border border-surface-container-low bg-surface-bright scholar-shadow">
@@ -305,7 +364,6 @@ export default function AdminMembers() {
               className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-primary/20"
             />
           </div>
-          <p className="text-xs font-semibold text-outline">{filteredMembers.length} thành viên</p>
         </div>
 
         <div className="overflow-x-auto">
@@ -328,14 +386,18 @@ export default function AdminMembers() {
                     Đang tải danh sách...
                   </td>
                 </tr>
-              ) : filteredMembers.length === 0 ? (
+              ) : members.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-8 text-center text-slate-500">
-                    Không tìm thấy thành viên phù hợp.
+                  <td colSpan={7} className="px-6 py-8">
+                    <EmptyState
+                      icon="person_search"
+                      title="Không tìm thấy thành viên phù hợp"
+                      message="Thử thay đổi từ khóa tìm kiếm hoặc thêm thành viên mới."
+                    />
                   </td>
                 </tr>
               ) : (
-                filteredMembers.map((member) => (
+                members.map((member) => (
                   <tr key={member.id} className="transition-colors hover:bg-slate-50">
                     <td className="px-6 py-4">
                       <span className="font-mono text-sm font-bold text-slate-700">
@@ -358,7 +420,7 @@ export default function AdminMembers() {
                       <p className="mt-0.5 text-xs text-slate-500">{member.phoneNumber}</p>
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-700">
-                      {formatDate(member.joinDate)}
+                      {formatDisplayDate(member.joinDate, 'Chưa cập nhật')}
                     </td>
                     <td className="px-6 py-4">
                       <span className="rounded-md border border-slate-200 bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">
@@ -385,7 +447,7 @@ export default function AdminMembers() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => handleDelete(member)}
+                          onClick={() => promptDelete(member)}
                           className="rounded-lg p-2 text-red-500 transition-all hover:bg-red-50"
                           title="Xóa"
                           aria-label={`Xóa ${member.name}`}
@@ -400,7 +462,25 @@ export default function AdminMembers() {
             </tbody>
           </table>
         </div>
+        
+        <div className="p-4">
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={handlePageChange}
+          />
+        </div>
       </section>
+
+      <ConfirmDialog
+        isOpen={isConfirmDeleteOpen}
+        title="Xác nhận xóa"
+        message={`Bạn có chắc chắn muốn xóa thành viên "${memberToDelete?.name}"? Hệ thống có thể không cho phép nếu sinh viên đang có sách mượn.`}
+        confirmLabel="Xóa thành viên"
+        isDestructive={true}
+        onConfirm={handleDelete}
+        onCancel={cancelDelete}
+      />
 
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
@@ -537,6 +617,130 @@ export default function AdminMembers() {
                   className="rounded-xl bg-primary px-5 py-2.5 font-bold text-white shadow-md shadow-primary/20 transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {isSaving ? 'Đang lưu...' : 'Lưu thay đổi'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {isImportModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-surface-container bg-slate-50 p-6">
+              <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                <span className="material-symbols-outlined text-primary">upload_file</span>
+                Nhập danh sách thành viên từ CSV
+              </h3>
+              <button
+                type="button"
+                onClick={() => { setIsImportModalOpen(false); setImportErrors([]); setImportFile(null); }}
+                className="text-slate-400 hover:text-slate-600 transition-colors"
+                aria-label="Đóng"
+              >
+                <span aria-hidden="true" className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            
+            <form onSubmit={handleImportSubmit} className="p-6 space-y-6">
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+                <p className="text-xs font-bold text-slate-700 uppercase tracking-wider">Cấu trúc cột tệp CSV mẫu:</p>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-200 text-slate-500 font-bold">
+                        <th className="pb-2">Họ tên *</th>
+                        <th className="pb-2">Email *</th>
+                        <th className="pb-2">Số điện thoại</th>
+                        <th className="pb-2">Mật khẩu</th>
+                        <th className="pb-2">Ngày tham gia</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr className="text-slate-600">
+                        <td className="pt-2 font-mono">ho_ten / name</td>
+                        <td className="pt-2 font-mono">email</td>
+                        <td className="pt-2 font-mono">so_dien_thoai / phone_number</td>
+                        <td className="pt-2 font-mono">mat_khau / password</td>
+                        <td className="pt-2 font-mono">ngay_tham_gia / join_date</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div className="flex justify-between items-center pt-2">
+                  <span className="text-[10px] text-slate-500">* Bắt buộc. Mật khẩu mặc định là "Student123" nếu để trống.</span>
+                  <button
+                    type="button"
+                    onClick={downloadTemplate}
+                    className="text-xs font-bold text-primary hover:text-primary-hover flex items-center gap-1 transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-[14px]">download</span>
+                    Tải file mẫu
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-slate-600">Chọn tệp tin CSV (.csv):</label>
+                <div className="border-2 border-dashed border-slate-200 hover:border-primary/50 transition-colors rounded-xl p-6 text-center cursor-pointer relative group">
+                  <input
+                    type="file"
+                    accept=".csv,text/csv"
+                    required
+                    onChange={(e) => setImportFile(e.target.files?.[0] || null)}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  />
+                  <div className="space-y-2 pointer-events-none">
+                    <span className="material-symbols-outlined text-4xl text-slate-400 group-hover:text-primary transition-colors">
+                      cloud_upload
+                    </span>
+                    <p className="text-sm font-semibold text-slate-700">
+                      {importFile ? importFile.name : 'Kéo thả tệp tin hoặc nhấp vào đây để chọn'}
+                    </p>
+                    <p className="text-xs text-slate-400">Chỉ chấp nhận tệp tin định dạng .csv tối đa 4MB</p>
+                  </div>
+                </div>
+              </div>
+
+              {importErrors.length > 0 && (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-4 max-h-40 overflow-y-auto space-y-1">
+                  <p className="text-xs font-bold text-red-800 flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[16px]">error</span>
+                    Dữ liệu không hợp lệ. Vui lòng sửa các lỗi sau:
+                  </p>
+                  <ul className="list-disc pl-5 text-xs text-red-700 space-y-0.5">
+                    {importErrors.map((err, i) => (
+                      <li key={i}>{err}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => { setIsImportModalOpen(false); setImportErrors([]); setImportFile(null); }}
+                  disabled={isImporting}
+                  className="rounded-xl bg-slate-100 px-5 py-2.5 font-bold text-slate-600 transition-colors hover:bg-slate-200 disabled:opacity-50"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={isImporting || !importFile}
+                  className="rounded-xl bg-primary px-5 py-2.5 font-bold text-white shadow-md shadow-primary/20 transition-opacity hover:opacity-90 disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {isImporting ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      Đang xử lý...
+                    </>
+                  ) : (
+                    <>
+                      <span className="material-symbols-outlined text-[16px]">check_circle</span>
+                      Bắt đầu Nhập
+                    </>
+                  )}
                 </button>
               </div>
             </form>

@@ -16,7 +16,7 @@ class BorrowingIndexRequest extends FormRequest
     {
         return [
             'query' => ['nullable', 'string', 'max:255'],
-            'status' => ['nullable', Rule::in(['pending', 'borrowed', 'returned', 'rejected'])],
+            'status' => ['nullable', Rule::in(['pending', 'approved', 'borrowed', 'returned', 'rejected'])],
             'member_id' => ['nullable', 'integer', 'exists:members,member_id'],
             'book_id' => ['nullable', 'integer', 'exists:books,book_id'],
             'page' => ['nullable', 'integer', 'min:1'],

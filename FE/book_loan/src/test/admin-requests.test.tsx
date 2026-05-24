@@ -11,7 +11,7 @@ let requestsState: BorrowRequest[] = [];
 const approveBorrowMock = vi.fn(async (loanId: number) => {
   requestsState = requestsState.map((request) =>
     request.id === loanId
-      ? { ...request, raw_status: 'borrowed', status: 'Đang mượn' }
+      ? { ...request, raw_status: 'approved', status: 'Chờ nhận sách' }
       : request,
   );
   return { message: 'Đã duyệt', loan: {} };
@@ -63,7 +63,7 @@ vi.mock('../api/borrowApi', async () => {
 });
 
 describe('AdminRequests', () => {
-  it('updates a pending request to borrowed after approval', async () => {
+  it('updates a pending request to approved after approval', async () => {
     requestsState = [
       {
         id: 1,
@@ -83,11 +83,11 @@ describe('AdminRequests', () => {
     renderAdminRequests();
 
     expect(await screen.findByText('Chờ duyệt')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Giao sách' }));
+    await user.click(screen.getByRole('button', { name: 'Duyệt' }));
 
     await waitFor(() => {
       expect(approveBorrowMock).toHaveBeenCalledWith(1);
-      expect(screen.queryByRole('button', { name: 'Giao sách' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Duyệt' })).not.toBeInTheDocument();
     });
   });
 

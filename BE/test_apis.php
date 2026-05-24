@@ -1,64 +1,115 @@
 <?php
-function testApi($method, $url, $data = null) {
-    echo "Testing $method $url\n";
+
+$baseUrl = rtrim(getenv('BOOK_LOAN_API_BASE_URL') ?: 'http://127.0.0.1:8000/api', '/');
+$demoPassword = getenv('LIBRARY_DEMO_PASSWORD') ?: 'Library@2026';
+
+function apiRequest(string $method, string $path, ?array $data = null, ?string $token = null): array
+{
+    global $baseUrl;
+
+    $headers = [
+        'Accept: application/json',
+        'Content-Type: application/json',
+    ];
+
+    if ($token) {
+        $headers[] = 'Authorization: Bearer '.$token;
+    }
+
     $options = [
         'http' => [
-            'header'  => "Content-type: application/json\r\n",
-            'method'  => $method,
-            'content' => $data ? json_encode($data) : null,
+            'method' => $method,
+            'header' => implode("\r\n", $headers)."\r\n",
             'ignore_errors' => true,
-        ]
+        ],
     ];
-    $context  = stream_context_create($options);
-    $result = file_get_contents("http://127.0.0.1:8000" . $url, false, $context);
-    echo $result . "\n\n";
-    return json_decode($result, true);
+
+    if ($data !== null) {
+        $options['http']['content'] = json_encode($data);
+    }
+
+    $url = $baseUrl.$path;
+    echo "\n$method $url\n";
+
+    $result = file_get_contents($url, false, stream_context_create($options));
+    $statusLine = $http_response_header[0] ?? 'HTTP status unavailable';
+    echo $statusLine."\n";
+    echo ($result ?: '')."\n";
+
+    $payload = json_decode((string) $result, true);
+
+    if (! is_array($payload)) {
+        return [];
+    }
+
+    return $payload;
 }
 
-// 1. Register User
-$res = testApi('POST', '/api/register', [
-    'name' => 'API Test User',
-    'email' => 'api_test_' . time() . '@example.com',
-    'password' => '123456',
-    'phone_number' => '123456789'
+function collectionData(array $payload): array
+{
+    return $payload['data'] ?? (array_is_list($payload) ? $payload : []);
+}
+
+$suffix = time();
+$studentEmail = "api.smoke.$suffix@student.hcmue.edu.vn";
+$studentPassword = 'Student123';
+
+$studentSession = apiRequest('POST', '/register', [
+    'name' => 'API Smoke Student',
+    'email' => $studentEmail,
+    'phone_number' => '0901999000',
+    'password' => $studentPassword,
+    'password_confirmation' => $studentPassword,
 ]);
-$memberId = $res['user']['member_id'] ?? null;
+$studentToken = $studentSession['token'] ?? null;
 
-// 2. Add Book
-$res = testApi('POST', '/api/admin/books', [
-    'title' => 'Test Book ' . time(),
-    'author' => 'Author Test',
-    'genre' => 'Testing',
-    'published_year' => 2026
+$adminSession = apiRequest('POST', '/login', [
+    'role' => 'admin',
+    'identifier' => 'nguyen.van.an@hcmue.edu.vn',
+    'password' => $demoPassword,
 ]);
-$bookId = $res['book']['book_id'] ?? null;
+$adminToken = $adminSession['token'] ?? null;
 
-// 3. Search Book
-testApi('GET', '/api/books/search?query=Testing');
+if (! $studentToken || ! $adminToken) {
+    fwrite(STDERR, "Unable to authenticate smoke-test users. Check seeded demo accounts and API server.\n");
+    exit(1);
+}
 
-// 4. Request Borrow
-if ($memberId && $bookId) {
-    $res = testApi('POST', '/api/borrow/request', [
-        'member_id' => $memberId,
-        'book_id' => $bookId
-    ]);
-    $loanId = $res['loan']['loan_id'] ?? null;
+apiRequest('GET', '/me', null, $studentToken);
+apiRequest('GET', '/members?limit=5', null, $adminToken);
+apiRequest('GET', '/digital-documents', null, $studentToken);
 
-    if ($loanId) {
-        // We know we need a librarian ID. Let's see if 1 exists or create one.
-        // Assuming librarian_id 1 exists (from previous tests or seed). 
-        // If not, this might fail, but it tests the validation.
-        testApi('PUT', "/api/admin/borrow/$loanId/approve", [
-            'librarian_id' => 1
-        ]);
+$booksPayload = apiRequest('GET', '/books?limit=1000', null, $studentToken);
+$books = collectionData($booksPayload);
+$book = null;
 
-        testApi('PUT', "/api/admin/borrow/$loanId/return", [
-            'librarian_id' => 1
-        ]);
+foreach ($books as $candidate) {
+    if (($candidate['available_quantity'] ?? 0) > 0) {
+        $book = $candidate;
+        break;
     }
 }
 
-// 5. Delete Book
-if ($bookId) {
-    testApi('DELETE', "/api/admin/books/$bookId");
+if (! $book) {
+    fwrite(STDERR, "No available book found for borrow smoke test.\n");
+    exit(1);
 }
+
+$borrowResponse = apiRequest('POST', '/requests', [
+    'book_id' => $book['book_id'],
+], $studentToken);
+$loanId = $borrowResponse['loan']['loan_id'] ?? null;
+
+if (! $loanId) {
+    fwrite(STDERR, "Borrow request was not created.\n");
+    exit(1);
+}
+
+apiRequest('GET', '/requests/me?limit=1000', null, $studentToken);
+apiRequest('GET', '/requests?limit=1000', null, $adminToken);
+apiRequest('POST', "/requests/$loanId/approve", null, $adminToken);
+apiRequest('POST', "/requests/$loanId/return", null, $adminToken);
+apiRequest('POST', '/logout', null, $studentToken);
+apiRequest('POST', '/logout', null, $adminToken);
+
+echo "\nSmoke flow completed.\n";
