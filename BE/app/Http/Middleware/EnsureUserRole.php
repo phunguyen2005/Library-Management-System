@@ -13,13 +13,13 @@ class EnsureUserRole
         $user = $request->user();
 
         if (! $user) {
-            return response()->json(['message' => 'Vui lòng đăng nhập để tiếp tục.'], 401);
+            return response()->json(['message' => __('messages.role.sign_in_required')], 401);
         }
 
         $role = method_exists($user, 'getRoleName') ? $user->getRoleName() : null;
 
         if (! $role || ! in_array($role, $roles, true)) {
-            return response()->json(['message' => 'Bạn không có quyền thực hiện thao tác này.'], 403);
+            return response()->json(['message' => __('messages.role.forbidden')], 403);
         }
 
         return $next($request);
