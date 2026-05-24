@@ -16,6 +16,25 @@ class Borrowing extends Model
 
     public $timestamps = false;
 
+    public const STATUS_PENDING = 'pending';
+    public const STATUS_APPROVED = 'approved';
+    public const STATUS_BORROWED = 'borrowed';
+    public const STATUS_RETURNED = 'returned';
+    public const STATUS_REJECTED = 'rejected';
+    public const STATUS_CANCELLED = 'cancelled';
+
+    public static function getStatuses(): array
+    {
+        return [
+            self::STATUS_PENDING,
+            self::STATUS_APPROVED,
+            self::STATUS_BORROWED,
+            self::STATUS_RETURNED,
+            self::STATUS_REJECTED,
+            self::STATUS_CANCELLED,
+        ];
+    }
+
     protected $fillable = [
         'book_id',
         'member_id',
@@ -40,7 +59,7 @@ class Borrowing extends Model
 
     public function book(): BelongsTo
     {
-        return $this->belongsTo(Book::class, 'book_id', 'book_id');
+        return $this->belongsTo(Book::class, 'book_id', 'book_id')->withTrashed();
     }
 
     public function member(): BelongsTo
@@ -51,5 +70,15 @@ class Borrowing extends Model
     public function librarian(): BelongsTo
     {
         return $this->belongsTo(Librarian::class, 'librarian_id', 'librarian_id');
+    }
+
+    public function review()
+    {
+        return $this->hasOne(Review::class, 'loan_id', 'loan_id');
+    }
+
+    public function fine()
+    {
+        return $this->hasOne(Fine::class, 'loan_id', 'loan_id');
     }
 }
