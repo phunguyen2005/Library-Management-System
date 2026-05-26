@@ -18,7 +18,11 @@ WORKDIR /var/www/html
 
 COPY . .
 
-RUN composer install --no-interaction --optimize-autoloader --no-dev
+# Dùng APP_KEY tạm thời để artisan commands không bị lỗi "No application encryption key"
+ENV APP_KEY="base64:3QmX+jV6ka56DK5g56XB8EHJEXgwGrD+bGS26jB4VYo="
+
+RUN composer install --no-interaction --optimize-autoloader --no-dev \
+    && php artisan package:discover --ansi
 
 RUN mkdir -p database && touch database/database.sqlite
 
@@ -26,4 +30,4 @@ RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cac
 
 EXPOSE 8000
 
-CMD ["sh", "-c", "php artisan migrate --force && php artisan serve --host=0.0.0.0 --port=8000"]
+CMD ["sh", "-c", "php artisan config:clear && php artisan migrate --force && php artisan serve --host=0.0.0.0 --port=8000"]
