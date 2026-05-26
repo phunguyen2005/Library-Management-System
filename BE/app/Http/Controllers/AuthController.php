@@ -149,8 +149,10 @@ class AuthController extends Controller
         try {
             \Illuminate\Support\Facades\Mail::to($user->email)->send(new \App\Mail\ChangePasswordOTP($otp));
         } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('sendPasswordOtp mail error: ' . $e->getMessage());
             return response()->json([
                 'message' => __('messages.auth.email_send_failed'),
+                'debug' => config('app.debug') ? $e->getMessage() : null,
             ], 500);
         }
 
@@ -330,7 +332,11 @@ class AuthController extends Controller
         try {
             \Illuminate\Support\Facades\Mail::to($email)->send(new \App\Mail\ForgotPasswordOTP($otp));
         } catch (\Exception $e) {
-            return response()->json(['message' => __('messages.auth.email_send_failed')], 500);
+            \Illuminate\Support\Facades\Log::error('forgotPassword mail error: ' . $e->getMessage());
+            return response()->json([
+                'message' => __('messages.auth.email_send_failed'),
+                'debug' => config('app.debug') ? $e->getMessage() : null,
+            ], 500);
         }
 
         return response()->json([
