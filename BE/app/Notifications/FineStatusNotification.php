@@ -48,7 +48,7 @@ class FineStatusNotification extends Notification implements ShouldQueue
                     ->line("- Tên tài liệu: $bookTitle")
                     ->line("- Số tiền phạt: $amount")
                     ->line("- Trạng thái: Đã thanh toán")
-                    ->action('Xem chi tiết tài khoản', url(config('app.frontend_url', 'http://localhost:3000') . '/history'));
+                    ->action('Xem chi tiết tài khoản', config('app.frontend_url', 'http://localhost:3000') . '/history');
         } elseif ($this->statusType === 'waived') {
             $message->subject('[Thư viện số HCMUE] Thông báo miễn giảm khoản phạt')
                     ->greeting("Kính chào $studentName,")
@@ -57,7 +57,7 @@ class FineStatusNotification extends Notification implements ShouldQueue
                     ->line("- Tên tài liệu: $bookTitle")
                     ->line("- Số tiền phạt: $amount")
                     ->line("- Trạng thái: Đã miễn phạt")
-                    ->action('Xem chi tiết tài khoản', url(config('app.frontend_url', 'http://localhost:3000') . '/history'));
+                    ->action('Xem chi tiết tài khoản', config('app.frontend_url', 'http://localhost:3000') . '/history');
         } else {
             $message->subject('[Thư viện số HCMUE] Thông báo khoản phạt mới phát sinh')
                     ->greeting("Kính chào $studentName,")
@@ -67,7 +67,7 @@ class FineStatusNotification extends Notification implements ShouldQueue
                     ->line("- Số tiền phạt: $amount")
                     ->line("- Lý do phạt: " . ($this->fine->reason === 'overdue' ? 'Trả sách quá hạn' : 'Hư hỏng/Mất sách'))
                     ->line("Vui lòng thanh toán khoản phạt sớm để tránh ảnh hưởng đến quyền lợi mượn sách tiếp theo.")
-                    ->action('Thanh toán khoản phạt', url(config('app.frontend_url', 'http://localhost:3000') . '/history'));
+                    ->action('Thanh toán khoản phạt', config('app.frontend_url', 'http://localhost:3000') . '/history');
         }
 
         return $message;

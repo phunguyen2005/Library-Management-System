@@ -108,7 +108,7 @@ class OAuthController extends Controller
 
     private function frontendOAuthCallback(array $query): string
     {
-        $frontendUrl = rtrim((string) env('FRONTEND_URL', 'http://localhost:3000'), '/');
+        $frontendUrl = rtrim((string) config('app.frontend_url', 'http://localhost:3000'), '/');
 
         return $frontendUrl . '/oauth-callback?' . http_build_query($query);
     }

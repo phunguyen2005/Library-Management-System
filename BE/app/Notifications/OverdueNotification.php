@@ -42,7 +42,7 @@ class OverdueNotification extends Notification implements ShouldQueue
             ->line('Cuốn sách "' . $this->borrowing->book->title . '" mà bạn mượn đã quá hạn trả.')
             ->line('Hạn trả cuối cùng là ngày ' . $this->borrowing->due_date->format('d/m/Y') . '.')
             ->line('Vui lòng đến thư viện trả sách ngay lập tức để tránh các hình phạt theo quy định.')
-            ->action('Xem chi tiết', url(config('app.frontend_url', 'http://localhost:3000') . '/history'));
+            ->action('Xem chi tiết', config('app.frontend_url', 'http://localhost:3000') . '/history');
     }
 
     /**

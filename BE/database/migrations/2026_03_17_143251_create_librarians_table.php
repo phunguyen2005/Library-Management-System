@@ -16,7 +16,7 @@ return new class extends Migration
             $table->string('name');
             $table->string('email')->nullable()->unique();
             $table->text('phone_number')->nullable();
-            $table->date('hire_date')->default(\Illuminate\Support\Facades\DB::raw('CURRENT_DATE'));
+            $table->date('hire_date')->default(\Illuminate\Support\Facades\DB::raw('(CURRENT_DATE)'));
         });
     }
 

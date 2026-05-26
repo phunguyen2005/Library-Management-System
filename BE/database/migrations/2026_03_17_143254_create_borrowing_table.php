@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id('loan_id');
             $table->unsignedBigInteger('book_id');
             $table->unsignedBigInteger('member_id');
-            $table->date('borrow_date')->default(\Illuminate\Support\Facades\DB::raw('CURRENT_DATE'));
+            $table->date('borrow_date')->default(\Illuminate\Support\Facades\DB::raw('(CURRENT_DATE)'));
             $table->date('return_date')->nullable();
             $table->unsignedBigInteger('librarian_id')->nullable();
 

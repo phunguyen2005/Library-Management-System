@@ -47,7 +47,7 @@ class OverdueMailNotification extends Notification implements ShouldQueue
             ->line("Hệ thống thư viện xin thông báo: Ấn phẩm \"$bookTitle\" do bạn mượn đã vượt quá thời hạn hoàn trả quy định.")
             ->line("Hạn trả cuối cùng: $dueDate.")
             ->line('Để tránh làm ảnh hưởng đến hồ sơ mượn sách và phát sinh các khoản phí phạt chậm trả, yêu cầu bạn mang ấn phẩm đến quầy thư viện hoàn trả ngay lập tức.')
-            ->action('Xem lịch sử mượn', url(config('app.frontend_url', 'http://localhost:3000') . '/history'))
+            ->action('Xem lịch sử mượn', config('app.frontend_url', 'http://localhost:3000') . '/history')
             ->line('Trường hợp bạn đã trả sách, vui lòng bỏ qua email này hoặc liên hệ thư viện để kiểm tra lại.')
             ->salutation("Trân trọng,\nThư viện số HCMUE");
     }

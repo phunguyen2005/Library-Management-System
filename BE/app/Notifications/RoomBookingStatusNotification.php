@@ -58,7 +58,7 @@ class RoomBookingStatusNotification extends Notification implements ShouldQueue
                     ->line("- Khung giờ: $timeStr")
                     ->line("- Mã nhận phòng: {$this->booking->booking_code}")
                     ->line("Vui lòng đến đúng giờ và thực hiện quét mã check-in tại phòng để bắt đầu sử dụng.")
-                    ->action('Xem lịch sử đặt phòng', url(config('app.frontend_url', 'http://localhost:3000') . '/room-bookings'));
+                    ->action('Xem lịch sử đặt phòng', config('app.frontend_url', 'http://localhost:3000') . '/room-bookings');
         } elseif ($this->statusType === 'rejected') {
             $message->subject('[Thư viện số HCMUE] Từ chối yêu cầu đặt phòng tự học')
                     ->greeting("Kính chào $studentName,")
@@ -68,7 +68,7 @@ class RoomBookingStatusNotification extends Notification implements ShouldQueue
             if ($this->reason) {
                 $message->line("- Lý do từ chối: {$this->reason}");
             }
-            $message->action('Đặt phòng khác', url(config('app.frontend_url', 'http://localhost:3000') . '/rooms'));
+            $message->action('Đặt phòng khác', config('app.frontend_url', 'http://localhost:3000') . '/rooms');
         } elseif ($this->statusType === 'cancelled') {
             $message->subject('[Thư viện số HCMUE] Xác nhận hủy đặt phòng tự học')
                     ->greeting("Kính chào $studentName,")
@@ -76,7 +76,7 @@ class RoomBookingStatusNotification extends Notification implements ShouldQueue
                     ->line("Thông tin phòng đã hủy:")
                     ->line("- Phòng: $roomName")
                     ->line("- Thời gian: ngày $dateStr ($timeStr)")
-                    ->action('Đặt phòng khác', url(config('app.frontend_url', 'http://localhost:3000') . '/rooms'));
+                    ->action('Đặt phòng khác', config('app.frontend_url', 'http://localhost:3000') . '/rooms');
         } elseif ($this->statusType === 'no_show') {
             $message->subject('[Thư viện số HCMUE] Cảnh báo: Vắng mặt lịch đặt phòng tự học')
                     ->greeting("Kính chào $studentName,")
@@ -87,7 +87,7 @@ class RoomBookingStatusNotification extends Notification implements ShouldQueue
             if ($this->reason) {
                 $message->line("- Lý do: {$this->reason}");
             }
-            $message->action('Xem lịch sử đặt phòng', url(config('app.frontend_url', 'http://localhost:3000') . '/room-bookings'));
+            $message->action('Xem lịch sử đặt phòng', config('app.frontend_url', 'http://localhost:3000') . '/room-bookings');
         }
 
         return $message;

@@ -44,7 +44,7 @@ class RoomBookingReminderNotification extends Notification implements ShouldQueu
             ->line("- Thời gian: ngày $dateStr từ $timeStr")
             ->line("- Mã nhận phòng: {$this->booking->booking_code}")
             ->line("Vui lòng chuẩn bị và có mặt đúng giờ để thực hiện quét mã check-in nhận phòng.")
-            ->action('Xem chi tiết đặt phòng', url(config('app.frontend_url', 'http://localhost:3000') . '/room-bookings'))
+            ->action('Xem chi tiết đặt phòng', config('app.frontend_url', 'http://localhost:3000') . '/room-bookings')
             ->salutation("Trân trọng,\nThư viện số HCMUE");
     }
 
