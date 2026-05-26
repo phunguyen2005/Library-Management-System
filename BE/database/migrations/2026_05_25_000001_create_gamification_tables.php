@@ -31,7 +31,7 @@ return new class extends Migration
         // 3. Create member_badges pivot table
         Schema::create('member_badges', function (Blueprint $table) {
             $table->id();
-            $table->unsignedInteger('member_id');
+            $table->unsignedBigInteger('member_id');
             $table->unsignedBigInteger('badge_id');
             $table->timestamp('earned_at')->useCurrent();
 
@@ -56,7 +56,7 @@ return new class extends Migration
         // 5. Create member_rewards table
         Schema::create('member_rewards', function (Blueprint $table) {
             $table->id();
-            $table->unsignedInteger('member_id');
+            $table->unsignedBigInteger('member_id');
             $table->unsignedBigInteger('reward_id');
             $table->string('status')->default('active'); // active, used, expired
             $table->timestamp('redeemed_at')->useCurrent();
@@ -70,7 +70,7 @@ return new class extends Migration
         // 6. Create gamify_logs table
         Schema::create('gamify_logs', function (Blueprint $table) {
             $table->id();
-            $table->unsignedInteger('member_id');
+            $table->unsignedBigInteger('member_id');
             $table->string('event_type'); // check_in, book_borrow, book_return, review_post, digital_read, redeem_reward, fine_waived
             $table->integer('xp_gained')->default(0);
             $table->integer('points_changed')->default(0);
