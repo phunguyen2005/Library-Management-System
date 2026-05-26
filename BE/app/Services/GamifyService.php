@@ -91,7 +91,7 @@ class GamifyService
 
                 case 'speed_reader':
                     $shouldAward = $member->readingProgress()
-                        ->where('percentage', '>=', 100)
+                        ->whereColumn('current_page', '>=', 'total_pages')
                         ->exists();
                     break;
 
