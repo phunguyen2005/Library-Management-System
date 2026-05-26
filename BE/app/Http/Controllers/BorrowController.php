@@ -98,9 +98,13 @@ class BorrowController extends Controller
 
         \App\Services\AuditLoggerService::log('borrow_request', 'Đã yêu cầu mượn sách: ' . $loan->book->title . ' (ID Sách: ' . $loan->book_id . ', Mã phiếu: #' . $loan->loan_id . ')', $member);
 
-        \App\Models\Librarian::all()->each(function ($librarian) use ($loan) {
-            $librarian->notify(new \App\Notifications\NewBorrowRequestNotification($loan));
-        });
+        try {
+            \App\Models\Librarian::all()->each(function ($librarian) use ($loan) {
+                $librarian->notify(new \App\Notifications\NewBorrowRequestNotification($loan));
+            });
+        } catch (\Exception $e) {
+            // Ignore notification failures on production
+        }
 
         return response()->json([
             'message' => __('messages.borrow.request_created'),
@@ -137,8 +141,12 @@ class BorrowController extends Controller
             $book->is_available = $book->available_quantity > 0;
             $book->save();
 
-            $loan->member->notify(new \App\Notifications\BorrowingStatusNotification($loan, 'approved'));
-            $loan->member->notify(new \App\Notifications\BorrowingStatusMailNotification($loan, 'approved'));
+            try {
+                $loan->member->notify(new \App\Notifications\BorrowingStatusNotification($loan, 'approved'));
+                $loan->member->notify(new \App\Notifications\BorrowingStatusMailNotification($loan, 'approved'));
+            } catch (\Exception $e) {
+                // Ignore mail sending failures on production
+            }
 
             \App\Services\AuditLoggerService::log('borrow_approve', 'Đã duyệt yêu cầu mượn sách: ' . $loan->book->title . ' cho thành viên: ' . $loan->member->name . ' (Mã phiếu: #' . $loan->loan_id . ')', $librarian);
 
@@ -220,8 +228,12 @@ class BorrowController extends Controller
             $loan->rejected_at = now();
             $loan->save();
 
-            $loan->member->notify(new \App\Notifications\BorrowingStatusNotification($loan, 'rejected', $reason));
-            $loan->member->notify(new \App\Notifications\BorrowingStatusMailNotification($loan, 'rejected', $reason));
+            try {
+                $loan->member->notify(new \App\Notifications\BorrowingStatusNotification($loan, 'rejected', $reason));
+                $loan->member->notify(new \App\Notifications\BorrowingStatusMailNotification($loan, 'rejected', $reason));
+            } catch (\Exception $e) {
+                // Ignore mail sending failures on production
+            }
 
             \App\Services\AuditLoggerService::log('borrow_reject', 'Đã từ chối yêu cầu mượn sách: ' . $loan->book->title . ' của thành viên: ' . $loan->member->name . ' (Lý do: ' . $reason . ', Mã phiếu: #' . $loan->loan_id . ')', $librarian);
 
@@ -330,8 +342,12 @@ class BorrowController extends Controller
                 $book->save();
             }
 
-            $loan->member->notify(new \App\Notifications\BorrowingStatusNotification($loan, 'returned'));
-            $loan->member->notify(new \App\Notifications\BorrowingStatusMailNotification($loan, 'returned'));
+            try {
+                $loan->member->notify(new \App\Notifications\BorrowingStatusNotification($loan, 'returned'));
+                $loan->member->notify(new \App\Notifications\BorrowingStatusMailNotification($loan, 'returned'));
+            } catch (\Exception $e) {
+                // Ignore mail sending failures on production
+            }
 
             \App\Services\AuditLoggerService::log('borrow_return', 'Đã nhận sách trả: ' . $loan->book->title . ' từ thành viên: ' . $loan->member->name . ' (Tình trạng: ' . $condition . ', Mã phiếu: #' . $loan->loan_id . ')', $librarian);
 
@@ -436,7 +452,11 @@ class BorrowController extends Controller
                 $librarian
             );
 
-            $loan->member->notify(new \App\Notifications\BorrowingStatusNotification($loan, 'extended'));
+            try {
+                $loan->member->notify(new \App\Notifications\BorrowingStatusNotification($loan, 'extended'));
+            } catch (\Exception $e) {
+                // Ignore notification failures on production
+            }
 
             return $loan->fresh(['book', 'member', 'librarian', 'fine']);
         });
