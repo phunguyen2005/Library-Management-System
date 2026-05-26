@@ -10,6 +10,8 @@ import {
 import CSVImportWizard from '../../components/CSVImportWizard';
 import CSVExportSelector from '../../components/CSVExportSelector';
 import { AnimatePresence } from 'framer-motion';
+import { API_BASE_URL } from '../../api/client';
+import { getStoredToken } from '../../auth/storage';
 
 const EXPECTED_FIELDS = [
   { key: 'name', label: 'Họ và tên', required: true, fallbacks: ['ho_ten', 'name', 'ten', 'full name'] },
@@ -147,13 +149,15 @@ export default function AdminMembers() {
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
   const handleExportMembers = (columns: string[]) => {
-    const sessionStr = localStorage.getItem('auth_session');
-    if (!sessionStr) return;
+    const token = getStoredToken();
+    if (!token) {
+      emitToast({ tone: 'error', title: 'Lỗi', message: 'Không thể xác thực để xuất dữ liệu.' });
+      return;
+    }
     try {
-      const token = JSON.parse(sessionStr).token;
       emitToast({ tone: 'info', title: 'Xuất dữ liệu', message: 'Đang khởi tạo tải dữ liệu...' });
 
-      let exportUrl = 'http://localhost:8000/api/reports/export-members';
+      let exportUrl = `${API_BASE_URL}/reports/export-members`;
       const params: Record<string, string> = {
         columns: columns.join(','),
       };

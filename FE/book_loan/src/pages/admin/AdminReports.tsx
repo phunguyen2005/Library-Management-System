@@ -12,6 +12,8 @@ import EmptyState from '../../components/EmptyState';
 import { getErrorMessage } from '../../lib/errors';
 import { emitToast } from '../../notifications/events';
 import CSVExportSelector from '../../components/CSVExportSelector';
+import { API_BASE_URL } from '../../api/client';
+import { getStoredToken } from '../../auth/storage';
 
 const AVAILABLE_EXPORT_COLUMNS_FINES = [
   { key: 'fine_id', label: 'Mã phạt / Giao dịch' },
@@ -206,13 +208,15 @@ export default function AdminReports() {
 
   // ── Export CSV ──────────────────────────────────────────────────────────────
   const handleExportCSV = () => {
-    const sessionStr = localStorage.getItem('auth_session');
-    if (!sessionStr) return;
+    const token = getStoredToken();
+    if (!token) {
+      emitToast({ tone: 'error', title: 'Lỗi', message: 'Không thể xác thực để tải báo cáo.' });
+      return;
+    }
     try {
-      const token = JSON.parse(sessionStr).token;
       emitToast({ tone: 'info', title: 'Xuất báo cáo', message: 'Đang khởi tạo tải báo cáo offline...' });
 
-      let exportUrl = 'http://localhost:8000/api/reports/export';
+      let exportUrl = `${API_BASE_URL}/reports/export`;
       if (activeFilter) {
         exportUrl += '?' + new URLSearchParams({
           filter_type: activeFilter.filter_type,
@@ -244,13 +248,15 @@ export default function AdminReports() {
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
   const handleExportFines = (columns: string[]) => {
-    const sessionStr = localStorage.getItem('auth_session');
-    if (!sessionStr) return;
+    const token = getStoredToken();
+    if (!token) {
+      emitToast({ tone: 'error', title: 'Lỗi', message: 'Không thể xác thực để xuất dữ liệu.' });
+      return;
+    }
     try {
-      const token = JSON.parse(sessionStr).token;
       emitToast({ tone: 'info', title: 'Xuất dữ liệu phạt', message: 'Đang khởi tạo tải báo cáo nộp phạt...' });
 
-      let exportUrl = 'http://localhost:8000/api/reports/export-fines';
+      let exportUrl = `${API_BASE_URL}/reports/export-fines`;
       const params: Record<string, string> = {
         columns: columns.join(','),
       };

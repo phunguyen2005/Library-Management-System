@@ -26,6 +26,8 @@ import type { FormattedBook } from '../../types/book';
 import { AnimatePresence } from 'framer-motion';
 import CSVImportWizard from '../../components/CSVImportWizard';
 import CSVExportSelector from '../../components/CSVExportSelector';
+import { API_BASE_URL } from '../../api/client';
+import { getStoredToken } from '../../auth/storage';
 
 const EXPECTED_FIELDS = [
   { key: 'title', label: 'Tên sách / Tiêu đề', required: true, fallbacks: ['ten_sach', 'title', 'tieu de', 'ten'] },
@@ -168,13 +170,15 @@ export default function AdminInventory() {
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
   const handleExportBooks = (columns: string[]) => {
-    const sessionStr = localStorage.getItem('auth_session');
-    if (!sessionStr) return;
+    const token = getStoredToken();
+    if (!token) {
+      emitToast({ tone: 'error', title: 'Lỗi', message: 'Không thể xác thực để xuất dữ liệu.' });
+      return;
+    }
     try {
-      const token = JSON.parse(sessionStr).token;
       emitToast({ tone: 'info', title: 'Xuất dữ liệu', message: 'Đang khởi tạo tải dữ liệu...' });
 
-      let exportUrl = 'http://localhost:8000/api/reports/export-books';
+      let exportUrl = `${API_BASE_URL}/reports/export-books`;
       const params: Record<string, string> = {
         columns: columns.join(','),
       };

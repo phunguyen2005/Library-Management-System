@@ -297,11 +297,22 @@ export default function AdminRequests() {
       emitToast({ tone: 'info', title: 'Không có dữ liệu xuất', message: 'Bộ lọc hiện tại không có bản ghi.' });
       return;
     }
+
+    const formatCSVDate = (dateStr?: string | null) => {
+      if (!dateStr) return '';
+      const match = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (match) {
+        const [, yyyy, mm, dd] = match;
+        return `${dd}/${mm}/${yyyy}`;
+      }
+      return dateStr;
+    };
+
     const rows = [
       ['Mã phiếu', 'Mã độc giả', 'Tên độc giả', 'Mã sách', 'Tên sách', 'Trạng thái', 'Ngày yêu cầu', 'Hạn trả', 'Ngày trả', 'Quá hạn', 'Lý do từ chối'],
       ...filteredRequests.map((r) => [
         String(r.id), r.code, r.name, r.bookCode, r.book, r.status,
-        r.requested_at || '', r.due_date || '', r.return_date || '',
+        formatCSVDate(r.requested_at), formatCSVDate(r.due_date), formatCSVDate(r.return_date),
         r.is_overdue ? 'Có' : 'Không', r.rejection_reason || '',
       ]),
     ];

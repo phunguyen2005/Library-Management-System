@@ -843,7 +843,18 @@ class ReportController extends Controller
         }, $fields);
 
         $rowStr = implode("\t", $rowFields) . "\r\n";
-        $utf16Row = mb_convert_encoding($rowStr, 'UTF-16LE', 'UTF-8');
+        if (function_exists('mb_convert_encoding')) {
+            $utf16Row = mb_convert_encoding($rowStr, 'UTF-16LE', 'UTF-8');
+        } elseif (function_exists('iconv')) {
+            $utf16Row = iconv('UTF-8', 'UTF-16LE//IGNORE', $rowStr);
+        } else {
+            // Pure-PHP basic conversion fallback (ASCII/UTF-8 character-by-character translation)
+            $utf16Row = '';
+            $len = strlen($rowStr);
+            for ($i = 0; $i < $len; $i++) {
+                $utf16Row .= $rowStr[$i] . "\x00";
+            }
+        }
         fwrite($file, $utf16Row);
     }
 
