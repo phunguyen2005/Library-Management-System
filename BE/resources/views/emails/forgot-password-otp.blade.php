@@ -12,7 +12,7 @@
 <body>
     <div class="container">
         <div style="margin-bottom: 25px;">
-            <img src="{{ $message->embed(public_path('logo.png')) }}" alt="HCMUE Logo" style="height: 75px; width: auto; object-fit: contain;">
+            <img src="https://raw.githubusercontent.com/phunguyen2005/Library-Management-System/main/BE/public/logo.png" alt="HCMUE Logo" style="height: 70px; width: auto; display: block; margin: 0 auto; object-fit: contain;">
         </div>
         <h2>Xin chào,</h2>
         <p>Chúng tôi nhận được yêu cầu khôi phục mật khẩu cho tài khoản của bạn tại <strong>Thư viện số HCMUE</strong>.</p>
