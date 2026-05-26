@@ -116,7 +116,7 @@ flowchart LR
 
 ### 3.1 Đánh giá từng Controller
 
-#### [AuthController.php](file:///d:/College/03_Year_3/PhP/xampp/htdocs/BOOK_LOAN_MIDTERM/BE/app/Http/Controllers/AuthController.php)
+#### [AuthController.php](../../BE/app/Http/Controllers/AuthController.php)
 
 > [!CAUTION]
 > **CRITICAL: Registration cho phép client set `role` field.**  
@@ -142,7 +142,7 @@ $user = User::create([
 - ⚠️ Không có rate limit cho login/OTP/forgot-password
 - ⚠️ OTP expiry logic có thể có bug (kiểm tra điều kiện `>` vs `<`)
 
-#### [BookController.php](file:///d:/College/03_Year_3/PhP/xampp/htdocs/BOOK_LOAN_MIDTERM/BE/app/Http/Controllers/BookController.php)
+#### [BookController.php](../../BE/app/Http/Controllers/BookController.php)
 
 | Issue | Severity | Fix |
 |-------|----------|-----|
@@ -151,7 +151,7 @@ $user = User::create([
 | Không soft delete | Medium | Thêm `SoftDeletes` trait |
 | Xóa sách có borrow active | High | Check trước khi xóa |
 
-#### [BorrowingController.php](file:///d:/College/03_Year_3/PhP/xampp/htdocs/BOOK_LOAN_MIDTERM/BE/app/Http/Controllers/BorrowingController.php)
+#### [BorrowingController.php](../../BE/app/Http/Controllers/BorrowingController.php)
 
 > [!WARNING]
 > **Approve/Return không dùng transaction** — nếu update status thành công nhưng update inventory fail, dữ liệu sẽ inconsistent.
@@ -164,7 +164,7 @@ $user = User::create([
 | Không check overdue | Medium | Thêm scope/method check due_date |
 | Return không validate status | Medium | Check `status === 'borrowed'` trước khi return |
 
-#### [MemberController.php](file:///d:/College/03_Year_3/PhP/xampp/htdocs/BOOK_LOAN_MIDTERM/BE/app/Http/Controllers/MemberController.php)
+#### [MemberController.php](../../BE/app/Http/Controllers/MemberController.php)
 
 - Thiếu pagination
 - Admin có thể tạo admin khác → nên restrict hoặc log
@@ -345,26 +345,26 @@ Schema::create('audit_logs', function (Blueprint $table) {
 #### Student Side (10 screens)
 | Màn hình | File | Trạng thái | Vấn đề |
 |----------|------|------------|--------|
-| Home | [Home.tsx](file:///d:/College/03_Year_3/PhP/xampp/htdocs/BOOK_LOAN_MIDTERM/FE/book_loan/src/pages/student/Home.tsx) | ✅ Tốt | Stats từ FE, không real-time |
-| Catalog | [Catalog.tsx](file:///d:/College/03_Year_3/PhP/xampp/htdocs/BOOK_LOAN_MIDTERM/FE/book_loan/src/pages/student/Catalog.tsx) | ✅ Tốt | Thiếu pagination, sort |
-| My Requests | [MyRequests.tsx](file:///d:/College/03_Year_3/PhP/xampp/htdocs/BOOK_LOAN_MIDTERM/FE/book_loan/src/pages/student/MyRequests.tsx) | ✅ | Thiếu empty state đẹp |
-| My Books | [MyBooks.tsx](file:///d:/College/03_Year_3/PhP/xampp/htdocs/BOOK_LOAN_MIDTERM/FE/book_loan/src/pages/student/MyBooks.tsx) | ✅ | Thiếu overdue highlight |
-| History | [History.tsx](file:///d:/College/03_Year_3/PhP/xampp/htdocs/BOOK_LOAN_MIDTERM/FE/book_loan/src/pages/student/History.tsx) | ✅ | Thiếu filter by date range |
-| Digital Library | [DigitalLibrary.tsx](file:///d:/College/03_Year_3/PhP/xampp/htdocs/BOOK_LOAN_MIDTERM/FE/book_loan/src/pages/student/DigitalLibrary.tsx) | ✅ | OK |
-| Book Detail | [BookDetail.tsx](file:///d:/College/03_Year_3/PhP/xampp/htdocs/BOOK_LOAN_MIDTERM/FE/book_loan/src/pages/student/BookDetail.tsx) | ✅ | Thiếu related books, reviews |
-| Profile | [Profile.tsx](file:///d:/College/03_Year_3/PhP/xampp/htdocs/BOOK_LOAN_MIDTERM/FE/book_loan/src/pages/student/Profile.tsx) | ✅ | OK |
-| Forgot Password | [ForgotPassword.tsx](file:///d:/College/03_Year_3/PhP/xampp/htdocs/BOOK_LOAN_MIDTERM/FE/book_loan/src/pages/student/ForgotPassword.tsx) | ✅ | OK |
-| Reset Password | [ResetPassword.tsx](file:///d:/College/03_Year_3/PhP/xampp/htdocs/BOOK_LOAN_MIDTERM/FE/book_loan/src/pages/student/ResetPassword.tsx) | ✅ | OK |
+| Home | [Home.tsx](src/pages/student/Home.tsx) | ✅ Tốt | Stats từ FE, không real-time |
+| Catalog | [Catalog.tsx](src/pages/student/Catalog.tsx) | ✅ Tốt | Thiếu pagination, sort |
+| My Requests | [MyRequests.tsx](src/pages/student/MyRequests.tsx) | ✅ | Thiếu empty state đẹp |
+| My Books | [MyBooks.tsx](src/pages/student/MyBooks.tsx) | ✅ | Thiếu overdue highlight |
+| History | [History.tsx](src/pages/student/History.tsx) | ✅ | Thiếu filter by date range |
+| Digital Library | [DigitalLibrary.tsx](src/pages/student/DigitalLibrary.tsx) | ✅ | OK |
+| Book Detail | [BookDetail.tsx](src/pages/student/BookDetail.tsx) | ✅ | Thiếu related books, reviews |
+| Profile | [Profile.tsx](src/pages/student/Profile.tsx) | ✅ | OK |
+| Forgot Password | [ForgotPassword.tsx](src/pages/student/ForgotPassword.tsx) | ✅ | OK |
+| Reset Password | [ResetPassword.tsx](src/pages/student/ResetPassword.tsx) | ✅ | OK |
 
 #### Admin Side (6 screens)
 | Màn hình | File | Trạng thái | Vấn đề |
 |----------|------|------------|--------|
-| Dashboard | [Dashboard.tsx](file:///d:/College/03_Year_3/PhP/xampp/htdocs/BOOK_LOAN_MIDTERM/FE/book_loan/src/pages/admin/Dashboard.tsx) | ✅ | Stats từ FE, cần backend API |
-| Manage Books | [ManageBooks.tsx](file:///d:/College/03_Year_3/PhP/xampp/htdocs/BOOK_LOAN_MIDTERM/FE/book_loan/src/pages/admin/ManageBooks.tsx) | ✅ | Thiếu pagination, confirm delete |
-| Manage Requests | [ManageRequests.tsx](file:///d:/College/03_Year_3/PhP/xampp/htdocs/BOOK_LOAN_MIDTERM/FE/book_loan/src/pages/admin/ManageRequests.tsx) | ✅ | Thiếu filter by status |
-| Manage Members | [ManageMembers.tsx](file:///d:/College/03_Year_3/PhP/xampp/htdocs/BOOK_LOAN_MIDTERM/FE/book_loan/src/pages/admin/ManageMembers.tsx) | ✅ | Thiếu pagination |
-| Reports | [Reports.tsx](file:///d:/College/03_Year_3/PhP/xampp/htdocs/BOOK_LOAN_MIDTERM/FE/book_loan/src/pages/admin/Reports.tsx) | ⚠️ | Frontend-only, cần backend API |
-| Settings | [Settings.tsx](file:///d:/College/03_Year_3/PhP/xampp/htdocs/BOOK_LOAN_MIDTERM/FE/book_loan/src/pages/admin/Settings.tsx) | ⚠️ | Local-only, không persist |
+| Dashboard | [Dashboard.tsx](src/pages/admin/Dashboard.tsx) | ✅ | Stats từ FE, cần backend API |
+| Manage Books | [ManageBooks.tsx](src/pages/admin/ManageBooks.tsx) | ✅ | Thiếu pagination, confirm delete |
+| Manage Requests | [ManageRequests.tsx](src/pages/admin/ManageRequests.tsx) | ✅ | Thiếu filter by status |
+| Manage Members | [ManageMembers.tsx](src/pages/admin/ManageMembers.tsx) | ✅ | Thiếu pagination |
+| Reports | [Reports.tsx](src/pages/admin/Reports.tsx) | ⚠️ | Frontend-only, cần backend API |
+| Settings | [Settings.tsx](src/pages/admin/Settings.tsx) | ⚠️ | Local-only, không persist |
 
 ### 5.2 UI/UX Improvements cần làm
 
@@ -380,7 +380,7 @@ Schema::create('audit_logs', function (Blueprint $table) {
    - Implement: Modal component `<ConfirmDialog />`
 
 3. **404 Page**
-   - File: Thêm `NotFound.tsx` và catch-all route trong [App.tsx](file:///d:/College/03_Year_3/PhP/xampp/htdocs/BOOK_LOAN_MIDTERM/FE/book_loan/src/App.tsx)
+   - File: Thêm `NotFound.tsx` và catch-all route trong [App.tsx](src/App.tsx)
 
 4. **Error Boundary**
    - File: Thêm `ErrorBoundary.tsx` wrap toàn app
@@ -450,7 +450,7 @@ Schema::create('audit_logs', function (Blueprint $table) {
 
 #### 🔴 Phải fix ngay
 
-**1. Fix Role Registration** — [AuthController.php](file:///d:/College/03_Year_3/PhP/xampp/htdocs/BOOK_LOAN_MIDTERM/BE/app/Http/Controllers/AuthController.php)
+**1. Fix Role Registration** — [AuthController.php](../../BE/app/Http/Controllers/AuthController.php)
 ```php
 // Trong method register(), thay:
 'role' => $request->role
@@ -458,7 +458,7 @@ Schema::create('audit_logs', function (Blueprint $table) {
 'role' => 'student'  // Hardcode, chỉ admin mới tạo được admin khác
 ```
 
-**2. Thêm Rate Limiting** — [api.php](file:///d:/College/03_Year_3/PhP/xampp/htdocs/BOOK_LOAN_MIDTERM/BE/routes/api.php)
+**2. Thêm Rate Limiting** — [api.php](../../BE/routes/api.php)
 ```php
 // Trong RouteServiceProvider hoặc bootstrap/app.php:
 RateLimiter::for('auth', function (Request $request) {
@@ -775,15 +775,15 @@ Borrowings:
 
 | # | Task | File/Module | Ưu tiên | Độ khó | Gợi ý implement |
 |---|------|-------------|---------|--------|-----------------|
-| 1.1 | **Fix role registration** | [AuthController.php](file:///d:/College/03_Year_3/PhP/xampp/htdocs/BOOK_LOAN_MIDTERM/BE/app/Http/Controllers/AuthController.php) | 🔴 Critical | ⭐ Easy | Hardcode `'role' => 'student'` trong register |
-| 1.2 | **Thêm DB transaction** cho approve/return | [BorrowingController.php](file:///d:/College/03_Year_3/PhP/xampp/htdocs/BOOK_LOAN_MIDTERM/BE/app/Http/Controllers/BorrowingController.php) | 🔴 Critical | ⭐⭐ Medium | Wrap trong `DB::transaction()` |
-| 1.3 | **Duplicate borrow check** | [BorrowingController.php](file:///d:/College/03_Year_3/PhP/xampp/htdocs/BOOK_LOAN_MIDTERM/BE/app/Http/Controllers/BorrowingController.php) | 🔴 High | ⭐ Easy | Thêm query check trước khi create |
-| 1.4 | **Validate return status** | [BorrowingController.php](file:///d:/College/03_Year_3/PhP/xampp/htdocs/BOOK_LOAN_MIDTERM/BE/app/Http/Controllers/BorrowingController.php) | 🔴 High | ⭐ Easy | Check `status === 'borrowed'` |
-| 1.5 | **Hash password reset token** | [AuthController.php](file:///d:/College/03_Year_3/PhP/xampp/htdocs/BOOK_LOAN_MIDTERM/BE/app/Http/Controllers/AuthController.php) | 🔴 High | ⭐ Easy | Dùng `Hash::make()` / `Hash::check()` |
-| 1.6 | **Thêm rate limiting** | [api.php](file:///d:/College/03_Year_3/PhP/xampp/htdocs/BOOK_LOAN_MIDTERM/BE/routes/api.php), bootstrap | 🔴 High | ⭐⭐ Medium | `RateLimiter::for()` + `throttle` middleware |
-| 1.7 | **Prevent delete book with active borrows** | [BookController.php](file:///d:/College/03_Year_3/PhP/xampp/htdocs/BOOK_LOAN_MIDTERM/BE/app/Http/Controllers/BookController.php) | 🟡 Medium | ⭐ Easy | Check active borrowings trước khi delete |
+| 1.1 | **Fix role registration** | [AuthController.php](../../BE/app/Http/Controllers/AuthController.php) | 🔴 Critical | ⭐ Easy | Hardcode `'role' => 'student'` trong register |
+| 1.2 | **Thêm DB transaction** cho approve/return | [BorrowingController.php](../../BE/app/Http/Controllers/BorrowingController.php) | 🔴 Critical | ⭐⭐ Medium | Wrap trong `DB::transaction()` |
+| 1.3 | **Duplicate borrow check** | [BorrowingController.php](../../BE/app/Http/Controllers/BorrowingController.php) | 🔴 High | ⭐ Easy | Thêm query check trước khi create |
+| 1.4 | **Validate return status** | [BorrowingController.php](../../BE/app/Http/Controllers/BorrowingController.php) | 🔴 High | ⭐ Easy | Check `status === 'borrowed'` |
+| 1.5 | **Hash password reset token** | [AuthController.php](../../BE/app/Http/Controllers/AuthController.php) | 🔴 High | ⭐ Easy | Dùng `Hash::make()` / `Hash::check()` |
+| 1.6 | **Thêm rate limiting** | [api.php](../../BE/routes/api.php), bootstrap | 🔴 High | ⭐⭐ Medium | `RateLimiter::for()` + `throttle` middleware |
+| 1.7 | **Prevent delete book with active borrows** | [BookController.php](../../BE/app/Http/Controllers/BookController.php) | 🟡 Medium | ⭐ Easy | Check active borrowings trước khi delete |
 | 1.8 | **Add confirmation dialogs** | FE components | 🟡 Medium | ⭐ Easy | Tạo `<ConfirmDialog />` component |
-| 1.9 | **Add 404 page** | FE [App.tsx](file:///d:/College/03_Year_3/PhP/xampp/htdocs/BOOK_LOAN_MIDTERM/FE/book_loan/src/App.tsx) | 🟡 Medium | ⭐ Easy | Catch-all route → NotFound component |
+| 1.9 | **Add 404 page** | FE [App.tsx](src/App.tsx) | 🟡 Medium | ⭐ Easy | Catch-all route → NotFound component |
 | 1.10 | **Add Error Boundary** | FE root | 🟡 Medium | ⭐ Easy | React ErrorBoundary class component |
 
 ---

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { updateMyProfile } from '../../api/userApi';
+import { updateMyProfile, sendPasswordOtp, verifyPasswordOtp } from '../../api/userApi';
 import { getActiveDevices, revokeDevice, type DeviceSession } from '../../api/authApi';
 import { useAuth } from '../../auth/AuthContext';
 import { getErrorMessage, isUnauthorizedError } from '../../lib/errors';
@@ -14,16 +14,149 @@ export default function StudentSettings() {
     name: '',
     email: '',
     phone_number: '',
-    current_password: '',
-    password: '',
-    password_confirmation: '',
     notify_due_soon: true,
     notify_new_books: true,
+    notify_borrow_status: true,
+    notify_room_status: true,
+    notify_room_reminder: true,
+    notify_fine_status: true,
+    notify_reservation: true,
   });
   const [isSaving, setIsSaving] = useState(false);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [devices, setDevices] = useState<DeviceSession[]>([]);
   const [loadingDevices, setLoadingDevices] = useState(true);
+
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [isOtpVerified, setIsOtpVerified] = useState(false);
+  const [passwordForm, setPasswordForm] = useState({
+    current_password: '',
+    password: '',
+    password_confirmation: '',
+    otp: '',
+  });
+  const [otpCountdown, setOtpCountdown] = useState(300);
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
+  const [otpError, setOtpError] = useState<string | null>(null);
+  const [resendingOtp, setResendingOtp] = useState(false);
+
+  useEffect(() => {
+    if (showPasswordModal && otpCountdown > 0) {
+      const timer = setTimeout(() => setOtpCountdown(otpCountdown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [showPasswordModal, otpCountdown]);
+
+  const formatCountdown = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  };
+
+  const handleOpenPasswordModal = async () => {
+    try {
+      setFeedback(null);
+      await sendPasswordOtp();
+      setOtpCountdown(300);
+      setIsOtpVerified(false);
+      setPasswordForm({
+        current_password: '',
+        password: '',
+        password_confirmation: '',
+        otp: '',
+      });
+      setOtpError(null);
+      setShowPasswordModal(true);
+      emitToast({
+        tone: 'success',
+        title: 'Mã OTP đã gửi',
+        message: 'Vui lòng kiểm tra email của bạn để nhận mã xác thực.',
+      });
+    } catch (error: unknown) {
+      const message = getErrorMessage(error, 'Không thể gửi mã xác thực OTP.');
+      setFeedback({ tone: 'error', message });
+      emitToast({
+        tone: 'error',
+        title: 'Không thể gửi OTP',
+        message,
+      });
+    }
+  };
+
+  const handleVerifyOtpStep = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (passwordForm.otp.length !== 6) return;
+
+    setIsVerifyingOtp(true);
+    setOtpError(null);
+
+    try {
+      await verifyPasswordOtp(passwordForm.otp);
+      setIsOtpVerified(true);
+      setOtpError(null);
+      emitToast({
+        tone: 'success',
+        title: 'Xác thực thành công',
+        message: 'Vui lòng thiết lập mật khẩu mới của bạn.',
+      });
+    } catch (error: unknown) {
+      const message = getErrorMessage(error, 'Mã OTP không chính xác hoặc đã hết hạn.');
+      setOtpError(message);
+    } finally {
+      setIsVerifyingOtp(false);
+    }
+  };
+
+  const handleSaveNewPassword = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setIsSaving(true);
+    setOtpError(null);
+
+    try {
+      const response = await updateMyProfile({
+        name: form.name,
+        phone_number: form.phone_number || null,
+        password: passwordForm.password,
+        password_confirmation: passwordForm.password_confirmation,
+        otp: passwordForm.otp,
+      });
+
+      updateUser(response.user);
+      setFeedback({ tone: 'success', message: response.message || 'Thay đổi mật khẩu thành công.' });
+      emitToast({
+        tone: 'success',
+        title: 'Thành công',
+        message: response.message || 'Đổi mật khẩu thành công.',
+      });
+      setShowPasswordModal(false);
+    } catch (error: unknown) {
+      const message = getErrorMessage(error, 'Không thể cập nhật mật khẩu mới.');
+      setOtpError(message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    setResendingOtp(true);
+    setOtpError(null);
+
+    try {
+      await sendPasswordOtp();
+      setOtpCountdown(300);
+      setPasswordForm((prev) => ({ ...prev, otp: '' }));
+      emitToast({
+        tone: 'success',
+        title: 'Mã OTP mới đã gửi',
+        message: 'Mã xác thực mới đã được gửi về email của bạn.',
+      });
+    } catch (error: unknown) {
+      const message = getErrorMessage(error, 'Không thể gửi lại mã xác thực.');
+      setOtpError(message);
+    } finally {
+      setResendingOtp(false);
+    }
+  };
 
   const fetchDevices = async () => {
     try {
@@ -59,6 +192,11 @@ export default function StudentSettings() {
       phone_number: user?.phone_number || '',
       notify_due_soon: user?.notify_due_soon ?? true,
       notify_new_books: user?.notify_new_books ?? true,
+      notify_borrow_status: user?.notify_borrow_status ?? true,
+      notify_room_status: user?.notify_room_status ?? true,
+      notify_room_reminder: user?.notify_room_reminder ?? true,
+      notify_fine_status: user?.notify_fine_status ?? true,
+      notify_reservation: user?.notify_reservation ?? true,
     }));
   }, [user]);
 
@@ -70,11 +208,13 @@ export default function StudentSettings() {
       const response = await updateMyProfile({
         name: form.name,
         phone_number: form.phone_number || null,
-        current_password: form.current_password || undefined,
-        password: form.password || undefined,
-        password_confirmation: form.password_confirmation || undefined,
         notify_due_soon: form.notify_due_soon,
         notify_new_books: form.notify_new_books,
+        notify_borrow_status: form.notify_borrow_status,
+        notify_room_status: form.notify_room_status,
+        notify_room_reminder: form.notify_room_reminder,
+        notify_fine_status: form.notify_fine_status,
+        notify_reservation: form.notify_reservation,
       });
 
       updateUser(response.user);
@@ -84,12 +224,6 @@ export default function StudentSettings() {
         title: 'Đã lưu hồ sơ',
         message: response.message,
       });
-      setForm((current) => ({
-        ...current,
-        current_password: '',
-        password: '',
-        password_confirmation: '',
-      }));
     } catch (error: unknown) {
       if (isUnauthorizedError(error)) {
         return;
@@ -108,7 +242,8 @@ export default function StudentSettings() {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="mx-auto w-full max-w-4xl space-y-6 p-4 md:p-8">
+    <>
+      <form onSubmit={handleSubmit} className="mx-auto w-full max-w-4xl space-y-6 p-4 md:p-8">
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
         <div>
           <h2 className="text-2xl md:text-3xl font-bold text-on-surface">Cài đặt cá nhân</h2>
@@ -228,55 +363,18 @@ export default function StudentSettings() {
             </span>
             Bảo mật tài khoản
           </h4>
-          <div className="grid max-w-2xl grid-cols-1 gap-6 md:grid-cols-2">
-            <div className="space-y-2">
-              <label
-                htmlFor="student-settings-current-password"
-                className="block text-xs font-bold uppercase tracking-widest text-slate-500"
-              >
-                Mật khẩu hiện tại
-              </label>
-              <input
-                id="student-settings-current-password"
-                type="password"
-                value={form.current_password}
-                onChange={(e) => setForm({ ...form, current_password: e.target.value })}
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/20"
-              />
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between border border-slate-100 rounded-xl p-4 bg-slate-50/50 hover:bg-slate-50 transition-colors gap-3">
+            <div>
+              <p className="text-sm font-semibold text-slate-800">Mật khẩu tài khoản</p>
+              <p className="text-xs text-slate-500 mt-1">Thay đổi mật khẩu tài khoản của bạn để bảo mật thông tin.</p>
             </div>
-            <div />
-            <div className="space-y-2">
-              <label
-                htmlFor="student-settings-password"
-                className="block text-xs font-bold uppercase tracking-widest text-slate-500"
-              >
-                Mật khẩu mới
-              </label>
-              <input
-                id="student-settings-password"
-                type="password"
-                value={form.password}
-                onChange={(e) => setForm({ ...form, password: e.target.value })}
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/20"
-              />
-            </div>
-            <div className="space-y-2">
-              <label
-                htmlFor="student-settings-password-confirmation"
-                className="block text-xs font-bold uppercase tracking-widest text-slate-500"
-              >
-                Xác nhận mật khẩu mới
-              </label>
-              <input
-                id="student-settings-password-confirmation"
-                type="password"
-                value={form.password_confirmation}
-                onChange={(e) =>
-                  setForm({ ...form, password_confirmation: e.target.value })
-                }
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/20"
-              />
-            </div>
+            <button
+              type="button"
+              onClick={handleOpenPasswordModal}
+              className="w-full sm:w-auto text-center text-xs font-bold text-primary hover:text-white bg-white border border-primary hover:bg-primary px-4 py-2 rounded-xl transition-all shadow-sm cursor-pointer"
+            >
+              Thay đổi mật khẩu
+            </button>
           </div>
         </section>
 
@@ -299,6 +397,76 @@ export default function StudentSettings() {
                 <p className="text-sm font-bold text-slate-800">Cảnh báo sách sắp đến hạn trả</p>
                 <p className="mt-0.5 text-xs text-slate-500">
                   Hệ thống sẽ gửi email nhắc nhở trước 2 ngày.
+                </p>
+              </span>
+            </label>
+            <label className="flex cursor-pointer items-start gap-4">
+              <input
+                type="checkbox"
+                checked={form.notify_borrow_status}
+                onChange={(e) => setForm({ ...form, notify_borrow_status: e.target.checked })}
+                className="mt-1 h-4 w-4 rounded border-outline text-primary focus:ring-primary"
+              />
+              <span>
+                <p className="text-sm font-bold text-slate-800">Trạng thái mượn sách</p>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  Gửi email khi yêu cầu mượn sách được duyệt (kèm mã QR) hoặc bị từ chối.
+                </p>
+              </span>
+            </label>
+            <label className="flex cursor-pointer items-start gap-4">
+              <input
+                type="checkbox"
+                checked={form.notify_reservation}
+                onChange={(e) => setForm({ ...form, notify_reservation: e.target.checked })}
+                className="mt-1 h-4 w-4 rounded border-outline text-primary focus:ring-primary"
+              />
+              <span>
+                <p className="text-sm font-bold text-slate-800">Sách đặt chỗ đã sẵn sàng</p>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  Gửi email khi sách bạn đặt chỗ trước có sẵn và yêu cầu đã được tự động duyệt.
+                </p>
+              </span>
+            </label>
+            <label className="flex cursor-pointer items-start gap-4">
+              <input
+                type="checkbox"
+                checked={form.notify_room_status}
+                onChange={(e) => setForm({ ...form, notify_room_status: e.target.checked })}
+                className="mt-1 h-4 w-4 rounded border-outline text-primary focus:ring-primary"
+              />
+              <span>
+                <p className="text-sm font-bold text-slate-800">Trạng thái phòng tự học</p>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  Gửi email khi yêu cầu đặt phòng được phê duyệt, bị từ chối hoặc hủy bỏ.
+                </p>
+              </span>
+            </label>
+            <label className="flex cursor-pointer items-start gap-4">
+              <input
+                type="checkbox"
+                checked={form.notify_room_reminder}
+                onChange={(e) => setForm({ ...form, notify_room_reminder: e.target.checked })}
+                className="mt-1 h-4 w-4 rounded border-outline text-primary focus:ring-primary"
+              />
+              <span>
+                <p className="text-sm font-bold text-slate-800">Nhắc nhở lịch đặt phòng học</p>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  Gửi email và thông báo trước 30-60 phút khi giờ đặt phòng tự học bắt đầu.
+                </p>
+              </span>
+            </label>
+            <label className="flex cursor-pointer items-start gap-4">
+              <input
+                type="checkbox"
+                checked={form.notify_fine_status}
+                onChange={(e) => setForm({ ...form, notify_fine_status: e.target.checked })}
+                className="mt-1 h-4 w-4 rounded border-outline text-primary focus:ring-primary"
+              />
+              <span>
+                <p className="text-sm font-bold text-slate-800">Biên lai tiền phạt</p>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  Gửi email xác nhận biên lai khi thanh toán phạt hoặc được miễn giảm phạt.
                 </p>
               </span>
             </label>
@@ -382,5 +550,152 @@ export default function StudentSettings() {
         </section>
       </div>
     </form>
+
+    {showPasswordModal && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
+        <div className="w-full max-w-md overflow-hidden rounded-2xl border border-white/20 bg-white/95 p-8 shadow-2xl shadow-slate-900/30">
+          {!isOtpVerified ? (
+            <>
+              <div className="flex flex-col items-center text-center">
+                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-100 text-sky-600">
+                  <span className="material-symbols-outlined text-3xl font-light">mail</span>
+                </div>
+                <h3 className="text-xl font-bold text-slate-800">Xác thực OTP</h3>
+                <p className="mt-2 text-sm text-slate-500">
+                  Mã xác thực OTP gồm 6 chữ số đã được gửi đến địa chỉ email của bạn: <span className="font-semibold text-slate-700">{user?.email}</span>.
+                </p>
+              </div>
+
+              <form onSubmit={handleVerifyOtpStep} className="mt-6 space-y-4">
+                {otpError && (
+                  <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-semibold text-red-600">
+                    <span className="material-symbols-outlined text-base">error</span>
+                    {otpError}
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <label className="block text-center text-xs font-bold uppercase tracking-widest text-slate-500">
+                    Nhập mã OTP
+                  </label>
+                  <input
+                    aria-label="Mã OTP đổi mật khẩu"
+                    type="text"
+                    maxLength={6}
+                    value={passwordForm.otp}
+                    onChange={(e) => setPasswordForm({ ...passwordForm, otp: e.target.value.replace(/\D/g, '') })}
+                    placeholder="000000"
+                    className="w-full rounded-xl border border-slate-200 bg-white py-2.5 text-center text-xl font-bold tracking-[0.5em] text-slate-800 outline-none focus:ring-2 focus:ring-primary/20"
+                    required
+                  />
+                </div>
+
+                <div className="flex items-center justify-between text-xs font-medium">
+                  <span className="text-slate-500">
+                    {otpCountdown > 0 ? (
+                      <>Mã hết hạn sau: <span className="font-bold text-slate-700">{formatCountdown(otpCountdown)}</span></>
+                    ) : (
+                      <span className="text-rose-500 font-semibold">Mã đã hết hạn</span>
+                    )}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleResendOtp}
+                    disabled={otpCountdown > 0 || resendingOtp}
+                    className={`font-semibold cursor-pointer ${
+                      otpCountdown > 0 ? 'text-slate-400 cursor-not-allowed' : 'text-primary hover:underline'
+                    }`}
+                  >
+                    {resendingOtp ? 'Đang gửi...' : 'Gửi lại mã'}
+                  </button>
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowPasswordModal(false)}
+                    className="flex-1 rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
+                  >
+                    Hủy bỏ
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={passwordForm.otp.length !== 6 || isVerifyingOtp}
+                    className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-primary py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary/20 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-wait cursor-pointer"
+                  >
+                    {isVerifyingOtp ? 'Đang xác thực...' : 'Tiếp tục'}
+                  </button>
+                </div>
+              </form>
+            </>
+          ) : (
+            <>
+              <div className="flex flex-col items-center text-center">
+                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600">
+                  <span className="material-symbols-outlined text-3xl font-light">key</span>
+                </div>
+                <h3 className="text-xl font-bold text-slate-800">Thiết lập mật khẩu mới</h3>
+                <p className="mt-2 text-sm text-slate-500">
+                  Mã OTP đã được xác thực thành công. Vui lòng nhập mật khẩu mới của bạn dưới đây.
+                </p>
+              </div>
+
+              <form onSubmit={handleSaveNewPassword} className="mt-6 space-y-4">
+                {otpError && (
+                  <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-semibold text-red-600">
+                    <span className="material-symbols-outlined text-base">error</span>
+                    {otpError}
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold uppercase tracking-widest text-slate-500">
+                    Mật khẩu mới
+                  </label>
+                  <input
+                    type="password"
+                    value={passwordForm.password}
+                    onChange={(e) => setPasswordForm({ ...passwordForm, password: e.target.value })}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold uppercase tracking-widest text-slate-500">
+                    Xác nhận mật khẩu mới
+                  </label>
+                  <input
+                    type="password"
+                    value={passwordForm.password_confirmation}
+                    onChange={(e) => setPasswordForm({ ...passwordForm, password_confirmation: e.target.value })}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+                    required
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setShowPasswordModal(false)}
+                    className="flex-1 rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
+                  >
+                    Hủy bỏ
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSaving}
+                    className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-primary py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary/20 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-wait cursor-pointer"
+                  >
+                    {isSaving ? 'Đang lưu...' : 'Xác nhận'}
+                  </button>
+                </div>
+              </form>
+            </>
+          )}
+        </div>
+      </div>
+    )}
+    </>
   );
 }

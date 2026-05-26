@@ -31,6 +31,7 @@ const StudentRequests = lazy(() => import('./pages/student/StudentRequests'));
 const StudentSettings = lazy(() => import('./pages/student/StudentSettings'));
 const Favorites = lazy(() => import('./pages/student/Favorites'));
 const StudentFines = lazy(() => import('./pages/student/Fines'));
+const Gamification = lazy(() => import('./pages/student/Gamification'));
 const MomoMockCheckout = lazy(() => import('./pages/student/MomoMockCheckout'));
 const VnpayMockCheckout = lazy(() => import('./pages/student/VnpayMockCheckout'));
 const RoomBookingPage = lazy(() => import('./pages/student/RoomBooking'));
@@ -69,6 +70,7 @@ export default function App() {
             <Route path="/room-booking" element={<RoomBookingPage />} />
             <Route path="/history" element={<History />} />
             <Route path="/fines" element={<StudentFines />} />
+            <Route path="/gamify" element={<Gamification />} />
             <Route path="/settings" element={<StudentSettings />} />
           </Route>
         </Route>

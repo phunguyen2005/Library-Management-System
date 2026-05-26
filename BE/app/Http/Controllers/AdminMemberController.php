@@ -15,7 +15,7 @@ class AdminMemberController extends Controller
     public function index(MemberIndexRequest $request)
     {
         $validated = $request->validated();
-        $query = Member::query()->orderBy('member_id');
+        $query = Member::query()->withCount('badges')->orderBy('member_id');
         $search = trim((string) ($validated['query'] ?? ''));
 
         if ($search !== '') {
@@ -87,6 +87,9 @@ class AdminMemberController extends Controller
     {
         $request->validate([
             'file' => 'required|file|mimes:csv,txt|max:4096',
+            'dry_run' => 'nullable|boolean',
+            'allow_partial' => 'nullable|boolean',
+            'column_mapping' => 'nullable|string', // JSON mapping
         ]);
 
         $file = $request->file('file');
@@ -107,24 +110,56 @@ class AdminMemberController extends Controller
             return trim(preg_replace('/[\x{FEFF}\x{200B}]/u', '', $h));
         }, $header);
 
-        // Map column names to indexes
-        $colMap = [
-            'name' => array_search('name', $header) !== false ? array_search('name', $header) : array_search('ho_ten', $header),
-            'email' => array_search('email', $header),
-            'phone_number' => array_search('phone_number', $header) !== false ? array_search('phone_number', $header) : array_search('so_dien_thoai', $header),
-            'password' => array_search('password', $header) !== false ? array_search('password', $header) : array_search('mat_khau', $header),
-            'join_date' => array_search('join_date', $header) !== false ? array_search('join_date', $header) : array_search('ngay_tham_gia', $header),
-        ];
+        $columnMapping = [];
+        if ($request->has('column_mapping')) {
+            $columnMapping = json_decode($request->input('column_mapping'), true) ?: [];
+        }
 
-        if ($colMap['name'] === false) $colMap['name'] = 0;
-        if ($colMap['email'] === false) $colMap['email'] = 1;
-        if ($colMap['phone_number'] === false) $colMap['phone_number'] = 2;
-        if ($colMap['password'] === false) $colMap['password'] = 3;
-        if ($colMap['join_date'] === false) $colMap['join_date'] = 4;
+        // Map column names to indexes
+        $colMap = [];
+        foreach (['name', 'email', 'phone_number', 'password', 'join_date'] as $key) {
+            $csvColName = $columnMapping[$key] ?? null;
+            if ($csvColName !== null) {
+                $idx = array_search(trim($csvColName), $header);
+                if ($idx !== false) {
+                    $colMap[$key] = $idx;
+                    continue;
+                }
+            }
+
+            // Fallback logic
+            $fallbackField = match($key) {
+                'name' => 'ho_ten',
+                'phone_number' => 'so_dien_thoai',
+                'password' => 'mat_khau',
+                'join_date' => 'ngay_tham_gia',
+                default => null
+            };
+
+            $idx = array_search($key, $header);
+            if ($idx === false && $fallbackField) {
+                $idx = array_search($fallbackField, $header);
+            }
+            $colMap[$key] = $idx;
+        }
+
+        // Name and Email are strictly required
+        if ($colMap['name'] === false) {
+            fclose($handle);
+            return response()->json(['message' => 'Không tìm thấy cột Họ tên (name) trong tệp CSV.'], 422);
+        }
+        if ($colMap['email'] === false) {
+            fclose($handle);
+            return response()->json(['message' => 'Không tìm thấy cột Email trong tệp CSV.'], 422);
+        }
+
+        $dryRun = filter_var($request->input('dry_run', false), FILTER_VALIDATE_BOOLEAN);
+        $allowPartial = filter_var($request->input('allow_partial', false), FILTER_VALIDATE_BOOLEAN);
 
         $successCount = 0;
         $errors = [];
         $rowNum = 1;
+        $importedEmails = []; // Prevent duplicate emails in the same CSV import file
 
         DB::beginTransaction();
         try {
@@ -137,31 +172,44 @@ class AdminMemberController extends Controller
 
                 $name = trim($row[$colMap['name']] ?? '');
                 $email = trim($row[$colMap['email']] ?? '');
-                $phone = trim($row[$colMap['phone_number']] ?? '');
-                $password = trim($row[$colMap['password']] ?? '');
-                $joinDate = trim($row[$colMap['join_date']] ?? '');
+                $phone = $colMap['phone_number'] !== false ? trim($row[$colMap['phone_number']] ?? '') : '';
+                $password = $colMap['password'] !== false ? trim($row[$colMap['password']] ?? '') : '';
+                $joinDate = $colMap['join_date'] !== false ? trim($row[$colMap['join_date']] ?? '') : '';
+
+                $rowErrors = [];
 
                 if (empty($name)) {
-                    $errors[] = "Dòng $rowNum: Tên không được để trống.";
-                    continue;
+                    $rowErrors[] = "Tên không được để trống.";
                 }
 
                 if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-                    $errors[] = "Dòng $rowNum: Email không hợp lệ ($email).";
-                    continue;
+                    $rowErrors[] = "Email không hợp lệ ($email).";
+                } else {
+                    if (in_array($email, $importedEmails, true)) {
+                        $rowErrors[] = "Email '$email' bị lặp lại trong tệp CSV.";
+                    } elseif (Member::where('email', $email)->exists()) {
+                        $rowErrors[] = "Email '$email' đã tồn tại trên hệ thống.";
+                    }
                 }
 
-                if (Member::where('email', $email)->exists()) {
-                    $errors[] = "Dòng $rowNum: Email '$email' đã tồn tại trong hệ thống.";
+                if (!empty($password)) {
+                    if (strlen($password) < 8 || !preg_match('/[a-zA-Z]/', $password) || !preg_match('/[0-9]/', $password)) {
+                        $rowErrors[] = "Mật khẩu phải có ít nhất 8 ký tự, bao gồm cả chữ và số.";
+                    }
+                }
+
+                if (count($rowErrors) > 0) {
+                    foreach ($rowErrors as $err) {
+                        $errors[] = "Dòng $rowNum: $err";
+                    }
                     continue;
                 }
 
                 if (empty($password)) {
                     $password = 'Student123';
-                } else if (strlen($password) < 8 || !preg_match('/[a-zA-Z]/', $password) || !preg_match('/[0-9]/', $password)) {
-                    $errors[] = "Dòng $rowNum: Mật khẩu phải có ít nhất 8 ký tự, bao gồm cả chữ và số.";
-                    continue;
                 }
+
+                $importedEmails[] = $email;
 
                 Member::create([
                     'name' => $name,
@@ -176,7 +224,20 @@ class AdminMemberController extends Controller
             
             fclose($handle);
 
-            if (count($errors) > 0) {
+            // Handle Dry-run / Aborting / Partial committing
+            if ($dryRun) {
+                DB::rollBack();
+                return response()->json([
+                    'message' => count($errors) > 0 
+                        ? 'Chạy thử hoàn tất: Có một số lỗi dữ liệu được phát hiện.' 
+                        : 'Chạy thử hoàn tất: Dữ liệu hoàn toàn hợp lệ và sẵn sàng nhập.',
+                    'dry_run' => true,
+                    'errors' => $errors,
+                    'success_count' => $successCount
+                ]);
+            }
+
+            if (count($errors) > 0 && !$allowPartial) {
                 DB::rollBack();
                 return response()->json([
                     'message' => 'Nhập dữ liệu thất bại do có lỗi validation.',
@@ -187,12 +248,16 @@ class AdminMemberController extends Controller
 
             DB::commit();
             
-            \App\Services\AuditLoggerService::log('member_import', "Đã import thành công $successCount thành viên từ file CSV.");
+            if ($successCount > 0) {
+                \App\Services\AuditLoggerService::log('member_import', "Đã import thành công $successCount thành viên từ file CSV.");
+            }
 
             return response()->json([
-                'message' => "Nhập dữ liệu thành công. Đã thêm $successCount thành viên.",
+                'message' => count($errors) > 0 
+                    ? "Nhập dữ liệu hoàn tất. Đã thêm thành công $successCount thành viên, bỏ qua " . (count($errors)) . " lỗi."
+                    : "Nhập dữ liệu thành công. Đã thêm $successCount thành viên.",
                 'success_count' => $successCount,
-                'errors' => []
+                'errors' => $errors
             ]);
 
         } catch (\Exception $e) {

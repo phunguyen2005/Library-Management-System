@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 import {
   getReportsData,
+  getFineDetails,
   ReportData,
   ReportFilter,
   ReportFilterType,
@@ -10,6 +11,23 @@ import {
 import EmptyState from '../../components/EmptyState';
 import { getErrorMessage } from '../../lib/errors';
 import { emitToast } from '../../notifications/events';
+import CSVExportSelector from '../../components/CSVExportSelector';
+
+const AVAILABLE_EXPORT_COLUMNS_FINES = [
+  { key: 'fine_id', label: 'Mã phạt / Giao dịch' },
+  { key: 'student_name', label: 'Tên độc giả' },
+  { key: 'student_email', label: 'Email độc giả' },
+  { key: 'amount', label: 'Số tiền phạt' },
+  { key: 'status', label: 'Trạng thái thu nợ' },
+  { key: 'payment_method', label: 'Phương thức nộp' },
+  { key: 'transaction_ref', label: 'Mã tham chiếu' },
+  { key: 'reason', label: 'Lý do phạt' },
+  { key: 'processor_name', label: 'Người xử lý' },
+  { key: 'created_at', label: 'Thời gian phạt' },
+  { key: 'paid_at', label: 'Thời gian nộp' },
+];
+
+const DEFAULT_EXPORT_COLUMNS_FINES = ['fine_id', 'student_name', 'amount', 'status', 'payment_method', 'paid_at'];
 
 import {
   DonutChart,
@@ -23,6 +41,8 @@ import {
   TopBooksList,
   TopMembersList,
   RecentTransactionsTable,
+  TopScholarsList,
+  RewardsStatsWidget,
 } from './reports/ReportWidgets';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -99,6 +119,58 @@ export default function AdminReports() {
   const [yearValue, setYearValue] = useState(currentYearString());
   const [activeFilter, setActiveFilter] = useState<ReportFilter>(null);
 
+  // Detailed modal state
+  const [detailType, setDetailType] = useState<'collected' | 'unpaid' | 'waived' | null>(null);
+  const [detailData, setDetailData] = useState<any[] | null>(null);
+  const [isDetailLoading, setIsDetailLoading] = useState(false);
+  const [detailSearch, setDetailSearch] = useState('');
+  const [modalStartDate, setModalStartDate] = useState('');
+  const [modalEndDate, setModalEndDate] = useState('');
+  const [detailError, setDetailError] = useState<string | null>(null);
+
+  const handleOpenDetail = async (type: 'collected' | 'unpaid' | 'waived') => {
+    setDetailType(type);
+    setIsDetailLoading(true);
+    setDetailError(null);
+    setDetailData([]);
+    setDetailSearch('');
+    setModalStartDate('');
+    setModalEndDate('');
+    try {
+      const res = await getFineDetails(type, activeFilter);
+      setDetailData(res);
+    } catch (e: unknown) {
+      setDetailError(getErrorMessage(e, 'Không thể tải danh sách chi tiết.'));
+    } finally {
+      setIsDetailLoading(false);
+    }
+  };
+
+  const filteredDetailData = (detailData || []).filter((item) => {
+    const searchLower = detailSearch.toLowerCase();
+    const matchesSearch = (
+      (item.student_name || '').toLowerCase().includes(searchLower) ||
+      (item.student_email || '').toLowerCase().includes(searchLower) ||
+      (item.book_title || '').toLowerCase().includes(searchLower) ||
+      (item.transaction_ref || '').toLowerCase().includes(searchLower) ||
+      (item.reason || '').toLowerCase().includes(searchLower) ||
+      (item.processor_name || '').toLowerCase().includes(searchLower) ||
+      (item.notes || '').toLowerCase().includes(searchLower) ||
+      (item.waived_reason || '').toLowerCase().includes(searchLower)
+    );
+
+    const itemDate = item.created_at ? item.created_at.substring(0, 10) : '';
+    let matchesDate = true;
+    if (modalStartDate && itemDate < modalStartDate) {
+      matchesDate = false;
+    }
+    if (modalEndDate && itemDate > modalEndDate) {
+      matchesDate = false;
+    }
+
+    return matchesSearch && matchesDate;
+  });
+
   const buildFilter = (): ReportFilter => {
     if (filterType === 'all') return null;
     if (filterType === 'range') return { filter_type: 'range', filter_value: `${startDate},${endDate}` };
@@ -165,6 +237,46 @@ export default function AdminReports() {
         .catch((err: Error) => emitToast({ tone: 'error', title: 'Thất bại', message: err.message }));
     } catch {
       emitToast({ tone: 'error', title: 'Lỗi', message: 'Không thể xác thực để tải báo cáo.' });
+    }
+  };
+
+  // ── Export Fines CSV ──────────────────────────────────────────────────────────────
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+
+  const handleExportFines = (columns: string[]) => {
+    const sessionStr = localStorage.getItem('auth_session');
+    if (!sessionStr) return;
+    try {
+      const token = JSON.parse(sessionStr).token;
+      emitToast({ tone: 'info', title: 'Xuất dữ liệu phạt', message: 'Đang khởi tạo tải báo cáo nộp phạt...' });
+
+      let exportUrl = 'http://localhost:8000/api/reports/export-fines';
+      const params: Record<string, string> = {
+        columns: columns.join(','),
+      };
+      if (activeFilter) {
+        params.filter_type = activeFilter.filter_type;
+        params.filter_value = activeFilter.filter_value;
+      }
+      exportUrl += '?' + new URLSearchParams(params).toString();
+
+      fetch(exportUrl, { headers: { Authorization: `Bearer ${token}` } })
+        .then((res) => { if (!res.ok) throw new Error('Yêu cầu xuất tệp dữ liệu thất bại.'); return res.blob(); })
+        .then((blob) => {
+          const url = window.URL.createObjectURL(blob);
+          const a = Object.assign(document.createElement('a'), {
+            href: url,
+            download: `bao-cao-nop-phat-${new Date().toISOString().slice(0, 10)}.csv`,
+          });
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          window.URL.revokeObjectURL(url);
+          emitToast({ tone: 'success', title: 'Thành công', message: 'Tải xuống tệp CSV thành công.' });
+        })
+        .catch((err: Error) => emitToast({ tone: 'error', title: 'Thất bại', message: err.message }));
+    } catch {
+      emitToast({ tone: 'error', title: 'Lỗi', message: 'Không thể xác thực để tải dữ liệu.' });
     }
   };
 
@@ -387,6 +499,7 @@ export default function AdminReports() {
                       textColor="text-emerald-600"
                       iconColor="text-emerald-500"
                       iconBg="bg-emerald-500/5"
+                      onClick={() => handleOpenDetail('collected')}
                     />
                     <FinanceCard
                       label="Nợ phạt tồn đọng"
@@ -397,6 +510,7 @@ export default function AdminReports() {
                       textColor="text-rose-600"
                       iconColor="text-rose-500"
                       iconBg="bg-rose-500/5"
+                      onClick={() => handleOpenDetail('unpaid')}
                     />
                     <FinanceCard
                       label="Phạt đã miễn giảm"
@@ -407,6 +521,7 @@ export default function AdminReports() {
                       textColor="text-blue-600"
                       iconColor="text-blue-500"
                       iconBg="bg-blue-500/5"
+                      onClick={() => handleOpenDetail('waived')}
                     />
                   </div>
 
@@ -431,9 +546,19 @@ export default function AdminReports() {
 
                   {/* Recent transactions */}
                   <section className="bg-surface border border-border rounded-2xl p-6 shadow-sm space-y-4">
-                    <div>
-                      <h3 className="text-base font-bold text-foreground">Nhật ký giao dịch gần đây</h3>
-                      <p className="text-xs text-muted-foreground mt-0.5">Danh sách các khoản nộp phạt thực tế đã hoàn thành.</p>
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <h3 className="text-base font-bold text-foreground">Nhật ký giao dịch gần đây</h3>
+                        <p className="text-xs text-muted-foreground mt-0.5">Danh sách các khoản nộp phạt thực tế đã hoàn thành.</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setIsExportModalOpen(true)}
+                        className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors shadow-sm"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">download</span>
+                        Xuất báo cáo phạt
+                      </button>
                     </div>
                     <RecentTransactionsTable transactions={data.recent_transactions} />
                   </section>
@@ -445,6 +570,7 @@ export default function AdminReports() {
               ════════════════════════════════════════════════════════════ */}
               {activeTab === 'rankings' && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Top Books */}
                   <section className="bg-surface border border-border rounded-2xl p-6 shadow-sm space-y-4">
                     <div>
                       <h3 className="text-base font-bold text-foreground">Top 5 sách được mượn nhiều nhất</h3>
@@ -453,12 +579,37 @@ export default function AdminReports() {
                     <TopBooksList books={data.top_books} />
                   </section>
 
+                  {/* Top Members by Borrow Count */}
                   <section className="bg-surface border border-border rounded-2xl p-6 shadow-sm space-y-4">
                     <div>
-                      <h3 className="text-base font-bold text-foreground">Top 5 sinh viên tích cực nhất</h3>
+                      <h3 className="text-base font-bold text-foreground">Top 5 sinh viên mượn nhiều nhất</h3>
                       <p className="text-xs text-muted-foreground mt-0.5">Những độc giả chăm chỉ mượn trả tài liệu học tập nhiều nhất.</p>
                     </div>
                     <TopMembersList members={data.top_members} />
+                  </section>
+
+                  {/* Top Scholars by XP */}
+                  <section className="bg-surface border border-border rounded-2xl p-6 shadow-sm space-y-4">
+                    <div>
+                      <h3 className="text-base font-bold text-foreground flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-primary text-[20px]">workspace_premium</span>
+                        Top 5 Học giả tích lũy XP
+                      </h3>
+                      <p className="text-xs text-muted-foreground mt-0.5">Những sinh viên tích cực tham gia các hoạt động thư viện nhất.</p>
+                    </div>
+                    <TopScholarsList scholars={data.top_xp_members || []} />
+                  </section>
+
+                  {/* Gamify Rewards Redemptions Stats */}
+                  <section className="bg-surface border border-border rounded-2xl p-6 shadow-sm space-y-4">
+                    <div>
+                      <h3 className="text-base font-bold text-foreground flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-amber-500 text-[20px]">military_tech</span>
+                        Thống kê quy đổi phần thưởng
+                      </h3>
+                      <p className="text-xs text-muted-foreground mt-0.5">Tổng quan số lượng vật phẩm/vận hành đã được kích hoạt.</p>
+                    </div>
+                    <RewardsStatsWidget stats={data.rewards_stats} />
                   </section>
                 </div>
               )}
@@ -467,6 +618,276 @@ export default function AdminReports() {
           </AnimatePresence>
         </div>
       )}
+
+      {/* ── Detailed Modal Overlay ─────────────────────────────────────── */}
+      <AnimatePresence>
+        {detailType && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setDetailType(null)}
+              className="absolute inset-0 bg-slate-900/60 dark:bg-black/70 backdrop-blur-md"
+            />
+
+            {/* Modal Card */}
+            <motion.div
+              initial={{ scale: 0.96, opacity: 0, y: 15 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.96, opacity: 0, y: 15 }}
+              transition={{ duration: 0.22, ease: 'easeOut' }}
+              className="relative bg-surface border border-border shadow-2xl rounded-2xl w-full max-w-5xl max-h-[85vh] flex flex-col overflow-hidden"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-border p-5 shrink-0 bg-slate-50/50 dark:bg-slate-800/20">
+                <div className="space-y-1">
+                  <h3 className="text-lg font-extrabold text-foreground tracking-tight">
+                    {detailType === 'collected' && 'Chi tiết Thực thu nộp phạt'}
+                    {detailType === 'unpaid' && 'Chi tiết Nợ phạt tồn đọng'}
+                    {detailType === 'waived' && 'Chi tiết Phạt đã miễn giảm'}
+                  </h3>
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary text-[10px] font-bold px-2 py-0.5">
+                      <span className="material-symbols-outlined text-[11px]">calendar_today</span>
+                      {filterLabel(activeFilter)}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground font-medium">
+                      Tổng số bản ghi: {filteredDetailData.length}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setDetailType(null)}
+                  className="rounded-full p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[20px]">close</span>
+                </button>
+              </div>
+
+              {/* Search and Date Range Filter Bar */}
+              <div className="p-4 border-b border-border shrink-0 bg-surface/90 backdrop-blur flex flex-col md:flex-row md:items-center gap-4">
+                <div className="flex-1 relative">
+                  <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-muted-foreground pointer-events-none">
+                    <span className="material-symbols-outlined text-[18px]">search</span>
+                  </span>
+                  <input
+                    type="text"
+                    placeholder="Tìm kiếm theo sinh viên, email, tên sách, thủ thư hoặc lý do..."
+                    value={detailSearch}
+                    onChange={(e) => setDetailSearch(e.target.value)}
+                    className="w-full rounded-xl border border-border bg-muted/50 pl-10 pr-9 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all focus:bg-surface"
+                  />
+                  {detailSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setDetailSearch('')}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-muted-foreground hover:text-foreground cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">cancel</span>
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 text-xs shrink-0">
+                  <span className="font-bold text-muted-foreground">Khoảng ngày:</span>
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      aria-label="Từ ngày"
+                      type="date"
+                      value={modalStartDate}
+                      onChange={(e) => setModalStartDate(e.target.value)}
+                      className="rounded-xl border border-border bg-muted/50 px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:bg-surface"
+                    />
+                    <span className="text-muted-foreground font-medium">—</span>
+                    <input
+                      aria-label="Đến ngày"
+                      type="date"
+                      value={modalEndDate}
+                      onChange={(e) => setModalEndDate(e.target.value)}
+                      className="rounded-xl border border-border bg-muted/50 px-3 py-1.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:bg-surface"
+                    />
+                  </div>
+                  {(modalStartDate || modalEndDate) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setModalStartDate('');
+                        setModalEndDate('');
+                      }}
+                      className="flex items-center gap-1 rounded-xl border border-border bg-muted px-2.5 py-1.5 font-bold text-muted-foreground hover:bg-border transition-colors cursor-pointer"
+                      title="Xóa bộ lọc khoảng ngày"
+                    >
+                      <span className="material-symbols-outlined text-[13px] font-bold">close</span>
+                      <span>Xóa lọc</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Body */}
+              <div className="flex-1 overflow-y-auto p-6 min-h-[300px]">
+                {isDetailLoading ? (
+                  <div className="flex flex-col items-center justify-center py-20 gap-3">
+                    <div className="w-8 h-8 border-3 border-primary border-t-transparent rounded-full animate-spin" />
+                    <p className="text-xs text-muted-foreground animate-pulse">Đang tải lịch sử chi tiết...</p>
+                  </div>
+                ) : detailError ? (
+                  <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-xs text-red-900 font-semibold shadow-sm">
+                    ⚠️ {detailError}
+                  </div>
+                ) : filteredDetailData.length === 0 ? (
+                  <EmptyState
+                    icon="search_off"
+                    title="Không có kết quả phù hợp"
+                    message="Vui lòng điều chỉnh từ khóa tìm kiếm hoặc kiểm tra khoảng thời gian lọc."
+                  />
+                ) : (
+                  <div className="overflow-x-auto border border-border rounded-xl">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="bg-slate-50 dark:bg-slate-800/40 border-b border-border text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                          <th className="px-4 py-3">Mã</th>
+                          <th className="px-4 py-3">Độc giả</th>
+                          <th className="px-4 py-3">Sách vi phạm</th>
+                          <th className="px-4 py-3">Lý do</th>
+                          <th className="px-4 py-3">Số tiền</th>
+                          {detailType === 'collected' && (
+                            <>
+                              <th className="px-4 py-3">Cổng thanh toán</th>
+                              <th className="px-4 py-3">Mã giao dịch</th>
+                              <th className="px-4 py-3">Ngày thu</th>
+                              <th className="px-4 py-3">Người xác nhận</th>
+                            </>
+                          )}
+                          {detailType === 'unpaid' && (
+                            <>
+                              <th className="px-4 py-3">Ngày tạo</th>
+                              <th className="px-4 py-3">Ghi chú</th>
+                            </>
+                          )}
+                          {detailType === 'waived' && (
+                            <>
+                              <th className="px-4 py-3">Lý do miễn giảm</th>
+                              <th className="px-4 py-3">Ngày duyệt</th>
+                              <th className="px-4 py-3">Thủ thư duyệt</th>
+                            </>
+                          )}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border/60 text-slate-700 dark:text-slate-300">
+                        {filteredDetailData.map((item, index) => {
+                          const METHOD_LABEL_MAP: Record<string, string> = {
+                            cash: 'Tiền mặt',
+                            momo: 'MoMo',
+                            vnpay: 'VNPay',
+                            transfer: 'Chuyển khoản',
+                          };
+                          const METHOD_STYLE_MAP: Record<string, string> = {
+                            cash: 'bg-green-50 text-green-700 border-green-200 dark:bg-green-500/10 dark:text-green-400 dark:border-green-500/20',
+                            momo: 'bg-pink-50 text-pink-700 border-pink-200 dark:bg-pink-500/10 dark:text-pink-400 dark:border-pink-500/20',
+                            vnpay: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20',
+                            transfer: 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-500/10 dark:text-purple-400 dark:border-purple-500/20',
+                          };
+
+                          const REASON_LABEL_MAP: Record<string, string> = {
+                            overdue: 'Quá hạn trả',
+                            damaged: 'Hư hỏng sách',
+                            lost: 'Mất sách',
+                          };
+
+                          return (
+                            <tr
+                              key={index}
+                              className="hover:bg-slate-50/40 dark:hover:bg-slate-800/20 transition-colors"
+                            >
+                              <td className="px-4 py-3 font-mono font-bold text-slate-500">#{item.id}</td>
+                              <td className="px-4 py-3 min-w-[150px]">
+                                <div className="font-semibold text-slate-800 dark:text-slate-200">
+                                  {item.student_name}
+                                </div>
+                                <div className="text-[10px] text-slate-400">{item.student_email}</div>
+                              </td>
+                              <td className="px-4 py-3 max-w-[200px] truncate" title={item.book_title}>
+                                {item.book_title}
+                              </td>
+                              <td className="px-4 py-3">
+                                <span className="inline-flex items-center gap-1 text-[10px] font-medium text-slate-600 dark:text-slate-400">
+                                  {REASON_LABEL_MAP[item.reason] || item.reason}
+                                </span>
+                              </td>
+                              <td className={`px-4 py-3 font-bold ${
+                                detailType === 'collected' ? 'text-emerald-600 dark:text-emerald-400' :
+                                detailType === 'unpaid' ? 'text-rose-600 dark:text-rose-400' :
+                                'text-blue-600 dark:text-blue-400'
+                              }`}>
+                                {item.amount.toLocaleString('vi-VN')} đ
+                              </td>
+                              {detailType === 'collected' && (
+                                <>
+                                  <td className="px-4 py-3">
+                                    <span className={`px-2 py-0.5 rounded border text-[9px] font-extrabold uppercase ${
+                                      METHOD_STYLE_MAP[item.method] ?? 'bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-400'
+                                    }`}>
+                                      {METHOD_LABEL_MAP[item.method] ?? item.method}
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-3 font-mono text-slate-600 dark:text-slate-400 max-w-[120px] truncate" title={item.transaction_ref}>
+                                    {item.transaction_ref || '—'}
+                                  </td>
+                                  <td className="px-4 py-3 text-slate-500 whitespace-nowrap">{item.created_at}</td>
+                                  <td className="px-4 py-3 text-slate-600 dark:text-slate-400 font-medium">
+                                    {item.processor_name}
+                                  </td>
+                                </>
+                              )}
+                              {detailType === 'unpaid' && (
+                                <>
+                                  <td className="px-4 py-3 text-slate-500 whitespace-nowrap">{item.created_at}</td>
+                                  <td className="px-4 py-3 text-slate-500 max-w-[200px] truncate" title={item.notes}>
+                                    {item.notes || '—'}
+                                  </td>
+                                </>
+                              )}
+                              {detailType === 'waived' && (
+                                <>
+                                  <td className="px-4 py-3 max-w-[150px] truncate text-slate-600 dark:text-slate-400 font-medium" title={item.waived_reason}>
+                                    <span className="inline-flex bg-blue-50/50 dark:bg-blue-900/10 text-blue-700 dark:text-blue-400 px-2 py-1 rounded-md text-[10px]">
+                                      {item.waived_reason || '—'}
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-3 text-slate-500 whitespace-nowrap">{item.created_at}</td>
+                                  <td className="px-4 py-3 text-slate-600 dark:text-slate-400 font-medium">
+                                    {item.processor_name}
+                                  </td>
+                                </>
+                              )}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {isExportModalOpen && (
+          <CSVExportSelector
+            isOpen={isExportModalOpen}
+            onClose={() => setIsExportModalOpen(false)}
+            onExport={handleExportFines}
+            availableColumns={AVAILABLE_EXPORT_COLUMNS_FINES}
+            defaultColumns={DEFAULT_EXPORT_COLUMNS_FINES}
+            title="Xuất báo cáo Giao dịch thu phạt"
+            description="Lọc và xuất nhật ký giao dịch nộp phạt thô ra tệp CSV để đối chiếu tài chính."
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

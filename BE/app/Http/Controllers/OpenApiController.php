@@ -12,9 +12,9 @@ class OpenApiController extends Controller
         return response()->json([
             'openapi' => '3.0.3',
             'info' => [
-                'title' => 'Book Loan Midterm API',
+                'title' => 'Library Management System API',
                 'version' => '3.0.0',
-                'description' => 'API documentation for the Book Loan Midterm digital library system.',
+                'description' => 'API documentation for the Library Management System digital library platform.',
             ],
             'servers' => [
                 ['url' => url('/api')],

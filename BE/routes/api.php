@@ -13,6 +13,7 @@ use App\Http\Controllers\OpenApiController;
 use App\Http\Controllers\ReadingProgressController;
 use App\Http\Controllers\RoomController;
 use App\Http\Controllers\RoomBookingController;
+use App\Http\Controllers\GamifyController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', HealthController::class);
@@ -33,12 +34,12 @@ Route::get('/auth/{provider}/redirect', [\App\Http\Controllers\OAuthController::
 Route::get('/auth/{provider}/callback', [\App\Http\Controllers\OAuthController::class, 'callback']);
 
 Route::get('/books', [BookController::class, 'index']);
+Route::get('/books/{book}', [BookController::class, 'show']);
 Route::get('/rooms', [RoomController::class, 'index']);
 Route::get('/rooms/{room}', [RoomController::class, 'show']);
 Route::get('/rooms/{room}/schedule', [RoomController::class, 'schedule']);
 Route::get('/books/autocomplete', [BookController::class, 'autocomplete']);
 Route::get('/books/{bookId}/reviews', [\App\Http\Controllers\ReviewController::class, 'index']);
-Route::get('/digital-documents', [BookController::class, 'getDigitalDocuments']);
 Route::get('/digital-documents/{book}/download', [BookController::class, 'downloadDigitalDocument'])
     ->middleware('signed')
     ->name('digital-documents.download');
@@ -53,6 +54,8 @@ Route::post('/vnpay/simulate-ipn', [\App\Http\Controllers\VnpayPaymentController
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
     Route::put('/me', [AuthController::class, 'updateProfile']);
+    Route::post('/me/send-password-otp', [AuthController::class, 'sendPasswordOtp']);
+    Route::post('/me/verify-password-otp', [AuthController::class, 'verifyPasswordOtp']);
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/me/devices', [AuthController::class, 'getActiveDevices']);
     Route::delete('/me/devices/{tokenId}', [AuthController::class, 'revokeDevice']);
@@ -61,8 +64,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/notifications/{id}/read', [\App\Http\Controllers\NotificationController::class, 'markAsRead']);
     Route::post('/notifications/read-all', [\App\Http\Controllers\NotificationController::class, 'markAllAsRead']);
 
-    Route::post('/ai/chat', [\App\Http\Controllers\AiChatController::class, 'chat']);
-    Route::get('/ai/recommendations', [\App\Http\Controllers\AiChatController::class, 'recommendations']);
+    Route::get('/digital-documents', [BookController::class, 'getDigitalDocuments']);
+
+    Route::middleware('throttle:10,1')->group(function () {
+        Route::post('/ai/chat', [\App\Http\Controllers\AiChatController::class, 'chat']);
+        Route::post('/ai/chat-stream', [\App\Http\Controllers\AiChatController::class, 'chatStream']);
+        Route::get('/ai/recommendations', [\App\Http\Controllers\AiChatController::class, 'recommendations']);
+    });
+    Route::get('/gamify/leaderboard', [GamifyController::class, 'leaderboard']);
 
     Route::middleware('role:student')->group(function () {
         Route::post('/requests', [BorrowController::class, 'requestBorrow']);
@@ -83,17 +92,24 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/fines/{fineId}/momo/pay', [\App\Http\Controllers\MomoPaymentController::class, 'initiatePayment']);
         Route::post('/fines/{fineId}/vnpay/pay', [\App\Http\Controllers\VnpayPaymentController::class, 'initiatePayment']);
         Route::get('/fines/payments/{paymentId}/status', [\App\Http\Controllers\MomoPaymentController::class, 'checkStatus']);
-        Route::post('/fines/payments/{paymentId}/confirm-transfer', [\App\Http\Controllers\MomoPaymentController::class, 'confirmTransfer']);
         
         // Room Bookings
         Route::post('/room-bookings', [RoomBookingController::class, 'store']);
         Route::get('/room-bookings/me', [RoomBookingController::class, 'myBookings']);
         Route::delete('/room-bookings/{id}/cancel', [RoomBookingController::class, 'cancel']);
         Route::post('/room-bookings/{id}/check-out', [RoomBookingController::class, 'checkOut']);
+
+        // Gamification
+        Route::get('/gamify/profile', [GamifyController::class, 'profile']);
+        Route::post('/gamify/check-in', [GamifyController::class, 'checkIn']);
+        Route::get('/gamify/badges', [GamifyController::class, 'badges']);
+        Route::get('/gamify/rewards', [GamifyController::class, 'rewards']);
+        Route::post('/gamify/rewards/{id}/redeem', [GamifyController::class, 'redeem']);
     });
 
     // Staff operations (both Admin and Librarian)
     Route::middleware('role:admin,librarian')->group(function () {
+        Route::post('/ai/books/metadata-all', [AiMetadataController::class, 'generateAll']);
         Route::post('/ai/books/{book}/metadata', [AiMetadataController::class, 'generate']);
 
         // Student Members Management
@@ -131,9 +147,6 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/admin/fines/statistics', [\App\Http\Controllers\FineController::class, 'statistics']);
             Route::post('/fines/{fineId}/pay', [\App\Http\Controllers\FineController::class, 'pay']);
             
-            Route::get('/admin/momo-pending', [\App\Http\Controllers\MomoPaymentController::class, 'getPendingTransfers']);
-            Route::post('/admin/momo-payments/{paymentId}/approve', [\App\Http\Controllers\MomoPaymentController::class, 'approveTransfer']);
-            Route::post('/admin/momo-payments/{paymentId}/reject', [\App\Http\Controllers\MomoPaymentController::class, 'rejectTransfer']);
         });
 
         // Room Bookings & Study Rooms Management
@@ -155,6 +168,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::middleware('permission:view_reports')->group(function () {
             Route::get('/reports', [\App\Http\Controllers\ReportController::class, 'index']);
             Route::get('/reports/export', [\App\Http\Controllers\ReportController::class, 'export']);
+            Route::get('/reports/export-books', [\App\Http\Controllers\ReportController::class, 'exportBooks']);
+            Route::get('/reports/export-members', [\App\Http\Controllers\ReportController::class, 'exportMembers']);
+            Route::get('/reports/export-fines', [\App\Http\Controllers\ReportController::class, 'exportFines']);
+            Route::get('/reports/fines-detail', [\App\Http\Controllers\ReportController::class, 'finesDetail']);
         });
 
         Route::middleware('permission:manage_settings')->group(function () {

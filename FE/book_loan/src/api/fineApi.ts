@@ -194,16 +194,6 @@ export async function simulateVnpayPayment(paymentId: number, status: 'completed
   });
 }
 
-export type AdminPendingMomoEntry = {
-  payment_id: number;
-  student_name: string;
-  student_email: string;
-  book_title: string;
-  fine_id: number;
-  amount_paid: number;
-  created_at: string;
-};
-
 export type CreateFinePayload = {
   member_id: number;
   loan_id?: number | null;
@@ -211,30 +201,6 @@ export type CreateFinePayload = {
   reason: FineReason;
   notes?: string | null;
 };
-
-export async function confirmMomoTransfer(paymentId: number) {
-  return apiRequest<unknown>(`/fines/payments/${paymentId}/confirm-transfer`, {
-    method: 'POST',
-  });
-}
-
-export async function getAdminPendingMomo() {
-  return apiRequest<{ data: AdminPendingMomoEntry[] }>('/admin/momo-pending', {
-    method: 'GET',
-  });
-}
-
-export async function approveMomoPayment(paymentId: number) {
-  return apiRequest<unknown>(`/admin/momo-payments/${paymentId}/approve`, {
-    method: 'POST',
-  });
-}
-
-export async function rejectMomoPayment(paymentId: number) {
-  return apiRequest<unknown>(`/admin/momo-payments/${paymentId}/reject`, {
-    method: 'POST',
-  });
-}
 
 export async function createFine(payload: CreateFinePayload) {
   return apiRequest<{ message: string; fine: FineEntry }>('/admin/fines', {

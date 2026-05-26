@@ -2,6 +2,8 @@
 
 namespace App\Http\Resources;
 
+use App\Models\Librarian;
+use App\Models\Member;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Facades\URL;
@@ -13,12 +15,12 @@ class DigitalDocumentResource extends JsonResource
         $openUrl = URL::temporarySignedRoute(
             'digital-documents.download',
             now()->addMinutes(30),
-            ['book' => $this->book_id, 'disposition' => 'inline'],
+            $this->signedAccessParameters($request, 'inline'),
         );
         $downloadUrl = URL::temporarySignedRoute(
             'digital-documents.download',
             now()->addMinutes(30),
-            ['book' => $this->book_id, 'disposition' => 'attachment'],
+            $this->signedAccessParameters($request, 'attachment'),
         );
 
         return [
@@ -32,7 +34,7 @@ class DigitalDocumentResource extends JsonResource
             'open_url' => $openUrl,
             'download_url' => $downloadUrl,
             'has_attached_file' => filled($this->file_path) || filled($this->file_url),
-            'download_count' => $this->download_count,
+            'download_count' => $this->realDownloadCount(),
             'ai_summary' => $this->ai_summary,
             'ai_tags' => $this->ai_tags ?? [],
             'ai_summary_generated_at' => $this->ai_summary_generated_at?->toISOString(),
@@ -41,5 +43,23 @@ class DigitalDocumentResource extends JsonResource
             'avg_rating' => (float) round($this->reviews()->avg('rating') ?? 0, 1),
             'reviews_count' => (int) $this->reviews()->count(),
         ];
+    }
+
+    private function signedAccessParameters(Request $request, string $disposition): array
+    {
+        $parameters = [
+            'book' => $this->book_id,
+            'disposition' => $disposition,
+        ];
+
+        $user = $request->user();
+
+        if ($user instanceof Member) {
+            $parameters['member_id'] = $user->member_id;
+        } elseif ($user instanceof Librarian) {
+            $parameters['librarian_id'] = $user->librarian_id;
+        }
+
+        return $parameters;
     }
 }

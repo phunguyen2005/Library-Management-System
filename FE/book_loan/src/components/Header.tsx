@@ -17,16 +17,21 @@ interface HeaderProps {
 export default function Header({ onToggleSidebar, onOpenMap }: HeaderProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { user, role } = useAuth();
+  const { user, logout } = useAuth();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<FormattedBook[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const accountMenuRef = useRef<HTMLDivElement>(null);
 
   const userName = user?.name || t('common.user');
-  const userInitial = userName.charAt(0).toUpperCase();
+  const userEmail = user?.email || t('header.accountMenu.emailFallback');
+  const userInitial = userName.trim().charAt(0).toUpperCase() || 'U';
+  const accountMenuLabel = t('header.accountMenu.open');
+  const userLevel = typeof user?.level === 'number' ? user.level : null;
 
   useEffect(() => {
     if (!query.trim()) {
@@ -70,6 +75,38 @@ export default function Header({ onToggleSidebar, onOpenMap }: HeaderProps) {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (accountMenuRef.current && !accountMenuRef.current.contains(event.target as Node)) {
+        setIsAccountMenuOpen(false);
+      }
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsAccountMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, []);
+
+  const handleAccountNavigate = (path: string) => {
+    setIsAccountMenuOpen(false);
+    navigate(path);
+  };
+
+  const handleLogout = async () => {
+    setIsAccountMenuOpen(false);
+    await logout();
+    navigate('/');
+  };
+
   return (
     <header className="sticky top-0 z-20 flex h-16 shrink-0 items-center justify-between border-b border-surface-container-high bg-surface-bright/80 px-4 md:px-8 backdrop-blur-md">
       <div className="flex flex-1 items-center gap-3" ref={wrapperRef}>
@@ -81,7 +118,7 @@ export default function Header({ onToggleSidebar, onOpenMap }: HeaderProps) {
         >
           <span className="material-symbols-outlined text-2xl">menu</span>
         </button>
-        <div className="relative w-full max-w-xl">
+        <div className="relative w-full max-w-xl lg:ml-6">
 
           <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-xl text-on-surface-variant">
             search
@@ -171,13 +208,101 @@ export default function Header({ onToggleSidebar, onOpenMap }: HeaderProps) {
             <span className="material-symbols-outlined text-2xl">map</span>
           </button>
           <NotificationDropdown />
-          <div className="ml-2 flex items-center gap-3 border-l border-surface-container-high pl-4">
-            <div className="hidden text-right sm:block">
-              <p className="text-xs font-bold text-on-surface">{userName}</p>
-            </div>
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-sm font-bold text-white shadow">
-              {userInitial}
-            </div>
+          <div
+            className="relative ml-2 border-l border-surface-container-high pl-4"
+            ref={accountMenuRef}
+          >
+            <button
+              type="button"
+              aria-label={accountMenuLabel}
+              aria-haspopup="menu"
+              aria-expanded={isAccountMenuOpen}
+              onClick={() => setIsAccountMenuOpen((current) => !current)}
+              className="flex min-h-10 items-center gap-2 rounded-full border border-transparent py-1 pl-1 pr-2 transition-colors hover:border-surface-container-high hover:bg-surface-container-low focus:outline-none focus:ring-2 focus:ring-primary/25 cursor-pointer"
+            >
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-white shadow">
+                {userInitial}
+              </span>
+              <span className="hidden min-w-0 text-left sm:block">
+                <span className="block max-w-32 truncate text-xs font-bold leading-tight text-on-surface">
+                  {userName}
+                </span>
+                {userLevel !== null ? (
+                  <span className="mt-0.5 block text-[10px] font-semibold uppercase leading-tight tracking-wide text-primary">
+                    {t('header.accountMenu.level', { level: userLevel })}
+                  </span>
+                ) : null}
+              </span>
+              <span
+                className={`material-symbols-outlined hidden text-[18px] text-on-surface-variant transition-transform sm:block ${
+                  isAccountMenuOpen ? 'rotate-180' : ''
+                }`}
+                aria-hidden="true"
+              >
+                expand_more
+              </span>
+            </button>
+
+            {isAccountMenuOpen ? (
+              <div
+                role="menu"
+                aria-label={accountMenuLabel}
+                className="absolute right-0 top-full z-50 mt-2 w-72 overflow-hidden rounded-2xl border border-surface-container-low bg-surface-bright shadow-2xl ring-1 ring-black/5"
+              >
+                <div className="border-b border-surface-container-low bg-surface-container-low/50 p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary text-base font-black text-white shadow-md">
+                      {userInitial}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-extrabold text-on-surface">{userName}</p>
+                      <p className="truncate text-xs font-medium text-on-surface-variant">{userEmail}</p>
+                      {userLevel !== null ? (
+                        <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-primary">
+                          {t('header.accountMenu.level', { level: userLevel })}
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-2">
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => handleAccountNavigate('/settings')}
+                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-low focus:bg-surface-container-low focus:outline-none cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[20px] text-on-surface-variant" aria-hidden="true">
+                      account_circle
+                    </span>
+                    <span>{t('header.accountMenu.profile')}</span>
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => handleAccountNavigate('/gamify')}
+                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-low focus:bg-surface-container-low focus:outline-none cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[20px] text-on-surface-variant" aria-hidden="true">
+                      emoji_events
+                    </span>
+                    <span>{t('header.accountMenu.rewards')}</span>
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => void handleLogout()}
+                    className="mt-1 flex w-full items-center gap-3 rounded-xl border-t border-surface-container-low px-3 py-2.5 text-left text-sm font-semibold text-error transition-colors hover:bg-red-50 focus:bg-red-50 focus:outline-none cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[20px]" aria-hidden="true">
+                      logout
+                    </span>
+                    <span>{t('common.logout')}</span>
+                  </button>
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
       </div>

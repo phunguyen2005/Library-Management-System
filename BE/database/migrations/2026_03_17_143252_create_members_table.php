@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id('member_id');
             $table->string('name');
             $table->string('email')->nullable()->unique();
-            $table->string('phone_number', 15)->nullable();
+            $table->text('phone_number')->nullable();
             $table->date('join_date')->default(\Illuminate\Support\Facades\DB::raw('CURRENT_DATE'));
         });
     }

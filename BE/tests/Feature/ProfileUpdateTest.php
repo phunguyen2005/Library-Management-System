@@ -45,8 +45,8 @@ class ProfileUpdateTest extends TestCase
         $this->assertDatabaseHas('librarians', [
             'librarian_id' => 1,
             'email' => 'nguyen.van.an@hcmue.edu.vn',
-            'phone_number' => '0901999999',
         ]);
+        $this->assertSame('0901999999', $librarian->fresh()->phone_number);
         $this->assertDatabaseMissing('librarians', [
             'email' => 'changed.admin@hcmue.edu.vn',
         ]);

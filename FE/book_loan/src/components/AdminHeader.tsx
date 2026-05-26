@@ -5,7 +5,11 @@ import NotificationDropdown from './NotificationDropdown';
 import ThemeToggle from './ThemeToggle';
 import LanguageToggle from './LanguageToggle';
 
-export default function AdminHeader() {
+type AdminHeaderProps = {
+  onOpenPolicy: () => void;
+};
+
+export default function AdminHeader({ onOpenPolicy }: AdminHeaderProps) {
   const { t } = useTranslation();
   const { user } = useAuth();
 
@@ -15,6 +19,14 @@ export default function AdminHeader() {
       </div>
 
       <div className="flex items-center gap-4">
+        <button
+          onClick={onOpenPolicy}
+          title="Chính sách & Quy định Thư viện"
+          className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl border border-surface-container-high bg-surface-bright text-on-surface shadow-sm transition-all hover:bg-surface-container-low hover:text-primary active:scale-95"
+        >
+          <span className="material-symbols-outlined text-[22px] font-light">menu_book</span>
+        </button>
+
         <ThemeToggle />
         <LanguageToggle />
         <NotificationDropdown />

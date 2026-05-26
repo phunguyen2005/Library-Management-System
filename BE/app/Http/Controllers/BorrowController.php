@@ -10,6 +10,7 @@ use App\Models\Book;
 use App\Models\Borrowing;
 use App\Models\Fine;
 use App\Models\LibrarySetting;
+use App\Models\Member;
 use App\Services\FineCalculationService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Exceptions\HttpResponseException;
@@ -24,14 +25,29 @@ class BorrowController extends Controller
         $validated = $request->validated();
 
         $loan = DB::transaction(function () use ($member, $validated) {
+            $memberLocked = Member::query()->lockForUpdate()->findOrFail($member->member_id);
+
             $unpaidFineTotal = Fine::query()
-                ->where('member_id', $member->member_id)
+                ->where('member_id', $memberLocked->member_id)
                 ->where('status', Fine::STATUS_UNPAID)
                 ->sum('amount');
 
             if ((float) $unpaidFineTotal > 0) {
                 throw new HttpResponseException(response()->json([
                     'message' => __('messages.borrow.unpaid_fines_block'),
+                ], 422));
+            }
+
+            $hasOverdueBook = Borrowing::query()
+                ->where('member_id', $memberLocked->member_id)
+                ->where('status', Borrowing::STATUS_BORROWED)
+                ->whereNotNull('due_date')
+                ->where('due_date', '<', now()->toDateString())
+                ->exists();
+
+            if ($hasOverdueBook) {
+                throw new HttpResponseException(response()->json([
+                    'message' => __('messages.borrow.has_overdue_book_block'),
                 ], 422));
             }
 
@@ -42,10 +58,10 @@ class BorrowController extends Controller
             }
 
             $settings = LibrarySetting::singleton();
-            $maxActiveLoans = max(1, (int) $settings->max_active_loans);
+            $maxActiveLoans = max(1, (int) $settings->max_active_loans) + $memberLocked->getActiveLimitBonus();
             $activeLoanCount = Borrowing::query()
-                ->where('member_id', $member->member_id)
-                ->whereIn('status', [Borrowing::STATUS_PENDING, Borrowing::STATUS_BORROWED])
+                ->where('member_id', $memberLocked->member_id)
+                ->whereIn('status', [Borrowing::STATUS_PENDING, Borrowing::STATUS_APPROVED, Borrowing::STATUS_BORROWED])
                 ->lockForUpdate()
                 ->count();
 
@@ -56,9 +72,9 @@ class BorrowController extends Controller
             }
 
             $duplicateLoan = Borrowing::query()
-                ->where('member_id', $member->member_id)
+                ->where('member_id', $memberLocked->member_id)
                 ->where('book_id', $book->book_id)
-                ->whereIn('status', [Borrowing::STATUS_PENDING, Borrowing::STATUS_BORROWED])
+                ->whereIn('status', [Borrowing::STATUS_PENDING, Borrowing::STATUS_APPROVED, Borrowing::STATUS_BORROWED])
                 ->lockForUpdate()
                 ->exists();
 
@@ -71,7 +87,7 @@ class BorrowController extends Controller
             }
 
             return Borrowing::query()->create([
-                'member_id' => $member->member_id,
+                'member_id' => $memberLocked->member_id,
                 'book_id' => $book->book_id,
                 'status' => Borrowing::STATUS_PENDING,
                 'borrow_date' => now()->toDateString(),
@@ -154,9 +170,22 @@ class BorrowController extends Controller
             $loan->librarian_id = $librarian->librarian_id;
             $settings = LibrarySetting::singleton();
             $loanPeriodDays = max(1, (int) $settings->loan_period_days);
+            
+            // Apply any active duration extensions
+            $extraDays = $loan->member->consumeNextDurationBonus();
+            
             $loan->borrow_date = now()->toDateString();
-            $loan->due_date = now()->addDays($loanPeriodDays)->toDateString();
+            $loan->due_date = now()->addDays($loanPeriodDays + $extraDays)->toDateString();
             $loan->save();
+
+            // Award XP for checkout
+            app(\App\Services\GamifyService::class)->awardXpAndPoints(
+                $loan->member,
+                50,
+                0,
+                'book_borrow',
+                'Nhận sách vật lý thành công: ' . $loan->book->title
+            );
 
             \App\Services\AuditLoggerService::log('borrow_pickup', 'Đã giao sách vật lý: ' . $loan->book->title . ' cho thành viên: ' . $loan->member->name . ' (Mã phiếu: #' . $loan->loan_id . ')', $librarian);
 
@@ -232,10 +261,31 @@ class BorrowController extends Controller
 
             $loan->status = Borrowing::STATUS_RETURNED;
             $loan->return_date = now()->toDateString();
+            
+            // Check if return is overdue
+            $today = now()->startOfDay();
+            $due = \Carbon\Carbon::parse($loan->due_date)->startOfDay();
+            $isOverdue = $today->gt($due);
+            
             $loan->save();
 
             // Sync overdue fine (if any)
             app(FineCalculationService::class)->syncOverdueFine($loan);
+
+            // Award return XP and Points
+            $xpGained = $isOverdue ? 10 : 100;
+            $pointsGained = $isOverdue ? 0 : 20;
+            $eventDesc = $isOverdue 
+                ? 'Trả sách quá hạn: ' . $loan->book->title 
+                : 'Trả sách đúng hạn: ' . $loan->book->title;
+
+            app(\App\Services\GamifyService::class)->awardXpAndPoints(
+                $loan->member,
+                $xpGained,
+                $pointsGained,
+                'book_return',
+                $eventDesc
+            );
 
             // Create damage / loss fine if condition is not good
             if ($condition === 'damaged' || $condition === 'lost') {
@@ -507,7 +557,7 @@ class BorrowController extends Controller
 
                 // Send mail
                 try {
-                    $nextReservation->member->notify(new \App\Notifications\BorrowingStatusMailNotification($borrowing, 'approved'));
+                    $nextReservation->member->notify(new \App\Notifications\BorrowingStatusMailNotification($borrowing, 'approved', null, true));
                 } catch (\Exception $e) {
                     // Ignore mail failures in tests/local
                 }

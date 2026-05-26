@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { fetchLibrarySettings, updateLibrarySettings, type LibrarySettings } from '../../api/librarySettingsApi';
 import { getActiveDevices, revokeDevice, type DeviceSession } from '../../api/authApi';
-import { updateMyProfile } from '../../api/userApi';
+import { updateMyProfile, sendPasswordOtp } from '../../api/userApi';
 import { useAuth } from '../../auth/AuthContext';
 import { getErrorMessage, isUnauthorizedError } from '../../lib/errors';
 import { emitToast } from '../../notifications/events';
@@ -53,6 +53,26 @@ export default function AdminSettings() {
   const [profileFeedback, setProfileFeedback] = useState<string | null>(null);
   const [devices, setDevices] = useState<DeviceSession[]>([]);
   const [loadingDevices, setLoadingDevices] = useState(true);
+
+  const [showOtpModal, setShowOtpModal] = useState(false);
+  const [otpValue, setOtpValue] = useState('');
+  const [otpCountdown, setOtpCountdown] = useState(300);
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
+  const [otpError, setOtpError] = useState<string | null>(null);
+  const [resendingOtp, setResendingOtp] = useState(false);
+
+  useEffect(() => {
+    if (showOtpModal && otpCountdown > 0) {
+      const timer = setTimeout(() => setOtpCountdown(otpCountdown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [showOtpModal, otpCountdown]);
+
+  const formatCountdown = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  };
 
   const fetchDevices = async () => {
     try {
@@ -146,23 +166,31 @@ export default function AdminSettings() {
       profileForm.current_password || profileForm.password || profileForm.password_confirmation,
     );
 
+    if (isChangingPassword) {
+      try {
+        await sendPasswordOtp();
+        setOtpCountdown(300);
+        setOtpValue('');
+        setOtpError(null);
+        setShowOtpModal(true);
+        emitToast({ tone: 'success', title: 'Mã OTP đã gửi', message: 'Vui lòng kiểm tra email của bạn để nhận mã xác thực.' });
+      } catch (error: unknown) {
+        const message = getErrorMessage(error, 'Không thể gửi mã xác thực OTP.');
+        setProfileFeedback(message);
+        emitToast({ tone: 'error', title: 'Không thể gửi OTP', message });
+      } finally {
+        setIsSavingProfile(false);
+      }
+      return;
+    }
+
     try {
       const response = await updateMyProfile({
         name: profileForm.name.trim(),
         phone_number: profileForm.phone_number.trim() || null,
-        current_password: isChangingPassword ? profileForm.current_password : undefined,
-        password: isChangingPassword ? profileForm.password : undefined,
-        password_confirmation: isChangingPassword ? profileForm.password_confirmation : undefined,
       });
 
       updateUser(response.user);
-      setProfileForm((current) => ({
-        ...current,
-        current_password: '',
-        password: '',
-        password_confirmation: '',
-      }));
-
       const message = response.message || 'Đã cập nhật hồ sơ quản trị.';
       setProfileFeedback(message);
       emitToast({ tone: 'success', title: 'Đã cập nhật hồ sơ', message });
@@ -176,6 +204,60 @@ export default function AdminSettings() {
       emitToast({ tone: 'error', title: 'Không thể cập nhật hồ sơ', message });
     } finally {
       setIsSavingProfile(false);
+    }
+  };
+
+  const handleConfirmOtp = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (otpValue.length !== 6) return;
+
+    setIsVerifyingOtp(true);
+    setOtpError(null);
+
+    try {
+      const response = await updateMyProfile({
+        name: profileForm.name.trim(),
+        phone_number: profileForm.phone_number.trim() || null,
+        current_password: profileForm.current_password,
+        password: profileForm.password,
+        password_confirmation: profileForm.password_confirmation,
+        otp: otpValue,
+      });
+
+      updateUser(response.user);
+      setProfileForm((current) => ({
+        ...current,
+        current_password: '',
+        password: '',
+        password_confirmation: '',
+      }));
+
+      const message = response.message || 'Cập nhật hồ sơ và đổi mật khẩu thành công.';
+      setProfileFeedback(message);
+      emitToast({ tone: 'success', title: 'Đã cập nhật mật khẩu', message });
+      setShowOtpModal(false);
+    } catch (error: unknown) {
+      const message = getErrorMessage(error, 'Xác thực OTP thất bại.');
+      setOtpError(message);
+    } finally {
+      setIsVerifyingOtp(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    setResendingOtp(true);
+    setOtpError(null);
+
+    try {
+      await sendPasswordOtp();
+      setOtpCountdown(300);
+      setOtpValue('');
+      emitToast({ tone: 'success', title: 'Mã OTP mới đã gửi', message: 'Mã xác thực mới đã được gửi về email của bạn.' });
+    } catch (error: unknown) {
+      const message = getErrorMessage(error, 'Không thể gửi lại mã xác thực.');
+      setOtpError(message);
+    } finally {
+      setResendingOtp(false);
     }
   };
 
@@ -830,6 +912,84 @@ export default function AdminSettings() {
           </div>
         )}
       </section>
+
+      {showOtpModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md overflow-hidden rounded-2xl border border-white/20 bg-white/95 p-8 shadow-2xl shadow-slate-900/30">
+            <div className="flex flex-col items-center text-center">
+              <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-100 text-sky-600">
+                <span className="material-symbols-outlined text-3xl font-light">key</span>
+              </div>
+              <h3 className="text-xl font-bold text-slate-800">Xác thực thay đổi mật khẩu</h3>
+              <p className="mt-2 text-sm text-slate-500">
+                Mã xác thực OTP gồm 6 chữ số đã được gửi đến địa chỉ email quản trị của bạn: <span className="font-semibold text-slate-700">{user?.email}</span>.
+              </p>
+            </div>
+
+            <form onSubmit={handleConfirmOtp} className="mt-6 space-y-6">
+              {otpError && (
+                <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-semibold text-red-600">
+                  <span className="material-symbols-outlined text-base">error</span>
+                  {otpError}
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <label className="block text-center text-xs font-bold uppercase tracking-widest text-slate-500">
+                  Nhập mã OTP
+                </label>
+                <input
+                  aria-label="Mã OTP đổi mật khẩu"
+                  type="text"
+                  maxLength={6}
+                  value={otpValue}
+                  onChange={(e) => setOtpValue(e.target.value.replace(/\D/g, ''))}
+                  placeholder="000000"
+                  className="w-full rounded-xl border border-slate-200 bg-white py-3.5 text-center text-2xl font-bold tracking-[0.5em] text-slate-800 outline-none focus:ring-2 focus:ring-primary/20"
+                  required
+                />
+              </div>
+
+              <div className="flex items-center justify-between text-xs font-medium">
+                <span className="text-slate-500">
+                  {otpCountdown > 0 ? (
+                    <>Mã hết hạn sau: <span className="font-bold text-slate-700">{formatCountdown(otpCountdown)}</span></>
+                  ) : (
+                    <span className="text-rose-500 font-semibold">Mã đã hết hạn</span>
+                  )}
+                </span>
+                <button
+                  type="button"
+                  onClick={handleResendOtp}
+                  disabled={otpCountdown > 0 || resendingOtp}
+                  className={`font-semibold cursor-pointer ${
+                    otpCountdown > 0 ? 'text-slate-400 cursor-not-allowed' : 'text-primary hover:underline'
+                  }`}
+                >
+                  {resendingOtp ? 'Đang gửi...' : 'Gửi lại mã'}
+                </button>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowOtpModal(false)}
+                  className="flex-1 rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  type="submit"
+                  disabled={otpValue.length !== 6 || isVerifyingOtp}
+                  className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-primary py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary/20 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-wait cursor-pointer"
+                >
+                  {isVerifyingOtp ? 'Đang xác thực...' : 'Xác nhận'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

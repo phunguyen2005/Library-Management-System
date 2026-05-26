@@ -26,4 +26,26 @@ class AiMetadataController extends Controller
             'book' => new BookResource($book),
         ]);
     }
+
+    public function generateAll(BookAiMetadataService $metadataService, BookCacheService $bookCache): JsonResponse
+    {
+        $books = Book::all();
+        $count = 0;
+
+        foreach ($books as $book) {
+            $metadataService->apply($book);
+            $count++;
+        }
+
+        $bookCache->bump();
+
+        AuditLoggerService::log(
+            'ai_metadata_generate_all',
+            'Generated AI summary and tags for all '.$count.' books.',
+        );
+
+        return response()->json([
+            'message' => 'AI metadata generated successfully for all '.$count.' books.',
+        ]);
+    }
 }

@@ -37,6 +37,14 @@ class VnpayPaymentController extends Controller
             ], 422);
         }
 
+        if ($fine->reason === Fine::REASON_OVERDUE && 
+            $fine->borrowing && 
+            $fine->borrowing->status !== \App\Models\Borrowing::STATUS_RETURNED) {
+            return response()->json([
+                'message' => __('messages.borrow.pay_overdue_requires_returned')
+            ], 422);
+        }
+
         $amount = (int) $fine->amount;
         if ($amount < 5000) {
             return response()->json([

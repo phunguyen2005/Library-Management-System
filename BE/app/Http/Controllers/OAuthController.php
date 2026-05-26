@@ -2,63 +2,70 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Member;
 use App\Models\Librarian;
+use App\Models\LoginHistory;
+use App\Models\Member;
+use App\Services\AuditLoggerService;
+use App\Support\InstitutionalEmail;
 use Illuminate\Http\Request;
-use Laravel\Socialite\Facades\Socialite;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
+use Laravel\Socialite\Facades\Socialite;
 
 class OAuthController extends Controller
 {
-    public function redirect($provider)
+    private const SUPPORTED_PROVIDERS = ['google', 'github'];
+
+    public function redirect(string $provider)
     {
-        return Socialite::driver($provider)->stateless()->redirect();
+        if (! in_array($provider, self::SUPPORTED_PROVIDERS, true)) {
+            abort(404);
+        }
+
+        $state = Str::random(40);
+        Cache::put($this->oauthStateCacheKey($provider, $state), true, now()->addMinutes(5));
+
+        return Socialite::driver($provider)
+            ->stateless()
+            ->with(['state' => $state])
+            ->redirect();
     }
 
-    public function callback($provider)
+    public function callback(Request $request, string $provider)
     {
+        if (! in_array($provider, self::SUPPORTED_PROVIDERS, true)) {
+            return redirect($this->frontendOAuthCallback(['error' => 'InvalidProvider']));
+        }
+
+        $state = (string) $request->query('state', '');
+        if ($state === '' || ! Cache::pull($this->oauthStateCacheKey($provider, $state))) {
+            return redirect($this->frontendOAuthCallback(['error' => 'InvalidState']));
+        }
+
         try {
             $socialUser = Socialite::driver($provider)->stateless()->user();
         } catch (\Exception $e) {
-            return redirect('http://localhost:3000/oauth-callback?error=Unauthorized');
+            return redirect($this->frontendOAuthCallback(['error' => 'Unauthorized']));
         }
 
         $email = $socialUser->getEmail();
-        if (!$email) {
+        if (! $email) {
             $email = ($socialUser->getNickname() ?? 'github_user') . '@github.com';
         }
 
-        // 1. Tìm ở bảng librarians trước (cho cả Admin và Thủ thư)
         $user = Librarian::where('email', $email)->first();
         $isLibrarian = true;
 
-        if (!$user) {
-            // 2. Tìm ở bảng members (sinh viên)
+        if (! $user) {
             $user = Member::where('email', $email)->first();
             $isLibrarian = false;
         }
 
-        if (!$user) {
-            // 3. Nếu là phunguyen2005 (email hoặc nickname khớp) hoặc email thực tế khớp với admin, tự động gán vào tài khoản Admin đã seed
-            $nickname = strtolower($socialUser->getNickname() ?? '');
-            $emailLower = strtolower($email);
-            if ($emailLower === '4901104111@student.hcmue.edu.vn' || str_starts_with($nickname, 'phunguyen2005') || str_starts_with($emailLower, 'phunguyen2005')) {
-                $user = Librarian::where('email', '4901104111@student.hcmue.edu.vn')
-                    ->orWhere('email', 'phunguyen2005@gmail.com')
-                    ->orWhere('email', $email)
-                    ->first();
-                if ($user) {
-                    $isLibrarian = true;
-                    // Cập nhật email của thủ thư sang email thực tế của GitHub nếu khác biệt
-                    if ($user->email !== $email) {
-                        $user->update(['email' => $email]);
-                    }
-                }
+        if (! $user) {
+            if (! InstitutionalEmail::isAllowed($email)) {
+                return redirect($this->frontendOAuthCallback(['error' => 'EmailDomainNotAllowed']));
             }
-        }
 
-        if (!$user) {
-            // 4. Nếu không tìm thấy và không phải là admin nhắm mục tiêu, tạo mới tài khoản thành viên (Sinh viên)
             $user = Member::create([
                 'name' => $socialUser->getName() ?? $socialUser->getNickname(),
                 'email' => $email,
@@ -68,35 +75,41 @@ class OAuthController extends Controller
                 'join_date' => now()->toDateString(),
             ]);
             $isLibrarian = false;
-        } else {
-            // Cập nhật thông tin provider nếu chưa được thiết lập (chỉ áp dụng cho sinh viên)
-            if (!$isLibrarian && !$user->provider_name) {
-                $user->update([
-                    'provider_name' => $provider,
-                    'provider_id' => $socialUser->getId(),
-                    'email_verified_at' => $user->email_verified_at ?? now(),
-                ]);
-            }
+        } elseif (! $isLibrarian && ! $user->provider_name) {
+            $user->update([
+                'provider_name' => $provider,
+                'provider_id' => $socialUser->getId(),
+                'email_verified_at' => $user->email_verified_at ?? now(),
+            ]);
         }
 
-        // Tạo token đăng nhập theo role tương ứng
         $role = $user->getRoleName();
-        $tokenResult = $user->createToken($role.'-session', ['role:'.$role]);
+        $tokenResult = $user->createToken($role . '-session', ['role:' . $role]);
         $token = $tokenResult->plainTextToken;
         $tokenId = $tokenResult->accessToken->id;
 
-        // Ghi nhận lịch sử đăng nhập & Audit log
-        \App\Services\AuditLoggerService::log('login', 'Đăng nhập thành công qua ' . ucfirst($provider), $user);
-        \App\Models\LoginHistory::create([
+        AuditLoggerService::log('login', 'Đăng nhập thành công qua ' . ucfirst($provider), $user);
+        LoginHistory::create([
             'user_id' => $isLibrarian ? $user->librarian_id : $user->member_id,
             'user_type' => $role,
-            'ip_address' => request()->ip(),
-            'user_agent' => request()->userAgent(),
-            'device_type' => \App\Http\Controllers\AuthController::getDeviceType(request()->userAgent() ?? ''),
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+            'device_type' => AuthController::getDeviceType($request->userAgent() ?? ''),
             'token_id' => $tokenId,
         ]);
 
-        // Chuyển hướng về Frontend kèm theo token
-        return redirect('http://localhost:3000/oauth-callback?token=' . $token);
+        return redirect($this->frontendOAuthCallback(['token' => $token]));
+    }
+
+    private function oauthStateCacheKey(string $provider, string $state): string
+    {
+        return 'oauth_state:' . $provider . ':' . hash('sha256', $state);
+    }
+
+    private function frontendOAuthCallback(array $query): string
+    {
+        $frontendUrl = rtrim((string) env('FRONTEND_URL', 'http://localhost:3000'), '/');
+
+        return $frontendUrl . '/oauth-callback?' . http_build_query($query);
     }
 }

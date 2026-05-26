@@ -79,6 +79,7 @@ export interface DigitalDocument {
   aiTags?: string[];
   aiSummaryGeneratedAt?: string | null;
   readingProgress?: ReadingProgressRecord | null;
+  is_favorite?: boolean;
 }
 
 export interface ReadingProgressRecord {

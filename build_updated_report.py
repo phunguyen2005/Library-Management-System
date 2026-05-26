@@ -6,7 +6,7 @@ from docx.enum.table import WD_TABLE_ALIGNMENT, WD_CELL_VERTICAL_ALIGNMENT
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 
-ROOT = Path(r"D:/College/03_Year_3/PhP/xampp/htdocs/BOOK_LOAN_MIDTERM")
+ROOT = Path(__file__).resolve().parent
 OUT = Path(r"D:/College/03_Year_3/PhP/BaoCao_QuanLyThuVienSo_HCMUE_CapNhat.docx")
 
 BLUE = "2E74B5"
@@ -309,7 +309,7 @@ def build_doc():
     p = doc.add_paragraph()
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
     spacing(p, after=18)
-    set_run(p.add_run("Book Loan Midterm - Enterprise Digital Library & Co-working Ecosystem"), size=12, italic=True, color=MUTED)
+    set_run(p.add_run("Library Management System - Enterprise Digital Library & Co-working Ecosystem"), size=12, italic=True, color=MUTED)
 
     cover = [
         ("Nhóm thực hiện", "TTVP Group"),
@@ -340,7 +340,7 @@ def build_doc():
     heading(doc, "LỜI MỞ ĐẦU", 1)
     para(doc, "Trong bối cảnh chuyển đổi số tại các trường đại học, thư viện không chỉ còn là nơi lưu trữ và cho mượn sách giấy, mà trở thành một hạ tầng học tập số kết hợp tài nguyên điện tử, không gian tự học, dữ liệu phân tích và các dịch vụ hỗ trợ cá nhân hóa. Hệ thống Quản lý Thư viện Số HCMUE được xây dựng nhằm mô phỏng một môi trường thư viện hiện đại cho sinh viên, thủ thư và quản trị viên.")
     para(doc, "So với phiên bản báo cáo ban đầu, hệ thống hiện tại đã được mở rộng đáng kể từ một ứng dụng quản lý mượn-trả cơ bản thành nền tảng thư viện số đầy đủ hơn: kiến trúc Backend API và Frontend SPA tách biệt, xác thực bằng Laravel Sanctum, phân quyền RBAC chi tiết, hàng đợi đặt chỗ, tài liệu số, phạt và thanh toán giả lập, đặt phòng tự học, thông báo, audit logs, báo cáo phân tích và tích hợp trợ lý AI Gemini.")
-    para(doc, "Báo cáo này cập nhật lại toàn bộ nội dung học thuật và kỹ thuật cho phù hợp với hiện trạng mã nguồn Book Loan Midterm. Các phần mô tả chức năng, mô hình dữ liệu, API, kiến trúc triển khai, kiểm thử và hướng phát triển được viết lại theo cách bám sát repository hiện tại, đồng thời giữ cấu trúc báo cáo đồ án/học phần truyền thống.")
+    para(doc, "Báo cáo này cập nhật lại toàn bộ nội dung học thuật và kỹ thuật cho phù hợp với hiện trạng mã nguồn Library Management System. Các phần mô tả chức năng, mô hình dữ liệu, API, kiến trúc triển khai, kiểm thử và hướng phát triển được viết lại theo cách bám sát repository hiện tại, đồng thời giữ cấu trúc báo cáo đồ án/học phần truyền thống.")
 
     heading(doc, "BẢNG PHÂN CÔNG THÀNH VIÊN NHÓM", 1)
     add_table(doc, ["MSSV", "Họ và tên", "Nội dung thực hiện cập nhật", "Mức độ hoàn thành", "Cộng tác"], [
@@ -364,7 +364,7 @@ def build_doc():
     heading(doc, "CHƯƠNG 1: TỔNG QUAN ĐỀ TÀI", 1)
     heading(doc, "1.1. Bối cảnh và động lực", 2)
     para(doc, "Quy trình thư viện truyền thống thường phụ thuộc vào ghi nhận thủ công, xử lý tại quầy và các bảng dữ liệu rời rạc. Điều này gây khó khăn khi cần kiểm tra trạng thái sách theo thời gian thực, giới hạn số lượng mượn, nhắc hạn trả, xử lý phạt hoặc đánh giá nhu cầu sử dụng phòng học. Với nhóm người dùng là sinh viên đại học, yêu cầu truy cập tài nguyên từ xa, đọc tài liệu số, đặt chỗ và nhận gợi ý học tập ngày càng rõ rệt.")
-    para(doc, "Book Loan Midterm hướng đến một hệ thống web hiện đại, trong đó frontend React đóng vai trò giao diện người dùng giàu tương tác, backend Laravel chịu trách nhiệm xác thực, phân quyền, nghiệp vụ và quản trị dữ liệu. Hệ thống được thiết kế theo tư duy API-first để dễ mở rộng sang mobile app, kiosk tại thư viện hoặc các dịch vụ tích hợp trong tương lai.")
+    para(doc, "Library Management System hướng đến một hệ thống web hiện đại, trong đó frontend React đóng vai trò giao diện người dùng giàu tương tác, backend Laravel chịu trách nhiệm xác thực, phân quyền, nghiệp vụ và quản trị dữ liệu. Hệ thống được thiết kế theo tư duy API-first để dễ mở rộng sang mobile app, kiosk tại thư viện hoặc các dịch vụ tích hợp trong tương lai.")
     heading(doc, "1.2. Mục tiêu đề tài", 2)
     bullets(doc, [
         "Xây dựng hệ thống quản lý thư viện số cho HCMUE với đầy đủ vòng đời tra cứu, mượn, duyệt, nhận sách, trả sách và đặt chỗ.",
@@ -385,7 +385,7 @@ def build_doc():
         ["UI/UX", "TailwindCSS 4, Motion, lucide-react", "Giao diện responsive, dark/light mode, animation và icon nhất quán."],
         ["Định tuyến", "react-router-dom 7.x", "BrowserRouter, Routes, Navigate, Outlet; tương thích cách tổ chức route kiểu v6."],
         ["Đa ngôn ngữ", "react-i18next + Laravel SetLocale", "Chuyển đổi tiếng Việt/tiếng Anh ở cả giao diện và thông báo API."],
-        ["QR/Thanh toán", "qrcode.react, @yudiel/react-qr-scanner", "Sinh mã QR, quét nhận sách, MoMo/VNPay sandbox và đối soát chuyển khoản."],
+        ["QR/Thanh toán", "qrcode.react, @yudiel/react-qr-scanner", "Sinh mã QR, quét nhận sách, cổng thanh toán MoMo/VNPay sandbox tự động."],
         ["AI", "Google Gemini API", "Chatbot, đề xuất cá nhân hóa, tạo tóm tắt và tag sách qua job nền."],
         ["Tài liệu API", "OpenAPI 3.0.3 + Swagger UI", "Cung cấp /api/openapi.json và /api/docs qua OpenApiController trong mã nguồn hiện tại."],
         ["DevOps", "Docker, Docker Compose", "Điều phối app, queue worker, MySQL db và frontend Nginx."],
@@ -397,7 +397,7 @@ def build_doc():
     heading(doc, "2.1. Tác nhân và phân quyền", 2)
     add_table(doc, ["Tác nhân", "Mô tả", "Quyền/tác vụ chính"], [
         ["Student", "Sinh viên sử dụng thư viện.", "Tìm kiếm sách, mượn/đặt chỗ, đọc tài liệu số, trả phí, đặt phòng, đánh giá, yêu thích, chat AI."],
-        ["Librarian", "Nhân viên/thủ thư vận hành hằng ngày.", "Quản lý sách, sinh viên, mượn-trả, phòng học, thanh toán phạt và đối soát MoMo."],
+        ["Librarian", "Nhân viên/thủ thư vận hành hằng ngày.", "Quản lý sách, sinh viên, mượn-trả, phòng học và thanh toán phạt."],
         ["Admin", "Quản trị viên hệ thống.", "Có toàn bộ quyền thủ thư, quản lý thủ thư, cấu hình hệ thống, waive fines, xem audit logs và reports."],
         ["External Services", "Dịch vụ ngoài hệ thống.", "Gemini API, MoMo/VNPay sandbox, email server, OAuth providers và trình duyệt sinh viên."],
     ], [1300, 2200, 5860], font_size=8.0)
@@ -407,7 +407,7 @@ def build_doc():
         ["Tra cứu & catalog", "Tìm kiếm, lọc, autocomplete, xem review.", "CRUD sách, upload tài liệu số, import CSV.", "Giám sát và quản trị toàn bộ dữ liệu catalog."],
         ["Mượn/trả & đặt chỗ", "Gửi yêu cầu, hủy pending, xem lịch sử, vào hàng đợi khi hết sách.", "Duyệt/từ chối, QR pickup, trả sách, gia hạn, xử lý hàng đợi.", "Thiết lập giới hạn mượn và chính sách vận hành."],
         ["Digital Library", "Đọc PDF/web, download signed URL, lưu tiến trình đọc.", "Tải lên file số và quản lý metadata.", "Theo dõi tài nguyên số trong báo cáo."],
-        ["Fines & Payments", "Xem phạt, MoMo QR/chuyển khoản, VNPay sandbox.", "Thu tiền mặt, duyệt/từ chối MoMo transfer, tạo phạt thủ công.", "Miễn giảm phạt và cấu hình mức phạt."],
+        ["Fines & Payments", "Xem phạt, thanh toán MoMo QR/VNPay sandbox tự động.", "Thu tiền mặt tại quầy, tạo phạt thủ công.", "Miễn giảm phạt và cấu hình mức phạt."],
         ["Study Rooms", "Đặt phòng, hủy, check-out.", "Quản lý phòng, duyệt/từ chối, check-in bằng mã.", "Cấu hình giới hạn phòng và xem thống kê sử dụng."],
         ["AI", "Chatbot và gợi ý sách cá nhân hóa.", "AI Enhancer tạo summary/tag khi thêm sách.", "Quản trị API key và theo dõi hiệu quả dữ liệu."],
         ["Bảo mật", "OTP, đổi mật khẩu, thiết bị đăng nhập, logout từ xa.", "Truy cập theo quyền vận hành.", "Audit logs, quản lý nhân sự và phân quyền."],
@@ -433,7 +433,7 @@ def build_doc():
             "Giới hạn số lượt mượn chủ động theo max_active_loans; không cho mượn trùng sách đang active.",
             "Khi sách hết, sinh viên có thể vào reservations queue; khi trả sách hệ thống tự chuyển cho người tiếp theo.",
             "Phạt quá hạn, hư hỏng, mất sách và phạt thủ công; fine có thể paid, unpaid hoặc waived.",
-            "Thanh toán hỗ trợ tiền mặt, MoMo mock QR/chuyển khoản đối soát và VNPay sandbox.",
+            "Thanh toán hỗ trợ tiền mặt tại quầy, MoMo mock QR và VNPay sandbox tự động qua IPN.",
         ]),
         ("2.3.4. Module phòng tự học", [
             "Sinh viên đặt phòng theo ngày/giờ, số người và ghi chú; hệ thống chống trùng lịch và giới hạn theo policy.",
@@ -451,18 +451,37 @@ def build_doc():
 
     heading(doc, "2.4. Use case tiêu biểu", 2)
     add_table(doc, ["Mã", "Use case", "Tác nhân", "Kết quả chính"], [
-        ["UC01", "Đăng nhập và quản lý phiên", "Student/Librarian/Admin", "Tạo Sanctum token, ghi login history, hỗ trợ revoke thiết bị."],
-        ["UC02", "Tìm kiếm và xem chi tiết sách", "Student/Public", "Danh sách sách, autocomplete, review, trạng thái sẵn có."],
-        ["UC03", "Gửi yêu cầu mượn sách", "Student", "Tạo borrowing pending hoặc reservation nếu hết sách."],
-        ["UC04", "Duyệt và xác nhận nhận sách", "Librarian/Admin", "approved rồi borrowed sau QR pickup, cập nhật tồn kho."],
-        ["UC05", "Trả sách và tính phạt", "Librarian/Admin", "returned, tăng tồn kho, sinh fine nếu quá hạn/hỏng/mất."],
-        ["UC06", "Đặt phòng tự học", "Student", "Tạo room_booking theo policy và chống trùng lịch."],
-        ["UC07", "Thanh toán phạt", "Student/Librarian", "MoMo/VNPay sandbox, tiền mặt, đối soát transfer."],
-        ["UC08", "AI chatbot và gợi ý sách", "Student", "Trả lời tự nhiên, đề xuất liên kết sách phù hợp."],
-        ["UC09", "AI Enhancer metadata", "Librarian/Admin", "Sinh summary/tag qua Gemini và job nền."],
-        ["UC10", "Quản lý nhân sự và phân quyền", "Admin", "CRUD librarians, gán roles/permissions."],
-        ["UC11", "Báo cáo phân tích", "Admin", "Biểu đồ, thống kê, CSV export."],
-        ["UC12", "Audit logs", "Admin", "Tra cứu lịch sử hành động và diff JSON."],
+        ["UC-01", "Đăng nhập hệ thống", "Tất cả", "Luồng chính (Email/Mật khẩu) và luồng phụ (Google/GitHub OAuth)."],
+        ["UC-02", "Đăng ký tài khoản", "Sinh viên", "Điền form thông tin và xác thực OTP qua Email."],
+        ["UC-03", "Khôi phục mật khẩu", "Tất cả", "Gửi OTP qua Email và thiết lập mật khẩu mới."],
+        ["UC-04", "Đăng xuất", "Tất cả", "Hủy phiên làm việc hiện tại, thu hồi token Sanctum."],
+        ["UC-05", "Quản lý phiên đăng nhập", "Tất cả", "Xem danh sách thiết bị đang đăng nhập và đăng xuất từ xa."],
+        ["UC-06", "Quản lý hồ sơ cá nhân", "Tất cả", "Cập nhật thông tin cá nhân, đổi mật khẩu và cài đặt nhận thông báo."],
+        ["UC-07", "Tra cứu danh mục sách", "Sinh viên, Khách", "Xem danh sách sách, lọc theo danh mục, tìm kiếm autocomplete FTS5."],
+        ["UC-08", "Tương tác với sách", "Sinh viên", "Đánh giá (1-5 sao), viết review và thêm vào danh sách yêu thích."],
+        ["UC-09", "Đọc tài liệu số", "Sinh viên", "Xem tài liệu PDF/EPUB trực tuyến thông qua Signed URL và lưu tiến độ."],
+        ["UC-10", "Đặt mượn sách cá nhân", "Sinh viên", "Tạo yêu cầu mượn, hủy khi chờ duyệt, xem lịch sử mượn."],
+        ["UC-11", "Xử lý yêu cầu mượn", "Thủ thư", "Xem danh sách yêu cầu chờ duyệt, phê duyệt hoặc từ chối mượn."],
+        ["UC-12", "Xác nhận giao sách tại quầy", "Thủ thư", "Check-out sách vật lý cho sinh viên (Confirm Pickup)."],
+        ["UC-13", "Xác nhận trả sách tại quầy", "Thủ thư", "Nhận lại sách, ghi nhận tình trạng hỏng/mất, tự động kích hoạt hàng đợi đặt chỗ."],
+        ["UC-14", "Gia hạn sách", "Thủ thư", "Gia hạn thêm thời gian mượn sách cho sinh viên dựa trên cấu hình hệ thống."],
+        ["UC-15", "Quản lý đặt chỗ (Reserve)", "Sinh viên", "Đặt chỗ trước (hàng đợi) khi sách hết bản in, hủy lượt đặt chỗ."],
+        ["UC-16", "Xem lịch phòng học", "Public, Sinh viên", "Xem thông tin chi tiết phòng, lịch trống theo từng khung giờ."],
+        ["UC-17", "Đặt phòng học cá nhân", "Sinh viên", "Đăng ký phòng nhóm, hủy lịch hẹn, check-out phòng sớm."],
+        ["UC-18", "Xử lý yêu cầu đặt phòng", "Thủ thư", "Duyệt hoặc từ chối lịch đặt phòng của sinh viên."],
+        ["UC-19", "Check-in phòng học", "Thủ thư", "Xác nhận sinh viên nhận phòng bằng cách nhập mã 6 ký tự hoặc quét QR."],
+        ["UC-20", "Xem công nợ tiền phạt", "Sinh viên", "Kiểm tra chi tiết các khoản phạt quá hạn, làm mất hoặc hỏng sách."],
+        ["UC-21", "Thanh toán phạt trực tuyến", "Sinh viên", "Thanh toán qua cổng VNPay (IPN tự động) hoặc quét QR MoMo."],
+        ["UC-22", "Thu phạt tại quầy", "Thủ thư", "Ghi nhận thanh toán tiền mặt trực tiếp từ sinh viên tại quầy."],
+        ["UC-23", "Quản lý nghiệp vụ tiền phạt", "Thủ thư, Admin", "Xem toàn bộ công nợ, tạo phạt thủ công. (Admin: Waive fine - miễn giảm phạt)."],
+        ["UC-24", "Tương tác với Trợ lý AI", "Sinh viên, Thủ thư", "Chat với Gemini AI nhận gợi ý sách cá nhân hóa hoặc hỗ trợ thông tin."],
+        ["UC-25", "Xử lý sách bằng AI", "Thủ thư, Admin", "Tự động tạo tóm tắt nội dung sách và gắn thẻ phân loại (tags) qua AI."],
+        ["UC-26", "Xem & Xuất báo cáo", "Admin", "Xem dashboard trực quan, xuất dữ liệu thống kê ra file CSV."],
+        ["UC-27", "Quản lý người dùng", "Admin, Thủ thư", "CRUD & Import CSV sinh viên (Thủ thư), CRUD thủ thư (Admin)."],
+        ["UC-28", "Quản lý kho sách", "Thủ thư", "CRUD sách, import CSV sách, quản lý file tài nguyên số đính kèm."],
+        ["UC-29", "Quản lý danh mục phòng học", "Thủ thư", "Thêm, sửa, cấu hình trạng thái hoạt động của các phòng học."],
+        ["UC-30", "Cấu hình tham số hệ thống", "Admin", "Điều chỉnh thời hạn mượn, mức phạt ngày, số sách tối đa được mượn."],
+        ["UC-31", "Tra cứu Audit Logs", "Admin", "Xem nhật ký lịch sử thay đổi dữ liệu của toàn bộ nhân viên hệ thống."],
     ], [760, 2300, 1900, 4400], font_size=7.8)
     heading(doc, "2.5. Yêu cầu phi chức năng", 2)
     add_table(doc, ["Tiêu chí", "Yêu cầu"], [
@@ -529,18 +548,18 @@ def build_doc():
         ["Catalog/Digital", "GET /books, /books/autocomplete, /digital-documents, /books/{id}/reviews", "Public hoặc signed URL"],
         ["Student Borrowing", "POST /requests, GET /requests/me, DELETE /requests/{id}/cancel", "auth:sanctum + role:student"],
         ["Favorites/Reviews/Progress", "GET/POST /favorites, POST /books/{id}/reviews, PUT /reading-progress/{book}", "Student"],
-        ["Fines/Payments", "GET /fines/me, POST /fines/{id}/momo/pay, /vnpay/pay, confirm-transfer", "Student; IPN public"],
+        ["Fines/Payments", "GET /fines/me, POST /fines/{id}/momo/pay, /vnpay/pay", "Student; IPN public"],
         ["Room Booking", "GET /rooms, POST /room-bookings, admin room-bookings actions", "Public listing; student/admin protected"],
-        ["Staff Operations", "members, books, requests, admin/fines, momo-pending", "role:admin,librarian + permission middleware"],
+        ["Staff Operations", "members, books, requests, admin/fines", "role:admin,librarian + permission middleware"],
         ["Admin-only", "librarians, library-settings, reports, audit-logs, waive fines", "permission-based admin capability"],
         ["AI/OpenAPI/Health", "POST /ai/chat, GET /ai/recommendations, /openapi.json, /docs, /health", "AI protected; docs/health public"],
     ], [1900, 5160, 2300], font_size=7.6)
     heading(doc, "3.6. Thiết kế các workflow nghiệp vụ chính", 2)
     add_table(doc, ["Workflow", "Luồng chính", "Điểm kiểm soát"], [
         ["Mượn sách", "Student gửi yêu cầu -> pending; staff approve -> approved; QR pickup -> borrowed; return -> returned.", "Giới hạn active loans, tồn kho, duplicate active request, unpaid fine block."],
-        ["Reservation queue", "Nếu sách hết, student vào hàng đợi; khi sách trả, hệ thống chuyển người đầu queue thành request/hold phù hợp.", "lockForUpdate, position shift, notification."],
+        ["Reservation queue", "Nếu sách hết, sinh viên vào hàng đợi; khi sách trả, hệ thống tự chuyển cho người tiếp theo.", "lockForUpdate, position shift, notification."],
         ["Fine accrual", "Command/service tính số ngày quá hạn theo fine_per_day, grace_period_days và max_fine_per_loan.", "Fine không vượt cap; paid/waived không tính lại."],
-        ["MoMo/VNPay", "Student tạo payment -> nhận QR/redirect mock -> IPN/simulate/confirm transfer -> staff approve nếu cần.", "Gateway response JSON, status pending/completed/failed, audit trail."],
+        ["MoMo/VNPay", "Student tạo payment -> nhận QR/redirect mock -> IPN/simulate tự động cập nhật.", "Gateway response JSON, status pending/completed/failed, audit trail."],
         ["Room booking", "Student chọn phòng/giờ/số người -> conflict policy -> pending/approved -> check-in -> completed/check-out.", "Max hours, max bookings/day, advance days, group size, check-in window."],
         ["AI metadata", "Staff nhấn generate hoặc tạo sách -> dispatch job -> Gemini sinh summary/tag -> lưu vào books.", "Fallback khi thiếu API key; queue ai-metadata."],
     ], [1800, 4660, 2900], font_size=7.6)
@@ -563,7 +582,7 @@ def build_doc():
     add_table(doc, ["Nhóm giao diện", "Màn hình tiêu biểu", "Chức năng nổi bật"], [
         ["Public/Auth", "Landing, Login, VerifyOtp, ForgotPassword, OAuthCallback", "Đăng nhập/đăng ký, OTP, OAuth, điều hướng theo role."],
         ["Student", "Home, Catalog, Digital, MyBooks, Requests, Favorites, Fines, RoomBooking, Settings", "Tra cứu, mượn, đọc tài liệu số, tiến trình đọc, thanh toán phạt, đặt phòng, quản lý phiên."],
-        ["Admin/Librarian", "Dashboard, Inventory, Requests, Members, Fines, MomoApprovals, RoomBookings, Settings, Reports, AuditLogs, Librarians", "Vận hành thư viện, phê duyệt, báo cáo, cấu hình, nhân sự và audit."],
+        ["Admin/Librarian", "Dashboard, Inventory, Requests, Members, Fines, RoomBookings, Settings, Reports, AuditLogs, Librarians", "Vận hành thư viện, phê duyệt, báo cáo, cấu hình, nhân sự và audit."],
         ["Shared Components", "Header, Sidebar, AiChatbot, NotificationDropdown, ReadingRoom, Pagination, ErrorBoundary", "Trải nghiệm thống nhất, AI nổi, thông báo, xử lý lỗi và skeleton/empty states."],
         ["API Modules", "src/api/*.ts", "Tách theo domain: auth, books, borrow, fines, roomBooking, report, ai, audit."],
     ], [1800, 3300, 4260], font_size=7.6)
@@ -620,7 +639,7 @@ def build_doc():
         ["DatabaseIntegrityTest", "Trigger tồn kho và ràng buộc khóa ngoại."],
         ["DigitalDocumentAccessTest", "Signed URL, filter tài liệu số, upload file hợp lệ/không hợp lệ."],
         ["BookReservationTest", "Đặt chỗ khi hết sách, position queue, hủy queue, return kích hoạt người kế tiếp."],
-        ["FinePaymentWorkflowTest", "Fine schema, accrual, summary, cash payment, waive, unpaid fine block, MoMo transfer."],
+        ["FinePaymentWorkflowTest", "Fine schema, accrual, summary, cash payment, waive, unpaid fine block."],
         ["LibraryUpgradePhase2/3", "Audit logs, overdue warnings, AI metadata, reading progress, health endpoint, OpenAPI docs, queue tables."],
         ["AiFeatureTest, BookReviewTest, FavoriteBooksTest, LocalizationTest", "AI fallback, review rules, favorites, Accept-Language."],
     ], [2600, 6760], font_size=7.6)
@@ -653,7 +672,7 @@ def build_doc():
     doc.add_page_break()
     heading(doc, "CHƯƠNG 6: KẾT LUẬN VÀ HƯỚNG PHÁT TRIỂN", 1)
     heading(doc, "6.1. Kết quả đạt được", 2)
-    para(doc, "Book Loan Midterm đã phát triển vượt phạm vi hệ thống quản lý thư viện cơ bản ban đầu. Hệ thống hiện có kiến trúc full-stack rõ ràng, xác thực token, RBAC chi tiết, quản trị kho sách, workflow mượn-trả nhiều trạng thái, hàng đợi đặt chỗ, tài liệu số, đọc và lưu tiến trình, quản lý phạt/thanh toán, phòng tự học, thông báo, audit logs, báo cáo phân tích, tích hợp Gemini AI và môi trường Docker.")
+    para(doc, "Library Management System đã phát triển vượt phạm vi hệ thống quản lý thư viện cơ bản ban đầu. Hệ thống hiện có kiến trúc full-stack rõ ràng, xác thực token, RBAC chi tiết, quản trị kho sách, workflow mượn-trả nhiều trạng thái, hàng đợi đặt chỗ, tài liệu số, đọc và lưu tiến trình, quản lý phạt/thanh toán, phòng tự học, thông báo, audit logs, báo cáo phân tích, tích hợp Gemini AI và môi trường Docker.")
     bullets(doc, [
         "Sinh viên có thể tự phục vụ nhiều nhu cầu: tìm sách, mượn/đặt chỗ, đọc tài liệu số, thanh toán phạt, đặt phòng và nhận đề xuất.",
         "Thủ thư có công cụ vận hành đầy đủ: duyệt yêu cầu, quét QR nhận sách, xử lý trả/gia hạn, import dữ liệu, đối soát phạt và quản lý phòng.",
@@ -680,8 +699,8 @@ def build_doc():
 
     heading(doc, "TÀI LIỆU THAM KHẢO", 1)
     numbers(doc, [
-        "Mã nguồn dự án Book Loan Midterm, thư mục BE/ và FE/book_loan/, cập nhật ngày 24/05/2026.",
-        "README.md và PROJECT_DOCUMENTATION.md của dự án Book Loan Midterm.",
+        "Mã nguồn dự án Library Management System, thư mục BE/ và FE/book_loan/, cập nhật ngày 24/05/2026.",
+        "README.md và PROJECT_DOCUMENTATION.md của dự án Library Management System.",
         "Laravel Documentation: https://laravel.com/docs",
         "Laravel Sanctum Documentation: https://laravel.com/docs/sanctum",
         "React Documentation: https://react.dev",
@@ -706,7 +725,7 @@ def build_doc():
 
     doc.core_properties.title = "Báo cáo cập nhật Hệ thống Quản lý Thư viện Số HCMUE"
     doc.core_properties.author = "TTVP Group"
-    doc.core_properties.subject = "Book Loan Midterm - Laravel React Digital Library"
+    doc.core_properties.subject = "Library Management System - Laravel React Digital Library"
     doc.save(str(OUT))
     print(OUT)
 

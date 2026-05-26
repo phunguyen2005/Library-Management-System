@@ -2,7 +2,7 @@
 
 > **Author**: Senior Product Owner & Fullstack Architect  
 > **Date**: 2026-05-23  
-> **Project**: Book Loan Midterm — TTVP Group
+> **Project**: Library Management System — TTVP Group
 > **Trạng thái hiện tại**: 🎉 **100% ĐÃ HOÀN THÀNH & TÍCH HỢP TẤT CẢ CÁC GIAI ĐOẠN**
 
 ---

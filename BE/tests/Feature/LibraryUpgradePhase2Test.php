@@ -47,7 +47,7 @@ class LibraryUpgradePhase2Test extends TestCase
 
     public function test_overdue_return_calculates_fine_correctly(): void
     {
-        Carbon::setTestNow(Carbon::parse('2026-05-23 12:00:00', 'Asia/Ho_Chi_Minh'));
+        Carbon::setTestNow(Carbon::parse('2026-05-23 12:00:00'));
 
         $librarian = Librarian::query()->firstOrFail();
         $token = $librarian->createToken('admin-token', ['role:admin']);

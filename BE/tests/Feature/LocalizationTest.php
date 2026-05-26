@@ -108,7 +108,7 @@ class LocalizationTest extends TestCase
                 'librarian_id' => null,
                 'status' => 'borrowed',
                 'borrow_date' => '2026-04-07',
-                'due_date' => '2026-04-21',
+                'due_date' => '2036-04-21',
                 'return_date' => null,
             ],
             [
@@ -117,7 +117,7 @@ class LocalizationTest extends TestCase
                 'librarian_id' => null,
                 'status' => 'borrowed',
                 'borrow_date' => '2026-04-07',
-                'due_date' => '2026-04-21',
+                'due_date' => '2036-04-21',
                 'return_date' => null,
             ],
         ]);

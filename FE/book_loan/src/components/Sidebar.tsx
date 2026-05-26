@@ -14,6 +14,7 @@ const navItems = [
   { path: '/room-booking', icon: 'meeting_room', labelKey: 'nav.roomBooking' },
   { path: '/history', icon: 'history', labelKey: 'nav.history' },
   { path: '/fines', icon: 'payments', labelKey: 'nav.fines' },
+  { path: '/gamify', icon: 'emoji_events', labelKey: 'nav.gamify' },
 ];
 
 interface SidebarProps {

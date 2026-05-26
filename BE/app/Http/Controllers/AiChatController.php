@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\Book;
 use App\Models\Borrowing;
 use App\Models\Reservation;
+use App\Models\Fine;
+use App\Models\RoomBooking;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -52,6 +54,9 @@ class AiChatController extends Controller
                 // Map history items into Gemini API roles
                 $contents = [];
                 foreach ($history as $chatItem) {
+                    if (empty($chatItem['text']) || trim($chatItem['text']) === '') {
+                        continue;
+                    }
                     $role = ($chatItem['sender'] === 'user') ? 'user' : 'model';
                     $contents[] = [
                         'role' => $role,
@@ -65,7 +70,8 @@ class AiChatController extends Controller
                     'parts' => [['text' => $message]]
                 ];
 
-                $response = Http::post("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={$apiKey}", [
+                $model = env('GEMINI_MODEL', 'gemini-2.5-flash');
+                $response = Http::post("https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}", [
                     'systemInstruction' => [
                         'parts' => [['text' => $systemPrompt]]
                     ],
@@ -94,7 +100,7 @@ class AiChatController extends Controller
         $normalizedMsg = mb_strtolower($message, 'UTF-8');
         
         // Welcome flow
-        if (Str::contains($normalizedMsg, ['chào', 'hello', 'hi', 'bắt đầu'])) {
+        if ($this->isGreetingMessage($normalizedMsg)) {
             return response()->json([
                 'response' => "Xin chào bạn! Tôi là **Thủ thư AI** của Thư viện HCMUE. 📚\n\nTôi có thể giúp bạn:\n"
                     . "* 🔍 Tìm kiếm sách theo từ khóa hoặc thể loại.\n"
@@ -220,7 +226,8 @@ class AiChatController extends Controller
                     . "  }\n"
                     . "]";
 
-                $response = Http::post("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={$apiKey}", [
+                $model = env('GEMINI_MODEL', 'gemini-2.5-flash');
+                $response = Http::post("https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}", [
                     'contents' => [
                         ['role' => 'user', 'parts' => [['text' => $prompt]]]
                     ],
@@ -306,5 +313,362 @@ class AiChatController extends Controller
         }
 
         return response()->json($results);
+    }
+
+    public function chatStream(Request $request)
+    {
+        $request->validate([
+            'message' => 'required|string',
+            'history' => 'nullable|array',
+        ]);
+
+        $message = $request->input('message');
+        $history = $request->input('history', []);
+        $apiKey = $this->getApiKey();
+        $member = $request->user();
+
+        // Load entire book catalog as context
+        $books = Book::all(['book_id', 'title', 'author', 'genre', 'is_available', 'available_quantity', 'location']);
+        $catalogText = $books->map(fn($b) => "- [ID: {$b->book_id}] \"{$b->title}\" của tác giả {$b->author} (Thể loại: {$b->genre}, Kệ: {$b->location}, " . ($b->is_available ? "Còn sách" : "Hết sách") . ")")->join("\n");
+
+        $systemPrompt = "Bạn là thủ thư AI thông thái và thân thiện của Thư viện trường Đại học Sư phạm TP.HCM (HCMUE).\n"
+            . "Nhiệm vụ của bạn là tư vấn, tìm kiếm sách, giải đáp các thắc mắc của sinh viên đang đăng nhập và hướng dẫn quy trình một cách lịch sự, chuyên nghiệp bằng tiếng Việt.\n\n"
+            . "Đây là danh mục sách hiện có trong hệ thống thư viện:\n"
+            . $catalogText . "\n\n"
+            . "HƯỚNG DẪN TRẢ LỜI:\n"
+            . "1. Trả lời câu hỏi ngắn gọn, rõ ràng, sử dụng định dạng Markdown (in đậm, danh sách gạch đầu dòng).\n"
+            . "2. Hãy luôn nhiệt tình tìm kiếm và gợi ý các cuốn sách phù hợp từ danh mục trên khi người dùng hỏi về bất kỳ chủ đề gì liên quan.\n"
+            . "3. QUAN TRỌNG: Khi gợi ý sách, bạn PHẢI viết kèm mã ID sách chính xác dưới dạng '[ID: X]' (ví dụ: 'Tôi gợi ý cuốn Clean Code [ID: 5]...'). Giao diện người dùng sẽ dùng mã này để tạo liên kết cho phép click xem trực tiếp. Đừng quên định dạng [ID: X] này!\n"
+            . "4. Nếu người dùng hỏi về quy trình mượn sách, hãy giải thích: Sinh viên gửi yêu cầu trực tuyến trên web -> Thủ thư duyệt -> Sinh viên nhận mã QR trên mail/in-app -> Sinh viên đến thư viện đưa thủ thư quét QR để nhận sách. Thời hạn nhận sách là 24 giờ.\n"
+            . "5. Nếu sách họ muốn mượn đã hết (available_quantity = 0), hãy nhắc họ có thể click vào chi tiết sách để sử dụng tính năng 'Đặt chỗ trước' (Reservation Queue) để xếp hàng chờ tự động.\n"
+            . "6. Bạn được cung cấp các công cụ (Tools) để xem sách đang mượn (getMyBorrowings), xem tiền phạt (getMyFines), và xem lịch đặt phòng tự học (getMyRoomBookings) của sinh viên này. Hãy gọi công cụ khi họ hỏi về thông tin cá nhân của họ.";
+
+        // Declare tools schema for Gemini
+        $tools = [
+            [
+                'functionDeclarations' => [
+                    [
+                        'name' => 'getMyBorrowings',
+                        'description' => 'Lấy danh sách các cuốn sách đang mượn hoặc lịch sử mượn sách của sinh viên hiện tại.',
+                        'parameters' => [
+                            'type' => 'OBJECT',
+                            'properties' => (object)[]
+                        ]
+                    ],
+                    [
+                        'name' => 'getMyFines',
+                        'description' => 'Lấy danh sách tất cả các khoản tiền phạt (chưa thanh toán hoặc đã thanh toán) của sinh viên hiện tại.',
+                        'parameters' => [
+                            'type' => 'OBJECT',
+                            'properties' => (object)[]
+                        ]
+                    ],
+                    [
+                        'name' => 'getMyRoomBookings',
+                        'description' => 'Lấy danh sách các phòng tự học được đặt (room bookings) của sinh viên hiện tại.',
+                        'parameters' => [
+                            'type' => 'OBJECT',
+                            'properties' => (object)[]
+                        ]
+                    ]
+                ]
+            ]
+        ];
+
+        if ($apiKey) {
+            try {
+                // Map history items into Gemini API roles
+                $contents = [];
+                foreach ($history as $chatItem) {
+                    if (empty($chatItem['text']) || trim($chatItem['text']) === '') {
+                        continue;
+                    }
+                    $role = ($chatItem['sender'] === 'user' || $chatItem['sender'] === 'model') ? $chatItem['sender'] : 'model';
+                    // Normalize user/model role name
+                    if ($role === 'ai') {
+                        $role = 'model';
+                    }
+                    $contents[] = [
+                        'role' => $role,
+                        'parts' => [['text' => $chatItem['text']]]
+                    ];
+                }
+
+                // Add current message
+                $contents[] = [
+                    'role' => 'user',
+                    'parts' => [['text' => $message]]
+                ];
+
+                // Check if user is asking about personal details that require tools
+                $normalizedMsg = mb_strtolower($message, 'UTF-8');
+                $needsTools = Str::contains($normalizedMsg, [
+                    'của tôi', 'cá nhân', 'tôi mượn', 'đang mượn', 'lịch sử mượn',
+                    'tiền phạt', 'phạt', 'đóng phạt', 'nợ phạt',
+                    'đặt phòng', 'phòng tự học', 'phòng nhóm', 'lịch đặt phòng', 'phòng của tôi'
+                ]);
+
+                if ($needsTools) {
+                    // Recursively resolve any function calls from Gemini
+                    $resolvedContents = $this->resolveFunctionCalls($contents, $apiKey, $systemPrompt, $tools, $member);
+
+                    if (isset($resolvedContents['error'])) {
+                        Log::error('Function calling resolution failed: ' . $resolvedContents['error']);
+                        // Fall back to direct stream generation without function calling
+                        $resolvedContents = $contents;
+                    }
+                } else {
+                    $resolvedContents = $contents;
+                }
+
+                // Now stream the final response using streamGenerateContent
+                return response()->stream(function () use ($apiKey, $resolvedContents, $systemPrompt) {
+                    $postData = [
+                        'systemInstruction' => [
+                            'parts' => [['text' => $systemPrompt]]
+                        ],
+                        'contents' => $resolvedContents,
+                        'generationConfig' => [
+                            'temperature' => 0.5,
+                            'maxOutputTokens' => 1000,
+                        ]
+                    ];
+
+                    $ch = curl_init();
+                    $model = env('GEMINI_MODEL', 'gemini-2.5-flash');
+                    curl_setopt($ch, CURLOPT_URL, "https://generativelanguage.googleapis.com/v1beta/models/{$model}:streamGenerateContent?alt=sse&key={$apiKey}");
+                    curl_setopt($ch, CURLOPT_RETURNTRANSFER, false);
+                    curl_setopt($ch, CURLOPT_POST, true);
+                    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($postData));
+                    curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+                    
+                    // Buffer function to echo chunks immediately to client
+                    curl_setopt($ch, CURLOPT_WRITEFUNCTION, function ($ch, $data) {
+                        echo $data;
+                        if (ob_get_level() > 0) {
+                            ob_flush();
+                        }
+                        flush();
+                        return strlen($data);
+                    });
+
+                    curl_exec($ch);
+                    curl_close($ch);
+                }, 200, [
+                    'Content-Type' => 'text/event-stream',
+                    'Cache-Control' => 'no-cache',
+                    'Connection' => 'keep-alive',
+                    'X-Accel-Buffering' => 'no',
+                ]);
+
+            } catch (\Exception $e) {
+                Log::error('Gemini Stream Exception: ' . $e->getMessage());
+            }
+        }
+
+        // --- FALLBACK OFFLINE STREAMING SEARCH ENGINE ---
+        // Simulates word-by-word streaming of fallback answers
+        return response()->stream(function () use ($message) {
+            $normalizedMsg = mb_strtolower($message, 'UTF-8');
+            $responseText = "";
+
+            if ($this->isGreetingMessage($normalizedMsg)) {
+                $responseText = "Xin chào bạn! Tôi là **Thủ thư AI** của Thư viện HCMUE. 📚\n\nTôi có thể giúp bạn:\n"
+                    . "* 🔍 Tìm kiếm sách theo từ khóa hoặc thể loại.\n"
+                    . "* 💡 Gợi ý sách hay phù hợp với ngành học.\n"
+                    . "* 📋 Giải đáp thắc mắc về quy trình mượn trả và đặt chỗ sách vật lý.\n\nBạn muốn tìm tài liệu về chủ đề gì hôm nay?";
+            } elseif (Str::contains($normalizedMsg, ['quy trình', 'mượn sách', 'nhận sách', 'quét', 'qr', 'hướng dẫn mượn'])) {
+                $responseText = "### Quy trình mượn sách tại thư viện:\n\n"
+                    . "1. **Yêu cầu trực tuyến**: Bạn truy cập trang **Danh mục**, chọn cuốn sách muốn mượn và click **Mượn ngay**.\n"
+                    . "2. **Thủ thư phê duyệt**: Yêu cầu sẽ gửi đến hệ thống quản lý. Khi được duyệt, bạn sẽ nhận được thông báo in-app và email kèm mã QR.\n"
+                    . "3. **Nhận sách**: Bạn đến thư viện, trình mã QR của phiếu mượn (trong mục *Yêu cầu của tôi* hoặc email) cho thủ thư quét để nhận sách trực tiếp. Bạn có **24 giờ** để đến nhận sách kể từ khi được duyệt.";
+            } elseif (Str::contains($normalizedMsg, ['đặt chỗ', 'hết sách', 'chờ', 'hàng đợi', 'reservation'])) {
+                $responseText = "### Tính năng Đặt chỗ trước (Reservation Queue):\n\n"
+                    . "Khi một cuốn sách bạn thích đã **hết bản sẵn có** (số lượng khả dụng bằng 0):\n"
+                    . "1. Hãy click vào chi tiết cuốn sách đó trên trang **Danh mục**.\n"
+                    . "2. Bạn sẽ thấy nút **\"Đặt chỗ trước\"** kèm theo vị trí của bạn trong hàng đợi hiện tại.\n"
+                    . "3. Click đặt chỗ, bạn sẽ được xếp vào hàng đợi chờ tự động.\n"
+                    . "4. Khi người mượn trước trả sách, hệ thống sẽ tự động duyệt phiếu mượn cho bạn (người xếp thứ nhất) và gửi thông báo. Bạn có 24h để qua nhận sách!";
+            } else {
+                // Check database keywords
+                $matchedBooks = Book::query()->where('is_digital', false)
+                    ->where(function ($q) use ($normalizedMsg) {
+                        $q->where('title', 'like', "%{$normalizedMsg}%")
+                          ->orWhere('genre', 'like', "%{$normalizedMsg}%")
+                          ->orWhere('author', 'like', "%{$normalizedMsg}%");
+                    })->limit(3)->get();
+
+                if ($matchedBooks->isNotEmpty()) {
+                    $bookLines = $matchedBooks->map(function ($b) {
+                        $statusStr = $b->available_quantity > 0 ? "Còn sách (Kệ: {$b->location})" : "Đã hết (có thể Đặt chỗ)";
+                        return "* **{$b->title}** - Tác giả: *{$b->author}* [ID: {$b->book_id}] ({$statusStr})";
+                    })->join("\n");
+
+                    $responseText = "[Trợ lý ngoại tuyến] Tôi đã tìm thấy một số cuốn sách phù hợp liên quan đến từ khóa bạn vừa tìm kiếm:\n\n"
+                        . $bookLines . "\n\n"
+                        . "Bạn có thể gõ mã sách hoặc click vào cuốn sách trên màn hình Danh mục để xem chi tiết và đăng ký mượn ngay nhé! Nếu bạn cần hướng dẫn gì thêm, hãy cứ tự nhiên hỏi tôi.";
+                } else {
+                    $responseText = "[Trợ lý ngoại tuyến] Cảm ơn bạn đã trò chuyện! Thư viện HCMUE có rất nhiều tài liệu phong phú thuộc nhiều ngành học.\n\n"
+                        . "Bạn có thể thử tìm kiếm với các từ khóa cụ thể như: *\"Lập trình\"*, *\"Cơ sở dữ liệu\"*, *\"Giáo trình\"*... hoặc hỏi tôi về *\"Quy trình mượn sách\"* và *\"Cách đặt chỗ\"*.\n\nTôi luôn sẵn sàng hỗ trợ!";
+                }
+            }
+
+            // Stream response text chunk by chunk to simulate streaming
+            $chunks = mb_str_split($responseText, 12, 'UTF-8');
+            foreach ($chunks as $chunk) {
+                $payload = [
+                    'candidates' => [
+                        [
+                            'content' => [
+                                'parts' => [
+                                    ['text' => $chunk]
+                                ]
+                            ]
+                        ]
+                    ]
+                ];
+                echo "data: " . json_encode($payload) . "\n\n";
+                if (ob_get_level() > 0) {
+                    ob_flush();
+                }
+                flush();
+                usleep(40000); // 40ms pause
+            }
+            echo "data: [DONE]\n\n";
+        }, 200, [
+            'Content-Type' => 'text/event-stream',
+            'Cache-Control' => 'no-cache',
+            'Connection' => 'keep-alive',
+            'X-Accel-Buffering' => 'no',
+        ]);
+    }
+
+    private function resolveFunctionCalls($contents, $apiKey, $systemPrompt, $tools, $member)
+    {
+        // Limit recursive function calling to 5 iterations
+        for ($i = 0; $i < 5; $i++) {
+            $model = env('GEMINI_MODEL', 'gemini-2.5-flash');
+            $response = Http::post("https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}", [
+                'systemInstruction' => [
+                    'parts' => [['text' => $systemPrompt]]
+                ],
+                'contents' => $contents,
+                'tools' => $tools,
+                'generationConfig' => [
+                    'temperature' => 0.5,
+                ]
+            ]);
+
+            if (!$response->successful()) {
+                return ['error' => 'API call failed: ' . $response->body()];
+            }
+
+            $candidate = $response->json('candidates.0');
+            $parts = $candidate['content']['parts'] ?? [];
+
+            $hasFunctionCall = false;
+            $functionCalls = [];
+            foreach ($parts as $part) {
+                if (isset($part['functionCall'])) {
+                    $hasFunctionCall = true;
+                    $functionCalls[] = $part['functionCall'];
+                }
+            }
+
+            if (!$hasFunctionCall) {
+                // If there's no function call requested, we are done!
+                return $contents;
+            }
+
+            // Append model's request to contents
+            $contents[] = $candidate['content'];
+
+            // Execute function calls
+            $toolParts = [];
+            foreach ($functionCalls as $call) {
+                $name = $call['name'];
+                $args = $call['args'] ?? [];
+                
+                $result = $this->executeFunction($name, $args, $member);
+
+                $toolParts[] = [
+                    'functionResponse' => [
+                        'name' => $name,
+                        'response' => [
+                            'output' => $result
+                        ]
+                    ]
+                ];
+            }
+
+            // Append tool responses
+            $contents[] = [
+                'role' => 'tool',
+                'parts' => $toolParts
+            ];
+        }
+
+        return ['error' => 'Exceeded maximum recursive tool calls'];
+    }
+
+    private function isGreetingMessage(string $normalizedMsg): bool
+    {
+        return preg_match('/(?:^|[^\p{L}])(?:chào|hello|hi|bắt đầu)(?:$|[^\p{L}])/u', $normalizedMsg) === 1;
+    }
+
+    private function executeFunction($name, $args, $member)
+    {
+        try {
+            if ($name === 'getMyBorrowings') {
+                $borrowings = Borrowing::where('member_id', $member->member_id)
+                    ->with('book')
+                    ->orderBy('created_at', 'desc')
+                    ->limit(5)
+                    ->get();
+
+                return $borrowings->map(fn($b) => [
+                    'book_title' => $b->book?->title ?? 'Sách đã xóa',
+                    'book_id' => $b->book_id,
+                    'status' => $b->status,
+                    'due_date' => $b->due_date ? $b->due_date->toDateString() : null,
+                    'fine_amount' => $b->fine?->amount ?? 0
+                ])->toArray();
+            }
+
+            if ($name === 'getMyFines') {
+                $fines = Fine::where('member_id', $member->member_id)
+                    ->orderBy('created_at', 'desc')
+                    ->get();
+
+                return $fines->map(fn($f) => [
+                    'fine_id' => $f->fine_id,
+                    'amount' => $f->amount,
+                    'reason' => $f->reason,
+                    'status' => $f->status, // paid, unpaid
+                    'created_at' => $f->created_at ? $f->created_at->toDateString() : null
+                ])->toArray();
+            }
+
+            if ($name === 'getMyRoomBookings') {
+                $bookings = RoomBooking::where('member_id', $member->member_id)
+                    ->with('room')
+                    ->orderBy('booking_date', 'desc')
+                    ->limit(5)
+                    ->get();
+
+                return $bookings->map(fn($b) => [
+                    'room_name' => $b->room?->name ?? 'Phòng đã xóa',
+                    'booking_date' => $b->booking_date ? $b->booking_date->toDateString() : null,
+                    'start_time' => $b->start_time,
+                    'end_time' => $b->end_time,
+                    'status' => $b->status
+                ])->toArray();
+            }
+        } catch (\Exception $e) {
+            Log::error("Error executing function $name: " . $e->getMessage());
+            return ['error' => 'Không thể thực thi hàm: ' . $e->getMessage()];
+        }
+
+        return ['error' => 'Hàm không hợp lệ hoặc chưa định nghĩa'];
     }
 }

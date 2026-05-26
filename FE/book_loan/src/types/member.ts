@@ -4,6 +4,10 @@ export interface MemberApiRecord {
   email?: string | null;
   phone_number?: string | null;
   join_date?: string | null;
+  xp?: number;
+  points?: number;
+  level?: number;
+  badges_count?: number;
 }
 
 export interface MemberListItem {
@@ -16,6 +20,10 @@ export interface MemberListItem {
   joinDate: string;
   status: string;
   statusColor: string;
+  xp: number;
+  points: number;
+  level: number;
+  badgesCount: number;
 }
 
 export type MemberPayload = {

@@ -14,14 +14,27 @@ class UpdateProfileRequest extends FormRequest
 
     public function rules(): array
     {
-        return [
+        $rules = [
             'name' => ['required', 'string', 'max:255'],
             'phone_number' => ['nullable', 'string', 'max:15'],
-            'current_password' => ['required_with:password', 'nullable', 'string'],
             'password' => ['nullable', 'confirmed', Password::min(8)->letters()->numbers()],
+            'otp' => ['nullable', 'string', 'size:6'],
             'notify_due_soon' => ['sometimes', 'boolean'],
             'notify_new_books' => ['sometimes', 'boolean'],
+            'notify_borrow_status' => ['sometimes', 'boolean'],
+            'notify_room_status' => ['sometimes', 'boolean'],
+            'notify_room_reminder' => ['sometimes', 'boolean'],
+            'notify_fine_status' => ['sometimes', 'boolean'],
+            'notify_reservation' => ['sometimes', 'boolean'],
         ];
+
+        if ($this->filled('password') && !$this->filled('otp')) {
+            $rules['current_password'] = ['required', 'string'];
+        } else {
+            $rules['current_password'] = ['nullable', 'string'];
+        }
+
+        return $rules;
     }
 
     public function messages(): array

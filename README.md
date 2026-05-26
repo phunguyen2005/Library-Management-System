@@ -419,9 +419,6 @@ Here are the main endpoints defined in `BE/routes/api.php`, grouped by scope and
     *   `GET /api/admin/fines` - Manage all system-wide fines.
     *   `GET /api/admin/fines/statistics` - Retrieve global financial analysis.
     *   `POST /api/fines/{fineId}/pay` - Manually settle a fine (cash payment).
-    *   `GET /api/admin/momo-pending` - View pending bank transfer slips.
-    *   `POST /api/admin/momo-payments/{paymentId}/approve` - Settle a bank transfer fine.
-    *   `POST /api/admin/momo-payments/{paymentId}/reject` - Decline a bank transfer fine submission.
 *   **Study Spaces Control (Permission: `manage_rooms`)**:
     *   `GET /api/admin/room-bookings` - Manage global room reservations.
     *   `GET /api/admin/room-bookings/statistics` - View room utilization charts.

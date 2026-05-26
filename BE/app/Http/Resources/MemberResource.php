@@ -15,6 +15,10 @@ class MemberResource extends JsonResource
             'email' => $this->email,
             'phone_number' => $this->phone_number,
             'join_date' => $this->join_date?->toDateString(),
+            'xp' => $this->xp ?? 0,
+            'points' => $this->points ?? 0,
+            'level' => $this->level ?? 1,
+            'badges_count' => $this->badges_count ?? $this->badges()->count(),
         ];
     }
 }

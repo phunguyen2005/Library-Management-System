@@ -1,4 +1,7 @@
 import React, { useMemo, useState } from 'react';
+import { SHELF_LABELS } from '../lib/bookClassification';
+
+export { SHELF_LABELS };
 
 interface LibraryMapModalProps {
   isOpen: boolean;
@@ -118,51 +121,8 @@ const ZONES: Record<string, MapZoneInfo> = {
     name: 'Khu Kệ Sách',
     description: 'Khu vực lưu trữ các kệ sách vật lý chính của thư viện phân theo phân mục.',
     icon: 'shelves',
-    details: 'Phân loại từ A1 đến E2 theo chuẩn phân loại thập phân Dewey. Sách khoa học tự nhiên ở dãy A, kinh tế - lịch sử ở dãy B, kỹ thuật ở dãy C, văn học xã hội ở dãy D và sách tham khảo ở dãy E.',
+    details: 'Phân loại từ A đến J theo sơ đồ thư viện: khoa học tự nhiên ở dãy A, kinh tế - lịch sử ở dãy B, công nghệ - kỹ thuật ở dãy C, văn học - xã hội ở dãy D, tham khảo ở dãy E và các nhóm chuyên đề bổ sung ở tầng 2.',
   },
-};
-
-export const SHELF_LABELS: Record<string, string> = {
-  A1: 'KHTN (Khoa học Tự nhiên)',
-  A2: 'KHTN (Khoa học Tự nhiên)',
-  A3: 'KHTN (Khoa học Tự nhiên)',
-  A4: 'KHTN (Khoa học Tự nhiên)',
-  B1: 'KT-LS (Kinh tế - Lịch sử)',
-  B2: 'KT-LS (Kinh tế - Lịch sử)',
-  B3: 'KT-LS (Kinh tế - Lịch sử)',
-  B4: 'KT-LS (Kinh tế - Lịch sử)',
-  B5: 'KT-LS (Kinh tế - Lịch sử)',
-  B6: 'KT-LS (Kinh tế - Lịch sử)',
-  B7: 'KT-LS (Kinh tế - Lịch sử)',
-  B8: 'KT-LS (Kinh tế - Lịch sử)',
-  C1: 'CN-KT (Công nghệ - Kỹ thuật)',
-  C2: 'CN-KT (Công nghệ - Kỹ thuật)',
-  C3: 'CN-KT (Công nghệ - Kỹ thuật)',
-  D1: 'VH-XH (Văn học - Xã hội)',
-  D2: 'VH-XH (Văn học - Xã hội)',
-  D3: 'VH-XH (Văn học - Xã hội)',
-  D4: 'VH-XH (Văn học - Xã hội)',
-  E1: 'Tham khảo',
-  E2: 'Từ điển',
-  E3: 'Tham khảo bổ sung',
-  F1: 'Ngoại ngữ / Ngoại văn',
-  F2: 'Ngoại ngữ / Ngoại văn',
-  F3: 'Ngoại ngữ / Ngoại văn',
-  F4: 'Ngoại ngữ / Ngoại văn',
-  F5: 'Ngoại ngữ / Ngoại văn',
-  F6: 'Ngoại ngữ / Ngoại văn',
-  G1: 'Giáo trình đại học',
-  G2: 'Giáo trình đại học',
-  G3: 'Giáo trình đại học',
-  G4: 'Giáo trình đại học',
-  H1: 'Pháp luật / Chính trị',
-  H2: 'Pháp luật / Chính trị',
-  H3: 'Pháp luật / Chính trị',
-  I1: 'Nghệ thuật / Thể thao',
-  I2: 'Nghệ thuật / Thể thao',
-  J1: 'Triết học / Tâm lý học',
-  J2: 'Triết học / Tâm lý học',
-  J3: 'Triết học / Tâm lý học',
 };
 
 export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bookTitle }: LibraryMapModalProps) {

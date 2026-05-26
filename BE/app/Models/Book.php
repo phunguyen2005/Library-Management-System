@@ -85,4 +85,28 @@ class Book extends Model
     {
         return $this->hasMany(ReadingProgress::class, 'book_id', 'book_id');
     }
+
+    public function digitalDocumentAccesses(): HasMany
+    {
+        return $this->hasMany(DigitalDocumentAccess::class, 'book_id', 'book_id');
+    }
+
+    public function digitalDownloads(): HasMany
+    {
+        return $this->digitalDocumentAccesses()
+            ->where('access_type', DigitalDocumentAccess::TYPE_DOWNLOAD);
+    }
+
+    public function realDownloadCount(): int
+    {
+        if (! $this->is_digital) {
+            return 0;
+        }
+
+        if (array_key_exists('digital_downloads_count', $this->getAttributes())) {
+            return (int) $this->getAttribute('digital_downloads_count');
+        }
+
+        return (int) $this->digitalDownloads()->count();
+    }
 }

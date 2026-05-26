@@ -1,18 +1,18 @@
 {
-  "videoPath": "D:\\College\\03_Year_3\\PhP\\xampp\\htdocs\\BOOK_LOAN_MIDTERM\\promos\\generated\\hcmue-library-10s-ad.mp4",
+  "videoPath": "promos/generated/hcmue-library-10s-ad.mp4",
   "mimeType": "video/mp4",
   "size": 1713961,
   "durationMs": 10000,
   "width": 1280,
   "height": 720,
   "hasAudio": true,
-  "previewPath": "D:\\College\\03_Year_3\\PhP\\xampp\\htdocs\\BOOK_LOAN_MIDTERM\\promos\\generated\\hcmue-library-10s-ad-preview.png",
-  "demoFramePath": "D:\\College\\03_Year_3\\PhP\\xampp\\htdocs\\BOOK_LOAN_MIDTERM\\promos\\generated\\hcmue-library-10s-ad-demo-frame.png",
+  "previewPath": "promos/generated/hcmue-library-10s-ad-preview.png",
+  "demoFramePath": "promos/generated/hcmue-library-10s-ad-demo-frame.png",
   "screens": [
-    "D:\\College\\03_Year_3\\PhP\\xampp\\htdocs\\BOOK_LOAN_MIDTERM\\promos\\generated\\screens\\login.png",
-    "D:\\College\\03_Year_3\\PhP\\xampp\\htdocs\\BOOK_LOAN_MIDTERM\\promos\\generated\\screens\\home.png",
-    "D:\\College\\03_Year_3\\PhP\\xampp\\htdocs\\BOOK_LOAN_MIDTERM\\promos\\generated\\screens\\requests.png",
-    "D:\\College\\03_Year_3\\PhP\\xampp\\htdocs\\BOOK_LOAN_MIDTERM\\promos\\generated\\screens\\digital.png",
-    "D:\\College\\03_Year_3\\PhP\\xampp\\htdocs\\BOOK_LOAN_MIDTERM\\promos\\generated\\screens\\requests-track.png"
+    "promos/generated/screens/login.png",
+    "promos/generated/screens/home.png",
+    "promos/generated/screens/requests.png",
+    "promos/generated/screens/digital.png",
+    "promos/generated/screens/requests-track.png"
   ]
 }

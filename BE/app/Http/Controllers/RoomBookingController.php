@@ -6,6 +6,7 @@ use App\Http\Requests\RoomBookingRejectRequest;
 use App\Http\Requests\RoomBookingStoreRequest;
 use App\Models\LibrarySetting;
 use App\Models\Librarian;
+use App\Models\Member;
 use App\Models\Room;
 use App\Models\RoomBooking;
 use App\Notifications\NewRoomBookingRequestNotification;
@@ -77,11 +78,19 @@ class RoomBookingController extends Controller
             ], 422);
         }
 
-        return DB::transaction(function () use ($room, $member, $dateStr, $startTimeStr, $endTimeStr, $validated, $settings) {
-            // Lock room bookings for conflict check
+        return DB::transaction(function () use ($roomId, $member, $dateStr, $startTimeStr, $endTimeStr, $validated, $settings) {
+            $roomLocked = Room::query()->bookable()->lockForUpdate()->findOrFail($roomId);
+            $memberLocked = Member::query()->lockForUpdate()->findOrFail($member->member_id);
+
+            if ($validated['group_size'] > $roomLocked->capacity) {
+                return response()->json([
+                    'message' => "Sức chứa tối đa của phòng {$roomLocked->name} là {$roomLocked->capacity} người."
+                ], 422);
+            }
+
             // 6. Check student daily limit
             $maxBookingsPerDay = (int) ($settings->room_max_bookings_per_day ?? LibrarySetting::DEFAULT_ROOM_MAX_BOOKINGS_PER_DAY);
-            $studentBookingsCount = RoomBooking::where('member_id', $member->member_id)
+            $studentBookingsCount = RoomBooking::where('member_id', $memberLocked->member_id)
                 ->where('date', $dateStr)
                 ->whereIn('status', [RoomBooking::STATUS_APPROVED, RoomBooking::STATUS_PENDING, RoomBooking::STATUS_COMPLETED])
                 ->lockForUpdate()
@@ -94,7 +103,7 @@ class RoomBookingController extends Controller
             }
 
             // 7. Check overlap conflicts
-            $hasConflict = RoomBooking::hasConflict($room->room_id, $dateStr, $startTimeStr, $endTimeStr);
+            $hasConflict = RoomBooking::hasConflict($roomLocked->room_id, $dateStr, $startTimeStr, $endTimeStr);
             if ($hasConflict) {
                 return response()->json([
                     'message' => 'Khoảng thời gian này đã có người đặt trước. Vui lòng chọn giờ khác.'
@@ -106,8 +115,8 @@ class RoomBookingController extends Controller
             $status = $requiresApproval ? RoomBooking::STATUS_PENDING : RoomBooking::STATUS_APPROVED;
 
             $booking = RoomBooking::create([
-                'room_id' => $room->room_id,
-                'member_id' => $member->member_id,
+                'room_id' => $roomLocked->room_id,
+                'member_id' => $memberLocked->member_id,
                 'date' => $dateStr,
                 'start_time' => $startTimeStr,
                 'end_time' => $endTimeStr,
@@ -119,7 +128,7 @@ class RoomBookingController extends Controller
 
             AuditLoggerService::log(
                 'room_booking_create',
-                'Đã đăng ký đặt phòng ' . $room->name . ' vào ngày ' . $dateStr . ' (' . substr($startTimeStr, 0, 5) . '-' . substr($endTimeStr, 0, 5) . ')',
+                'Đã đăng ký đặt phòng ' . $roomLocked->name . ' vào ngày ' . $dateStr . ' (' . substr($startTimeStr, 0, 5) . '-' . substr($endTimeStr, 0, 5) . ')',
                 $member
             );
 
@@ -276,6 +285,17 @@ class RoomBookingController extends Controller
             $booking->check_in_at = now();
             $booking->save();
 
+            // Award check-in XP and Points
+            if ($booking->member) {
+                app(\App\Services\GamifyService::class)->awardXpAndPoints(
+                    $booking->member,
+                    40,
+                    10,
+                    'room_checkin',
+                    'Check-in phòng học nhóm: ' . ($booking->room?->name ?? 'Phòng tự học')
+                );
+            }
+
             AuditLoggerService::log(
                 'room_booking_admin_checkin_code',
                 'Thủ thư check-in hộ phòng ' . $booking->room?->name . ' cho ' . $booking->member?->name . ' bằng mã ' . $code,
@@ -376,12 +396,11 @@ class RoomBookingController extends Controller
         return DB::transaction(function () use ($id, $admin) {
             $booking = RoomBooking::lockForUpdate()->findOrFail($id);
 
-            if ($booking->status !== RoomBooking::STATUS_PEND) {
-                // Wait, spelling error status constraint?
-            }
             if ($booking->status !== RoomBooking::STATUS_PENDING) {
                 return response()->json(['message' => 'Lượt đặt phòng này không ở trạng thái chờ duyệt.'], 422);
             }
+
+            Room::query()->lockForUpdate()->findOrFail($booking->room_id);
 
             // Check conflicts again at the moment of approval
             $bookingDateStr = $booking->date instanceof \DateTimeInterface 
@@ -469,6 +488,17 @@ class RoomBookingController extends Controller
 
             $booking->check_in_at = now();
             $booking->save();
+
+            // Award check-in XP and Points
+            if ($booking->member) {
+                app(\App\Services\GamifyService::class)->awardXpAndPoints(
+                    $booking->member,
+                    40,
+                    10,
+                    'room_checkin',
+                    'Check-in phòng học nhóm: ' . ($booking->room?->name ?? 'Phòng tự học')
+                );
+            }
 
             AuditLoggerService::log(
                 'room_booking_admin_checkin',

@@ -7,6 +7,33 @@ import {
   updateMember,
   importMembers,
 } from '../../api/userApi';
+import CSVImportWizard from '../../components/CSVImportWizard';
+import CSVExportSelector from '../../components/CSVExportSelector';
+import { AnimatePresence } from 'framer-motion';
+
+const EXPECTED_FIELDS = [
+  { key: 'name', label: 'Họ và tên', required: true, fallbacks: ['ho_ten', 'name', 'ten', 'full name'] },
+  { key: 'email', label: 'Địa chỉ Email', required: true, fallbacks: ['email', 'thu dien tu', 'mail'] },
+  { key: 'phone_number', label: 'Số điện thoại', required: false, fallbacks: ['phone', 'so_dien_thoai', 'sdt', 'tel'] },
+  { key: 'password', label: 'Mật khẩu', required: false, fallbacks: ['mat_khau', 'password', 'pwd'] },
+  { key: 'join_date', label: 'Ngày tham gia', required: false, fallbacks: ['join_date', 'ngay_tham_gia', 'ngay tham gia'] },
+];
+
+const SAMPLE_CSV = "\uFEFFho_ten,email,so_dien_thoai,mat_khau,ngay_tham_gia\nNguyễn Văn A,vana@gmail.com,0987654321,Student123,2026-05-23\nTrần Thị B,thib@gmail.com,0912345678,Student123,2026-05-23";
+
+const AVAILABLE_EXPORT_COLUMNS = [
+  { key: 'member_id', label: 'Mã sinh viên' },
+  { key: 'name', label: 'Họ và tên' },
+  { key: 'email', label: 'Địa chỉ Email' },
+  { key: 'phone_number', label: 'Số điện thoại' },
+  { key: 'level', label: 'Cấp độ học giả' },
+  { key: 'xp', label: 'Tích lũy XP' },
+  { key: 'points', label: 'Xu tích lũy' },
+  { key: 'join_date', label: 'Ngày tham gia' },
+];
+
+const DEFAULT_EXPORT_COLUMNS = ['member_id', 'name', 'email', 'phone_number', 'join_date'];
+
 import EmptyState from '../../components/EmptyState';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import Pagination from '../../components/Pagination';
@@ -24,6 +51,10 @@ type MemberFormData = {
   join_date: string;
   password: string;
   password_confirmation: string;
+  level?: number;
+  xp?: number;
+  points?: number;
+  badgesCount?: number;
 };
 
 type ModalMode = 'add' | 'edit';
@@ -50,6 +81,10 @@ function mapMember(member: MemberApiRecord): MemberListItem {
     joinDate: member.join_date || '',
     status: 'Hoạt động',
     statusColor: 'bg-green-100 text-green-700 border-green-200',
+    xp: member.xp ?? 0,
+    points: member.points ?? 0,
+    level: member.level ?? 1,
+    badgesCount: member.badges_count ?? 0,
   };
 }
 
@@ -107,55 +142,44 @@ export default function AdminMembers() {
   const [memberToDelete, setMemberToDelete] = useState<MemberListItem | null>(null);
   const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
 
-  // --- CSV Import state ---
+  // --- CSV Import/Export state ---
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
-  const [importFile, setImportFile] = useState<File | null>(null);
-  const [isImporting, setIsImporting] = useState(false);
-  const [importErrors, setImportErrors] = useState<string[]>([]);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
-  const handleImportSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!importFile) return;
-
-    setIsImporting(true);
-    setImportErrors([]);
-
+  const handleExportMembers = (columns: string[]) => {
+    const sessionStr = localStorage.getItem('auth_session');
+    if (!sessionStr) return;
     try {
-      const response = await importMembers(importFile);
-      emitToast({
-        tone: 'success',
-        title: 'Nhập dữ liệu thành công',
-        message: response.message,
-      });
-      setIsImportModalOpen(false);
-      setImportFile(null);
-      await loadMembers(false);
-    } catch (error: unknown) {
-      if (isUnauthorizedError(error)) {
-        return;
-      }
-      const errDetails = (error as any).details;
-      if (errDetails && Array.isArray(errDetails.errors)) {
-        setImportErrors(errDetails.errors);
-      } else {
-        const message = getErrorMessage(error, 'Không thể nhập dữ liệu thành viên.');
-        emitToast({ tone: 'error', title: 'Lỗi nhập dữ liệu', message });
-      }
-    } finally {
-      setIsImporting(false);
-    }
-  };
+      const token = JSON.parse(sessionStr).token;
+      emitToast({ tone: 'info', title: 'Xuất dữ liệu', message: 'Đang khởi tạo tải dữ liệu...' });
 
-  const downloadTemplate = () => {
-    const csvContent = "\uFEFFho_ten,email,so_dien_thoai,mat_khau,ngay_tham_gia\nNguyễn Văn A,vana@gmail.com,0987654321,Student123,2026-05-23\nTrần Thị B,thib@gmail.com,0912345678,Student123,2026-05-23";
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", "mau_nhap_thanh_vien.csv");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+      let exportUrl = 'http://localhost:8000/api/reports/export-members';
+      const params: Record<string, string> = {
+        columns: columns.join(','),
+      };
+      if (searchTerm) {
+        params.query = searchTerm;
+      }
+      exportUrl += '?' + new URLSearchParams(params).toString();
+
+      fetch(exportUrl, { headers: { Authorization: `Bearer ${token}` } })
+        .then((res) => { if (!res.ok) throw new Error('Yêu cầu xuất tệp dữ liệu thất bại.'); return res.blob(); })
+        .then((blob) => {
+          const url = window.URL.createObjectURL(blob);
+          const a = Object.assign(document.createElement('a'), {
+            href: url,
+            download: `danh-sach-sinh-vien-${new Date().toISOString().slice(0, 10)}.csv`,
+          });
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          window.URL.revokeObjectURL(url);
+          emitToast({ tone: 'success', title: 'Thành công', message: 'Tải xuống tệp CSV thành công.' });
+        })
+        .catch((err: Error) => emitToast({ tone: 'error', title: 'Thất bại', message: err.message }));
+    } catch {
+      emitToast({ tone: 'error', title: 'Lỗi', message: 'Không thể xác thực để xuất dữ liệu.' });
+    }
   };
 
   const searchTerm = searchParams.get('search') || '';
@@ -229,6 +253,10 @@ export default function AdminMembers() {
       join_date: member.joinDate,
       password: '',
       password_confirmation: '',
+      level: member.level,
+      xp: member.xp,
+      points: member.points,
+      badgesCount: member.badgesCount,
     });
     setIsModalOpen(true);
   };
@@ -335,6 +363,14 @@ export default function AdminMembers() {
           >
             <span aria-hidden="true" className="material-symbols-outlined text-sm">upload_file</span>
             Nhập từ CSV
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsExportModalOpen(true)}
+            className="flex items-center gap-2 rounded-xl bg-surface-container-high px-5 py-2.5 font-medium text-slate-700 transition-all hover:bg-slate-200 hover:-translate-y-0.5"
+          >
+            <span aria-hidden="true" className="material-symbols-outlined text-sm">download</span>
+            Xuất CSV
           </button>
           <button
             type="button"
@@ -500,6 +536,35 @@ export default function AdminMembers() {
             </div>
             <form onSubmit={handleSubmit} className="space-y-4 p-6">
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                {modalMode === 'edit' && (
+                  <div className="md:col-span-2 bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-100 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div>
+                      <h4 className="font-bold text-sm text-indigo-900 flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-[18px]">workspace_premium</span>
+                        Thành tích Học giả (Gamification)
+                      </h4>
+                      <p className="text-[11px] text-indigo-700 mt-0.5">Thống kê hoạt động học tập và đọc sách của sinh viên.</p>
+                    </div>
+                    <div className="flex flex-wrap gap-3 text-center w-full sm:w-auto">
+                      <div className="flex-1 min-w-[70px] bg-white/80 border border-indigo-200/50 rounded-lg px-2.5 py-1.5 shadow-sm">
+                        <span className="text-[9px] uppercase font-bold text-slate-400 block tracking-wider">Cấp độ</span>
+                        <span className="font-extrabold text-indigo-600 text-sm">Lvl {formData.level ?? 1}</span>
+                      </div>
+                      <div className="flex-1 min-w-[70px] bg-white/80 border border-indigo-200/50 rounded-lg px-2.5 py-1.5 shadow-sm">
+                        <span className="text-[9px] uppercase font-bold text-slate-400 block tracking-wider">Tích lũy</span>
+                        <span className="font-extrabold text-blue-600 text-sm">{formData.xp ?? 0} XP</span>
+                      </div>
+                      <div className="flex-1 min-w-[70px] bg-white/80 border border-indigo-200/50 rounded-lg px-2.5 py-1.5 shadow-sm">
+                        <span className="text-[9px] uppercase font-bold text-slate-400 block tracking-wider">Điểm xu</span>
+                        <span className="font-extrabold text-amber-600 text-sm">{formData.points ?? 0} 🪙</span>
+                      </div>
+                      <div className="flex-1 min-w-[70px] bg-white/80 border border-indigo-200/50 rounded-lg px-2.5 py-1.5 shadow-sm">
+                        <span className="text-[9px] uppercase font-bold text-slate-400 block tracking-wider">Huy hiệu</span>
+                        <span className="font-extrabold text-emerald-600 text-sm">{formData.badgesCount ?? 0} 🏅</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <div className="md:col-span-2">
                   <label htmlFor="member-name" className="mb-1 block text-xs font-bold text-slate-600">
                     Họ và tên <span className="text-red-500">*</span>
@@ -624,129 +689,34 @@ export default function AdminMembers() {
         </div>
       )}
 
-      {isImportModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-xl overflow-hidden rounded-2xl bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-surface-container bg-slate-50 p-6">
-              <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                <span className="material-symbols-outlined text-primary">upload_file</span>
-                Nhập danh sách thành viên từ CSV
-              </h3>
-              <button
-                type="button"
-                onClick={() => { setIsImportModalOpen(false); setImportErrors([]); setImportFile(null); }}
-                className="text-slate-400 hover:text-slate-600 transition-colors"
-                aria-label="Đóng"
-              >
-                <span aria-hidden="true" className="material-symbols-outlined">close</span>
-              </button>
-            </div>
-            
-            <form onSubmit={handleImportSubmit} className="p-6 space-y-6">
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
-                <p className="text-xs font-bold text-slate-700 uppercase tracking-wider">Cấu trúc cột tệp CSV mẫu:</p>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs border-collapse">
-                    <thead>
-                      <tr className="border-b border-slate-200 text-slate-500 font-bold">
-                        <th className="pb-2">Họ tên *</th>
-                        <th className="pb-2">Email *</th>
-                        <th className="pb-2">Số điện thoại</th>
-                        <th className="pb-2">Mật khẩu</th>
-                        <th className="pb-2">Ngày tham gia</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr className="text-slate-600">
-                        <td className="pt-2 font-mono">ho_ten / name</td>
-                        <td className="pt-2 font-mono">email</td>
-                        <td className="pt-2 font-mono">so_dien_thoai / phone_number</td>
-                        <td className="pt-2 font-mono">mat_khau / password</td>
-                        <td className="pt-2 font-mono">ngay_tham_gia / join_date</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-                <div className="flex justify-between items-center pt-2">
-                  <span className="text-[10px] text-slate-500">* Bắt buộc. Mật khẩu mặc định là "Student123" nếu để trống.</span>
-                  <button
-                    type="button"
-                    onClick={downloadTemplate}
-                    className="text-xs font-bold text-primary hover:text-primary-hover flex items-center gap-1 transition-colors"
-                  >
-                    <span className="material-symbols-outlined text-[14px]">download</span>
-                    Tải file mẫu
-                  </button>
-                </div>
-              </div>
+      <AnimatePresence>
+        {isImportModalOpen && (
+          <CSVImportWizard
+            isOpen={isImportModalOpen}
+            onClose={() => setIsImportModalOpen(false)}
+            onImportSuccess={() => {
+              void loadMembers(false);
+            }}
+            entityType="member"
+            importApiCall={importMembers}
+            expectedFields={EXPECTED_FIELDS}
+            sampleCSV={SAMPLE_CSV}
+            sampleFileName="mau_nhap_thanh_vien.csv"
+          />
+        )}
 
-              <div className="space-y-2">
-                <label className="block text-xs font-bold text-slate-600">Chọn tệp tin CSV (.csv):</label>
-                <div className="border-2 border-dashed border-slate-200 hover:border-primary/50 transition-colors rounded-xl p-6 text-center cursor-pointer relative group">
-                  <input
-                    type="file"
-                    accept=".csv,text/csv"
-                    required
-                    onChange={(e) => setImportFile(e.target.files?.[0] || null)}
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                  />
-                  <div className="space-y-2 pointer-events-none">
-                    <span className="material-symbols-outlined text-4xl text-slate-400 group-hover:text-primary transition-colors">
-                      cloud_upload
-                    </span>
-                    <p className="text-sm font-semibold text-slate-700">
-                      {importFile ? importFile.name : 'Kéo thả tệp tin hoặc nhấp vào đây để chọn'}
-                    </p>
-                    <p className="text-xs text-slate-400">Chỉ chấp nhận tệp tin định dạng .csv tối đa 4MB</p>
-                  </div>
-                </div>
-              </div>
-
-              {importErrors.length > 0 && (
-                <div className="bg-red-50 border border-red-200 rounded-xl p-4 max-h-40 overflow-y-auto space-y-1">
-                  <p className="text-xs font-bold text-red-800 flex items-center gap-1">
-                    <span className="material-symbols-outlined text-[16px]">error</span>
-                    Dữ liệu không hợp lệ. Vui lòng sửa các lỗi sau:
-                  </p>
-                  <ul className="list-disc pl-5 text-xs text-red-700 space-y-0.5">
-                    {importErrors.map((err, i) => (
-                      <li key={i}>{err}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => { setIsImportModalOpen(false); setImportErrors([]); setImportFile(null); }}
-                  disabled={isImporting}
-                  className="rounded-xl bg-slate-100 px-5 py-2.5 font-bold text-slate-600 transition-colors hover:bg-slate-200 disabled:opacity-50"
-                >
-                  Hủy
-                </button>
-                <button
-                  type="submit"
-                  disabled={isImporting || !importFile}
-                  className="rounded-xl bg-primary px-5 py-2.5 font-bold text-white shadow-md shadow-primary/20 transition-opacity hover:opacity-90 disabled:opacity-50 flex items-center gap-1.5"
-                >
-                  {isImporting ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      Đang xử lý...
-                    </>
-                  ) : (
-                    <>
-                      <span className="material-symbols-outlined text-[16px]">check_circle</span>
-                      Bắt đầu Nhập
-                    </>
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+        {isExportModalOpen && (
+          <CSVExportSelector
+            isOpen={isExportModalOpen}
+            onClose={() => setIsExportModalOpen(false)}
+            onExport={handleExportMembers}
+            availableColumns={AVAILABLE_EXPORT_COLUMNS}
+            defaultColumns={DEFAULT_EXPORT_COLUMNS}
+            title="Xuất danh sách Thành viên"
+            description="Lọc và xuất danh sách độc giả học giả ra tệp CSV để lưu trữ hoặc phân tích."
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

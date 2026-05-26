@@ -60,6 +60,13 @@ class ReadingProgressController extends Controller
         $currentPage = min((int) $validated['current_page'], (int) $validated['total_pages']);
         $member = $request->user();
 
+        $oldProgress = ReadingProgress::query()
+            ->where('member_id', $member->member_id)
+            ->where('book_id', $book->book_id)
+            ->first();
+        
+        $wasCompleted = $oldProgress && $oldProgress->progressPercent() >= 100;
+
         $progress = ReadingProgress::query()->updateOrCreate(
             [
                 'member_id' => $member->member_id,
@@ -73,6 +80,19 @@ class ReadingProgressController extends Controller
         );
 
         $progress->load('book');
+
+        $isCompletedNow = $progress->progressPercent() >= 100;
+
+        if ($isCompletedNow && !$wasCompleted) {
+            // Award completion points
+            app(\App\Services\GamifyService::class)->awardXpAndPoints(
+                $member,
+                120,
+                30,
+                'digital_read',
+                'Hoàn thành đọc tài liệu số: ' . $book->title
+            );
+        }
 
         return response()->json([
             'message' => 'Reading progress synced successfully.',

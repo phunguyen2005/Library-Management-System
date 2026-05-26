@@ -59,9 +59,12 @@ const deleteBookMock = vi.fn(async (_bookId: unknown) => ({ message: 'Deleted' }
 const uploadDigitalFileMock = vi.fn(async (_bookId: unknown, _file: unknown) => uploadedBook);
 
 vi.mock('../api/bookApi', () => ({
-  fetchBooks: () => fetchBooksMock(),
-  fetchBorrowableBooks: () => fetchBorrowableBooksMock(),
-  fetchDigitalResourceBooks: () => fetchDigitalResourceBooksMock(),
+  fetchBooks: (page?: number, query?: string, limit?: number) =>
+    Reflect.apply(fetchBooksMock, null, [page, query, limit]),
+  fetchBorrowableBooks: (page?: number, query?: string, limit?: number) =>
+    Reflect.apply(fetchBorrowableBooksMock, null, [page, query, limit]),
+  fetchDigitalResourceBooks: (page?: number, query?: string, limit?: number) =>
+    Reflect.apply(fetchDigitalResourceBooksMock, null, [page, query, limit]),
   addBook: (payload: unknown) => addBookMock(payload),
   addBorrowableBook: (payload: unknown) => addBorrowableBookMock(payload),
   addDigitalResource: (payload: unknown) => addDigitalResourceMock(payload),
@@ -76,6 +79,7 @@ vi.mock('../api/bookApi', () => ({
 
 vi.mock('../api/aiApi', () => ({
   generateBookMetadata: vi.fn(),
+  generateAllBooksMetadata: vi.fn(),
 }));
 
 function renderAdminInventory() {
@@ -117,17 +121,43 @@ describe('AdminInventory digital upload', () => {
     await user.click(screen.getByRole('button', { name: 'Thêm sách mượn' }));
     await user.type(screen.getByLabelText('Tiêu đề sách'), 'Physical Algorithms');
     await user.type(screen.getByLabelText('Tác giả sách'), 'Library Admin');
-    await user.type(screen.getByLabelText('Vị trí sách'), 'Shelf B');
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Danh mục' }),
+      'Công nghệ - Kỹ thuật',
+    );
+    await user.selectOptions(screen.getByLabelText('Vị trí sách'), 'Kệ C2');
     await user.click(screen.getByRole('button', { name: 'Lưu sách mượn' }));
 
     await waitFor(() => {
       expect(addBorrowableBookMock).toHaveBeenCalledWith(
         expect.objectContaining({
           title: 'Physical Algorithms',
+          genre: 'Công nghệ - Kỹ thuật',
+          location: 'Kệ C2',
         }),
       );
       expect(uploadDigitalFileMock).not.toHaveBeenCalled();
     });
+  });
+
+  it('limits borrow book category and shelf choices to the library map groups', async () => {
+    const user = userEvent.setup();
+
+    renderAdminInventory();
+
+    await waitFor(() => expect(fetchBorrowableBooksMock).toHaveBeenCalled());
+    await user.click(screen.getByRole('button', { name: 'Thêm sách mượn' }));
+
+    const categorySelect = screen.getByRole('combobox', { name: 'Danh mục' });
+    expect(categorySelect).toHaveDisplayValue('G - Giáo trình Đại học');
+    expect(screen.getByRole('option', { name: 'C - Công nghệ - Kỹ thuật' })).toBeInTheDocument();
+
+    await user.selectOptions(categorySelect, 'Công nghệ - Kỹ thuật');
+
+    const shelfSelect = screen.getByLabelText('Vị trí sách');
+    expect(shelfSelect).toHaveDisplayValue('Kệ C1 (CN-KT - Công nghệ - Kỹ thuật)');
+    expect(screen.getByRole('option', { name: 'Kệ C1 (CN-KT - Công nghệ - Kỹ thuật)' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: /Kệ B1/ })).not.toBeInTheDocument();
   });
 
   it('uploads a selected digital file after creating a digital resource', async () => {

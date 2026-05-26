@@ -185,6 +185,14 @@ class FineController extends Controller
                 abort(response()->json(['message' => 'Khoản phí phạt này không còn ở trạng thái chưa thanh toán.'], 422));
             }
 
+            if ($fine->reason === Fine::REASON_OVERDUE && 
+                $fine->borrowing && 
+                $fine->borrowing->status !== \App\Models\Borrowing::STATUS_RETURNED) {
+                abort(response()->json([
+                    'message' => __('messages.borrow.pay_overdue_requires_returned')
+                ], 422));
+            }
+
             $payment = FinePayment::query()->create([
                 'fine_id' => $fine->fine_id,
                 'amount_paid' => $fine->amount,

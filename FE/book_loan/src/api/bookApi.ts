@@ -5,6 +5,7 @@ import type {
   FormattedBook,
 } from '../types/book';
 import { getCoverUrl } from '../lib/display';
+import { normalizePhysicalCategory, normalizePhysicalLocation } from '../lib/bookClassification';
 import type { PaginatedResponse } from '../types/pagination';
 import i18n from '../i18n';
 
@@ -39,6 +40,13 @@ export function normalizeBook(book: BookApiRecord): FormattedBook {
   const availableQuantity = Number(book.available_quantity ?? 0);
   const totalQuantity = Number(book.total_quantity ?? 0);
   const isAvailable = Boolean(book.is_available) && availableQuantity > 0;
+  const isDigital = Boolean(book.is_digital);
+  const category = isDigital
+    ? book.genre || 'Khac'
+    : normalizePhysicalCategory(book.genre);
+  const location = isDigital
+    ? book.location || 'Khu A'
+    : normalizePhysicalLocation(category, book.location);
 
   return {
     id: book.book_id,
@@ -46,9 +54,9 @@ export function normalizeBook(book: BookApiRecord): FormattedBook {
     title: book.title,
     author: book.author,
     isbn: `ISBN-${book.book_id}000`,
-    category: book.genre || 'Khac',
-    genre: book.genre || 'Khac',
-    location: book.location || 'Khu A',
+    category,
+    genre: category,
+    location,
     status: toStatus(isAvailable),
     statusKey: isAvailable ? 'available' : 'unavailable',
     statusColor: toStatusColor(isAvailable),
@@ -57,7 +65,7 @@ export function normalizeBook(book: BookApiRecord): FormattedBook {
     available_quantity: availableQuantity,
     published_year: book.published_year || undefined,
     is_available: isAvailable,
-    is_digital: Boolean(book.is_digital),
+    is_digital: isDigital,
     resource_type: book.resource_type || null,
     file_format: book.file_format || null,
     file_size: book.file_size || null,
@@ -84,9 +92,9 @@ export function unwrapCollection<T>(payload: T[] | PaginatedResponse<T>): T[] {
   return [];
 }
 
-export async function fetchBooks(page = 1, query = '') {
+export async function fetchBooks(page = 1, query = '', limit = 10) {
   const data = await apiRequest<PaginatedResponse<BookApiRecord>>(
-    `/books?limit=10&page=${page}&query=${encodeURIComponent(query)}`
+    `/books?limit=${limit}&page=${page}&query=${encodeURIComponent(query)}`
   );
   return {
     ...data,
@@ -94,9 +102,9 @@ export async function fetchBooks(page = 1, query = '') {
   };
 }
 
-export async function fetchBorrowableBooks(page = 1, query = '') {
+export async function fetchBorrowableBooks(page = 1, query = '', limit = 10) {
   const data = await apiRequest<PaginatedResponse<BookApiRecord>>(
-    `/books?is_digital=false&limit=10&page=${page}&query=${encodeURIComponent(query)}`
+    `/books?is_digital=false&limit=${limit}&page=${page}&query=${encodeURIComponent(query)}`
   );
   return {
     ...data,
@@ -104,9 +112,9 @@ export async function fetchBorrowableBooks(page = 1, query = '') {
   };
 }
 
-export async function fetchDigitalResourceBooks(page = 1, query = '') {
+export async function fetchDigitalResourceBooks(page = 1, query = '', limit = 10) {
   const data = await apiRequest<PaginatedResponse<BookApiRecord>>(
-    `/books?is_digital=true&limit=10&page=${page}&query=${encodeURIComponent(query)}`
+    `/books?is_digital=true&limit=${limit}&page=${page}&query=${encodeURIComponent(query)}`
   );
   return {
     ...data,
@@ -114,9 +122,9 @@ export async function fetchDigitalResourceBooks(page = 1, query = '') {
   };
 }
 
-export async function searchBooks(query: string, page = 1) {
+export async function searchBooks(query: string, page = 1, limit = 10) {
   const data = await apiRequest<PaginatedResponse<BookApiRecord>>(
-    `/books?query=${encodeURIComponent(query)}&limit=10&page=${page}`
+    `/books?query=${encodeURIComponent(query)}&limit=${limit}&page=${page}`
   );
   return {
     ...data,
@@ -256,11 +264,21 @@ export async function autocompleteBooks(q: string) {
   }).then(books => books.map(normalizeBook));
 }
 
-export async function importBooks(file: File) {
+export async function importBooks(file: File, options?: { dry_run?: boolean; allow_partial?: boolean; column_mapping?: string }) {
   const formData = new FormData();
   formData.append('file', file);
+  if (options) {
+    if (options.dry_run !== undefined) formData.append('dry_run', options.dry_run ? '1' : '0');
+    if (options.allow_partial !== undefined) formData.append('allow_partial', options.allow_partial ? '1' : '0');
+    if (options.column_mapping !== undefined) formData.append('column_mapping', options.column_mapping);
+  }
   return apiRequest<{ message: string; success_count: number; errors: string[] }>('/books/import', {
     method: 'POST',
     body: formData,
   });
+}
+
+export async function fetchBookDetail(bookId: number): Promise<FormattedBook> {
+  const book = await apiRequest<BookApiRecord>(`/books/${bookId}`);
+  return normalizeBook(book);
 }

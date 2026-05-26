@@ -54,15 +54,15 @@ describe('ThemeProvider', () => {
     const user = userEvent.setup();
     renderWithTheme(<ThemeToggle />);
 
-    await user.click(screen.getByRole('button', { name: 'Chuyển sang chế độ tối' }));
+    // Click trigger to open dropdown
+    await user.click(screen.getByRole('button', { name: 'Chọn giao diện' }));
+
+    // Click dark mode option
+    await user.click(screen.getByRole('button', { name: 'Chế độ tối' }));
 
     await waitFor(() => expect(document.documentElement).toHaveClass('dark'));
     expect(document.documentElement.style.colorScheme).toBe('dark');
     expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe('dark');
-    expect(screen.getByRole('button', { name: 'Chuyển sang chế độ sáng' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
   });
 
   it('restores a stored dark mode preference', async () => {
@@ -71,10 +71,6 @@ describe('ThemeProvider', () => {
     renderWithTheme(<ThemeToggle />);
 
     await waitFor(() => expect(document.documentElement).toHaveClass('dark'));
-    expect(screen.getByRole('button', { name: 'Chuyển sang chế độ sáng' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
   });
 });
 
@@ -82,12 +78,12 @@ describe('public theme toggles', () => {
   it('shows the theme toggle on the landing header', async () => {
     renderPublicRoute(<Landing />, '/');
 
-    expect(await screen.findByRole('button', { name: 'Chuyển sang chế độ tối' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Chọn giao diện' })).toBeInTheDocument();
   });
 
   it('shows the theme toggle on the login header', async () => {
     renderPublicRoute(<Login />, '/login');
 
-    expect(await screen.findByRole('button', { name: 'Chuyển sang chế độ tối' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Chọn giao diện' })).toBeInTheDocument();
   });
 });

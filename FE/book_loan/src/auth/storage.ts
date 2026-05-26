@@ -11,7 +11,17 @@ export type AuthUser = {
   hire_date?: string | null;
   notify_due_soon?: boolean;
   notify_new_books?: boolean;
+  notify_borrow_status?: boolean;
+  notify_room_status?: boolean;
+  notify_room_reminder?: boolean;
+  notify_fine_status?: boolean;
+  notify_reservation?: boolean;
   permissions?: string[];
+  xp?: number;
+  points?: number;
+  level?: number;
+  daily_streak?: number;
+  last_check_in_at?: string | null;
 };
 
 export type AuthSession = {

@@ -9,7 +9,11 @@ use App\Http\Resources\BookResource;
 use App\Http\Resources\DigitalDocumentResource;
 use App\Jobs\GenerateBookAiMetadataJob;
 use App\Models\Book;
+use App\Models\DigitalDocumentAccess;
+use App\Models\Librarian;
+use App\Models\Member;
 use App\Services\BookCacheService;
+use App\Support\BookClassification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -26,8 +30,11 @@ class BookController extends Controller
         $validated = $request->validated();
         $books = $this->bookCache->remember('index', $validated, function () use ($validated) {
             $query = Book::query()
-                ->withCount(['favoritedBy as favorite_count'])
-                ->orderBy('book_id');
+                ->withCount([
+                    'favoritedBy as favorite_count',
+                    'digitalDownloads as digital_downloads_count',
+                ])
+                ->orderByDesc('book_id');
             $search = trim((string) ($validated['query'] ?? ''));
 
             if ($search !== '') {
@@ -70,9 +77,36 @@ class BookController extends Controller
         return BookResource::collection($books);
     }
 
+    public function show(Book $book)
+    {
+        $book->loadCount([
+            'favoritedBy as favorite_count',
+            'digitalDownloads as digital_downloads_count',
+        ]);
+        return new BookResource($book);
+    }
+
     public function store(BookUpsertRequest $request)
     {
         $validated = $request->validated();
+        $isDigital = (bool) ($validated['is_digital'] ?? false);
+        if (! $isDigital) {
+            $normalizedClassification = BookClassification::normalizePhysical(
+                $validated['genre'] ?? null,
+                $validated['location'] ?? null,
+            );
+
+            if ($normalizedClassification === null) {
+                return response()->json([
+                    'message' => 'Phân loại sách phải thuộc một nhóm trên sơ đồ thư viện A-J.',
+                    'errors' => [
+                        'genre' => ['Phân loại sách phải thuộc một nhóm trên sơ đồ thư viện A-J.'],
+                    ],
+                ], 422);
+            }
+
+            $validated = array_merge($validated, $normalizedClassification);
+        }
         $quantity = array_key_exists('quantity', $validated) ? (int) $validated['quantity'] : 1;
 
         $book = Book::query()->create([
@@ -82,13 +116,13 @@ class BookController extends Controller
             'published_year' => $validated['published_year'] ?? null,
             'location' => $validated['location'] ?? null,
             'cover' => $validated['cover'] ?? null,
-            'is_digital' => (bool) ($validated['is_digital'] ?? false),
+            'is_digital' => $isDigital,
             'resource_type' => $validated['resource_type'] ?? null,
             'file_format' => $validated['file_format'] ?? null,
             'file_size' => $validated['file_size'] ?? null,
             'file_path' => $validated['file_path'] ?? null,
             'file_url' => $validated['file_url'] ?? null,
-            'download_count' => (int) ($validated['download_count'] ?? 0),
+            'download_count' => 0,
             'total_quantity' => $quantity,
             'available_quantity' => $quantity,
             'is_available' => $quantity > 0,
@@ -106,6 +140,24 @@ class BookController extends Controller
     public function update(BookUpsertRequest $request, Book $book)
     {
         $validated = $request->validated();
+        $isDigital = (bool) ($validated['is_digital'] ?? $book->is_digital);
+        if (! $isDigital) {
+            $normalizedClassification = BookClassification::normalizePhysical(
+                array_key_exists('genre', $validated) ? $validated['genre'] : $book->genre,
+                array_key_exists('location', $validated) ? $validated['location'] : $book->location,
+            );
+
+            if ($normalizedClassification === null) {
+                return response()->json([
+                    'message' => 'Phân loại sách phải thuộc một nhóm trên sơ đồ thư viện A-J.',
+                    'errors' => [
+                        'genre' => ['Phân loại sách phải thuộc một nhóm trên sơ đồ thư viện A-J.'],
+                    ],
+                ], 422);
+            }
+
+            $validated = array_merge($validated, $normalizedClassification);
+        }
         $checkedOut = max(0, $book->total_quantity - $book->available_quantity);
         $nextQuantity = array_key_exists('quantity', $validated) ? (int) $validated['quantity'] : $book->total_quantity;
 
@@ -122,13 +174,12 @@ class BookController extends Controller
             'published_year' => array_key_exists('published_year', $validated) ? $validated['published_year'] : $book->published_year,
             'location' => array_key_exists('location', $validated) ? $validated['location'] : $book->location,
             'cover' => array_key_exists('cover', $validated) ? $validated['cover'] : $book->cover,
-            'is_digital' => (bool) ($validated['is_digital'] ?? $book->is_digital),
+            'is_digital' => $isDigital,
             'resource_type' => array_key_exists('resource_type', $validated) ? $validated['resource_type'] : $book->resource_type,
             'file_format' => array_key_exists('file_format', $validated) ? $validated['file_format'] : $book->file_format,
             'file_size' => array_key_exists('file_size', $validated) ? $validated['file_size'] : $book->file_size,
             'file_path' => array_key_exists('file_path', $validated) ? $validated['file_path'] : $book->file_path,
             'file_url' => array_key_exists('file_url', $validated) ? $validated['file_url'] : $book->file_url,
-            'download_count' => (int) ($validated['download_count'] ?? $book->download_count),
         ]);
         $book->total_quantity = $nextQuantity;
         $book->available_quantity = max(0, $nextQuantity - $checkedOut);
@@ -199,8 +250,11 @@ class BookController extends Controller
         $documents = $this->bookCache->remember('digital-documents', [], function () {
             return Book::query()
                 ->where('is_digital', true)
-                ->withCount(['favoritedBy as favorite_count'])
-                ->orderByDesc('download_count')
+                ->withCount([
+                    'favoritedBy as favorite_count',
+                    'digitalDownloads as digital_downloads_count',
+                ])
+                ->orderByDesc('digital_downloads_count')
                 ->get();
         }, 120);
 
@@ -215,12 +269,16 @@ class BookController extends Controller
             ], 404);
         }
 
-        $book->increment('download_count');
+        $disposition = $request->query('disposition') === 'attachment' ? 'attachment' : 'inline';
+        $accessType = $disposition === 'attachment'
+            ? DigitalDocumentAccess::TYPE_DOWNLOAD
+            : DigitalDocumentAccess::TYPE_PREVIEW;
+
+        $this->recordDigitalDocumentAccess($request, $book, $accessType);
         $this->bookCache->bump();
 
-        \App\Services\AuditLoggerService::log('digital_file_download', 'Đã đọc trực tuyến/tải xuống tài liệu số: ' . $book->title . ' (ID: ' . $book->book_id . ')');
+        \App\Services\AuditLoggerService::log('digital_file_download', 'Đã đọc trực tuyến/tải xuống tài liệu số: ' . $book->title . ' (ID: ' . $book->book_id . ')', $this->signedAccessActor($request));
 
-        $disposition = $request->query('disposition') === 'attachment' ? 'attachment' : 'inline';
         $filename = $this->digitalFilename($book);
 
         if ($book->file_path) {
@@ -256,6 +314,53 @@ class BookController extends Controller
             'Content-Type' => 'text/plain; charset=UTF-8',
             'Content-Disposition' => $disposition.'; filename="'.$filename.'"',
         ]);
+    }
+
+    private function recordDigitalDocumentAccess(Request $request, Book $book, string $accessType): void
+    {
+        DigitalDocumentAccess::query()->create([
+            'book_id' => $book->book_id,
+            'member_id' => $this->signedIntegerQuery($request, 'member_id'),
+            'librarian_id' => $this->signedIntegerQuery($request, 'librarian_id'),
+            'access_type' => $accessType,
+            'ip_address' => $request->ip(),
+            'user_agent' => Str::limit((string) $request->userAgent(), 1000, ''),
+            'accessed_at' => now(),
+        ]);
+
+        if ($accessType === DigitalDocumentAccess::TYPE_DOWNLOAD) {
+            $book->forceFill([
+                'download_count' => $book->digitalDownloads()->count(),
+            ])->save();
+        }
+    }
+
+    private function signedAccessActor(Request $request): Member|Librarian|null
+    {
+        $memberId = $this->signedIntegerQuery($request, 'member_id');
+
+        if ($memberId !== null) {
+            return Member::query()->find($memberId);
+        }
+
+        $librarianId = $this->signedIntegerQuery($request, 'librarian_id');
+
+        if ($librarianId !== null) {
+            return Librarian::query()->find($librarianId);
+        }
+
+        return null;
+    }
+
+    private function signedIntegerQuery(Request $request, string $key): ?int
+    {
+        $value = $request->query($key);
+
+        if (is_numeric($value) && (int) $value > 0) {
+            return (int) $value;
+        }
+
+        return null;
     }
 
     private function storedDigitalFilename(string $originalName, string $extension): string
@@ -356,6 +461,9 @@ class BookController extends Controller
     {
         $request->validate([
             'file' => 'required|file|mimes:csv,txt|max:4096',
+            'dry_run' => 'nullable|boolean',
+            'allow_partial' => 'nullable|boolean',
+            'column_mapping' => 'nullable|string', // JSON mapping
         ]);
 
         $file = $request->file('file');
@@ -376,24 +484,54 @@ class BookController extends Controller
             return trim(preg_replace('/[\x{FEFF}\x{200B}]/u', '', $h));
         }, $header);
 
-        // Expected headers
-        $colMap = [
-            'title' => array_search('title', $header) !== false ? array_search('title', $header) : array_search('ten_sach', $header),
-            'author' => array_search('author', $header) !== false ? array_search('author', $header) : array_search('tac_gia', $header),
-            'genre' => array_search('genre', $header) !== false ? array_search('genre', $header) : array_search('the_loai', $header),
-            'published_year' => array_search('published_year', $header) !== false ? array_search('published_year', $header) : array_search('nam_xuat_ban', $header),
-            'location' => array_search('location', $header) !== false ? array_search('location', $header) : array_search('vi_tri', $header),
-            'quantity' => array_search('quantity', $header) !== false ? array_search('quantity', $header) : array_search('so_luong', $header),
-            'is_digital' => array_search('is_digital', $header) !== false ? array_search('is_digital', $header) : array_search('sach_so', $header),
-        ];
+        $columnMapping = [];
+        if ($request->has('column_mapping')) {
+            $columnMapping = json_decode($request->input('column_mapping'), true) ?: [];
+        }
 
-        if ($colMap['title'] === false) $colMap['title'] = 0;
-        if ($colMap['author'] === false) $colMap['author'] = 1;
-        if ($colMap['genre'] === false) $colMap['genre'] = 2;
-        if ($colMap['published_year'] === false) $colMap['published_year'] = 3;
-        if ($colMap['location'] === false) $colMap['location'] = 4;
-        if ($colMap['quantity'] === false) $colMap['quantity'] = 5;
-        if ($colMap['is_digital'] === false) $colMap['is_digital'] = 6;
+        // Expected headers mapping
+        $colMap = [];
+        foreach (['title', 'author', 'genre', 'published_year', 'location', 'quantity', 'is_digital'] as $key) {
+            $csvColName = $columnMapping[$key] ?? null;
+            if ($csvColName !== null) {
+                $idx = array_search(trim($csvColName), $header);
+                if ($idx !== false) {
+                    $colMap[$key] = $idx;
+                    continue;
+                }
+            }
+
+            // Fallback
+            $fallbackField = match($key) {
+                'title' => 'ten_sach',
+                'author' => 'tac_gia',
+                'genre' => 'the_loai',
+                'published_year' => 'nam_xuat_ban',
+                'location' => 'vi_tri',
+                'quantity' => 'so_luong',
+                'is_digital' => 'sach_so',
+                default => null
+            };
+
+            $idx = array_search($key, $header);
+            if ($idx === false && $fallbackField) {
+                $idx = array_search($fallbackField, $header);
+            }
+            $colMap[$key] = $idx;
+        }
+
+        // Title and Author are strictly required
+        if ($colMap['title'] === false) {
+            fclose($handle);
+            return response()->json(['message' => 'Không tìm thấy cột Tiêu đề (title) trong tệp CSV.'], 422);
+        }
+        if ($colMap['author'] === false) {
+            fclose($handle);
+            return response()->json(['message' => 'Không tìm thấy cột Tác giả (author) trong tệp CSV.'], 422);
+        }
+
+        $dryRun = filter_var($request->input('dry_run', false), FILTER_VALIDATE_BOOLEAN);
+        $allowPartial = filter_var($request->input('allow_partial', false), FILTER_VALIDATE_BOOLEAN);
 
         $successCount = 0;
         $errors = [];
@@ -410,29 +548,46 @@ class BookController extends Controller
 
                 $title = trim($row[$colMap['title']] ?? '');
                 $author = trim($row[$colMap['author']] ?? '');
-                $genre = trim($row[$colMap['genre']] ?? '');
-                $publishedYear = trim($row[$colMap['published_year']] ?? '');
-                $location = trim($row[$colMap['location']] ?? '');
-                $quantityStr = trim($row[$colMap['quantity']] ?? '1');
-                $isDigitalStr = trim($row[$colMap['is_digital']] ?? '0');
+                $genre = $colMap['genre'] !== false ? trim($row[$colMap['genre']] ?? '') : '';
+                $publishedYear = $colMap['published_year'] !== false ? trim($row[$colMap['published_year']] ?? '') : '';
+                $location = $colMap['location'] !== false ? trim($row[$colMap['location']] ?? '') : '';
+                $quantityStr = $colMap['quantity'] !== false ? trim($row[$colMap['quantity']] ?? '1') : '1';
+                $isDigitalStr = $colMap['is_digital'] !== false ? trim($row[$colMap['is_digital']] ?? '0') : '0';
+
+                $rowErrors = [];
 
                 if (empty($title)) {
-                    $errors[] = "Dòng $rowNum: Tên sách không được để trống.";
-                    continue;
+                    $rowErrors[] = "Tên sách không được để trống.";
                 }
 
                 if (empty($author)) {
-                    $errors[] = "Dòng $rowNum: Tác giả không được để trống.";
-                    continue;
+                    $rowErrors[] = "Tác giả không được để trống.";
                 }
 
                 $quantity = is_numeric($quantityStr) ? (int)$quantityStr : 1;
                 if ($quantity < 0) {
-                    $errors[] = "Dòng $rowNum: Số lượng sách không được nhỏ hơn 0.";
-                    continue;
+                    $rowErrors[] = "Số lượng sách không được nhỏ hơn 0.";
                 }
 
                 $isDigital = filter_var($isDigitalStr, FILTER_VALIDATE_BOOLEAN);
+
+                if (!$isDigital) {
+                    $normalizedClassification = BookClassification::normalizePhysical($genre, $location);
+
+                    if ($normalizedClassification === null) {
+                        $rowErrors[] = "Phân loại sách phải thuộc một nhóm trên sơ đồ thư viện A-J (Thể loại: '$genre', Kệ: '$location').";
+                    } else {
+                        $genre = $normalizedClassification['genre'];
+                        $location = $normalizedClassification['location'];
+                    }
+                }
+
+                if (count($rowErrors) > 0) {
+                    foreach ($rowErrors as $err) {
+                        $errors[] = "Dòng $rowNum: $err";
+                    }
+                    continue;
+                }
 
                 Book::create([
                     'title' => $title,
@@ -451,7 +606,19 @@ class BookController extends Controller
 
             fclose($handle);
 
-            if (count($errors) > 0) {
+            if ($dryRun) {
+                DB::rollBack();
+                return response()->json([
+                    'message' => count($errors) > 0 
+                        ? 'Chạy thử hoàn tất: Có một số lỗi dữ liệu được phát hiện.' 
+                        : 'Chạy thử hoàn tất: Dữ liệu hoàn toàn hợp lệ và sẵn sàng nhập.',
+                    'dry_run' => true,
+                    'errors' => $errors,
+                    'success_count' => $successCount
+                ]);
+            }
+
+            if (count($errors) > 0 && !$allowPartial) {
                 DB::rollBack();
                 return response()->json([
                     'message' => 'Nhập dữ liệu thất bại do có lỗi validation.',
@@ -462,16 +629,20 @@ class BookController extends Controller
 
             DB::commit();
 
-            if (isset($this->bookCache)) {
+            if (isset($this->bookCache) && $successCount > 0) {
                 $this->bookCache->bump();
             }
 
-            \App\Services\AuditLoggerService::log('book_import', "Đã import thành công $successCount sách từ file CSV.");
+            if ($successCount > 0) {
+                \App\Services\AuditLoggerService::log('book_import', "Đã import thành công $successCount sách từ file CSV.");
+            }
 
             return response()->json([
-                'message' => "Nhập dữ liệu thành công. Đã thêm $successCount sách.",
+                'message' => count($errors) > 0 
+                    ? "Nhập dữ liệu hoàn tất. Đã thêm thành công $successCount sách, bỏ qua " . (count($errors)) . " lỗi."
+                    : "Nhập dữ liệu thành công. Đã thêm $successCount sách.",
                 'success_count' => $successCount,
-                'errors' => []
+                'errors' => $errors
             ]);
 
         } catch (\Exception $e) {

@@ -102,6 +102,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setStoredSession(nextSession);
     setSessionState(nextSession);
     setIsAuthReady(true);
+    sessionStorage.removeItem('dismissed_checkin_today');
   };
 
   const updateUser = (user: AuthUser) => {
@@ -131,6 +132,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       clearStoredSession();
       setSessionState(null);
       setIsAuthReady(true);
+      sessionStorage.removeItem('dismissed_checkin_today');
     }
   };
   

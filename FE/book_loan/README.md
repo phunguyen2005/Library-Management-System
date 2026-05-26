@@ -1,6 +1,6 @@
 # Book Loan Frontend
 
-React + TypeScript + Vite client for the Book Loan Midterm system.
+React + TypeScript + Vite client for the Library Management System.
 
 ## Stack
 

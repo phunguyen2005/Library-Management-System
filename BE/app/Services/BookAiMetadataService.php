@@ -78,8 +78,9 @@ class BookAiMetadataService
             '- Digital: '.($book->is_digital ? 'yes' : 'no'),
         ]);
 
+        $model = env('GEMINI_MODEL', 'gemini-2.5-flash');
         $response = Http::timeout(12)->post(
-            "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={$apiKey}",
+            "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}",
             [
                 'contents' => [
                     ['role' => 'user', 'parts' => [['text' => $prompt]]],

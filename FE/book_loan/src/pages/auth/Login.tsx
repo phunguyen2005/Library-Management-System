@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, Link } from 'react-router-dom';
 import { loginUser, registerStudent } from '../../api/authApi';
@@ -19,9 +19,18 @@ export default function Login() {
   const [errorMsg, setErrorMsg] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
 
   const navigate = useNavigate();
   const { setSession } = useAuth();
+
+  useEffect(() => {
+    const savedEmail = localStorage.getItem('remembered_email');
+    if (savedEmail) {
+      setIdentifier(savedEmail);
+      setRememberMe(true);
+    }
+  }, []);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -36,6 +45,14 @@ export default function Login() {
       if ((response as any).require_otp && (response as any).email) {
         navigate('/verify-otp', { state: { email: (response as any).email } });
         return;
+      }
+
+      if (isLogin) {
+        if (rememberMe) {
+          localStorage.setItem('remembered_email', identifier);
+        } else {
+          localStorage.removeItem('remembered_email');
+        }
       }
 
       setSession({
@@ -153,6 +170,8 @@ export default function Login() {
                       </span>
                       <input
                         type="text"
+                        name="name"
+                        autoComplete="name"
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         placeholder="Nguyễn Văn A"
@@ -171,6 +190,8 @@ export default function Login() {
                       </span>
                       <input
                         type="text"
+                        name="phone"
+                        autoComplete="tel"
                         value={phone}
                         onChange={(e) => setPhone(e.target.value)}
                         placeholder="0123456789"
@@ -191,6 +212,8 @@ export default function Login() {
                   </span>
                   <input
                     type="email"
+                    name="email"
+                    autoComplete="username"
                     value={identifier}
                     onChange={(e) => setIdentifier(e.target.value)}
                     placeholder="email@hcmue.edu.vn"
@@ -221,6 +244,8 @@ export default function Login() {
                   </span>
                   <input
                     type="password"
+                    name="password"
+                    autoComplete={isLogin ? 'current-password' : 'new-password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
@@ -234,6 +259,25 @@ export default function Login() {
                   </p>
                 )}
               </div>
+
+              {isLogin && (
+                <div className="flex items-center">
+                  <input
+                    id="remember-me"
+                    name="remember-me"
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    className="h-4 w-4 rounded border-surface-container-high text-primary focus:ring-primary bg-surface-container-low cursor-pointer"
+                  />
+                  <label
+                    htmlFor="remember-me"
+                    className="ml-2 text-sm text-slate-600 cursor-pointer select-none"
+                  >
+                    {t('auth.rememberMe')}
+                  </label>
+                </div>
+              )}
 
               <button
                 type="submit"

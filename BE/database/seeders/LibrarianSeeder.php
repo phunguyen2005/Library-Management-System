@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\Librarian;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
@@ -12,6 +13,7 @@ class LibrarianSeeder extends Seeder
     public function run(): void
     {
         $defaultPassword = env('LIBRARY_DEMO_PASSWORD', 'Library@2026');
+        $encryptPhone = fn (string $phone): string => Crypt::encryptString($phone);
 
         DB::table('librarians')->upsert([
             [
@@ -19,7 +21,7 @@ class LibrarianSeeder extends Seeder
                 'name' => 'Nguyen Van An',
                 'email' => 'nguyen.van.an@hcmue.edu.vn',
                 'password' => Hash::make($defaultPassword),
-                'phone_number' => '0912345678',
+                'phone_number' => $encryptPhone('0912345678'),
                 'hire_date' => '2026-03-17',
             ],
             [
@@ -27,7 +29,7 @@ class LibrarianSeeder extends Seeder
                 'name' => 'Tran Thi Mai',
                 'email' => 'tran.thi.mai@hcmue.edu.vn',
                 'password' => Hash::make($defaultPassword),
-                'phone_number' => '0987654321',
+                'phone_number' => $encryptPhone('0987654321'),
                 'hire_date' => '2026-03-17',
             ],
             [
@@ -35,7 +37,7 @@ class LibrarianSeeder extends Seeder
                 'name' => 'Phu Nguyen (Admin)',
                 'email' => '4901104111@student.hcmue.edu.vn',
                 'password' => Hash::make($defaultPassword),
-                'phone_number' => '0909123456',
+                'phone_number' => $encryptPhone('0909123456'),
                 'hire_date' => '2026-05-23',
             ],
         ], ['librarian_id'], ['name', 'email', 'password', 'phone_number', 'hire_date']);

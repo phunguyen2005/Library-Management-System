@@ -35,6 +35,16 @@ class AuthenticatedUserResource extends JsonResource
                 'join_date' => $user->join_date?->toDateString(),
                 'notify_due_soon' => $user->notify_due_soon,
                 'notify_new_books' => $user->notify_new_books,
+                'notify_borrow_status' => $user->notify_borrow_status,
+                'notify_room_status' => $user->notify_room_status,
+                'notify_room_reminder' => $user->notify_room_reminder,
+                'notify_fine_status' => $user->notify_fine_status,
+                'notify_reservation' => $user->notify_reservation,
+                'xp' => $user->xp,
+                'points' => $user->points,
+                'level' => $user->level,
+                'daily_streak' => $user->daily_streak,
+                'last_check_in_at' => $user->last_check_in_at?->toIso8601String(),
             ];
         }
 

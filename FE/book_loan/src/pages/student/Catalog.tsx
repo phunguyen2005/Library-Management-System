@@ -15,6 +15,7 @@ import StarRating from '../../components/StarRating';
 import LibraryMapModal from '../../components/LibraryMapModal';
 import { applyImageFallback } from '../../lib/display';
 import { getErrorMessage, isUnauthorizedError } from '../../lib/errors';
+import { BOOK_CLASSIFICATIONS } from '../../lib/bookClassification';
 import { emitToast } from '../../notifications/events';
 import type { FormattedBook } from '../../types/book';
 
@@ -115,7 +116,7 @@ export default function Catalog() {
     setLoadError(null);
 
     Promise.all([
-      fetchBorrowableBooks(),
+      fetchBorrowableBooks(1, '', 1000),
       fetchFavoriteBooks(),
       fetchMyReservations(),
       getMyRequests(),
@@ -162,12 +163,6 @@ export default function Catalog() {
       setReviews([]);
     }
   }, [selectedBook]);
-
-  const categories = useMemo(() => {
-    return Array.from(new Set(books.map((book) => book.category).filter(Boolean))).sort((a, b) =>
-      a.localeCompare(b, 'vi'),
-    );
-  }, [books]);
 
   const filteredBooks = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -513,18 +508,18 @@ export default function Catalog() {
               >
                 Tất cả phân loại
               </button>
-              {categories.map((item) => (
+              {BOOK_CLASSIFICATIONS.map((item) => (
                 <button
-                  key={item}
+                  key={item.code}
                   type="button"
-                  onClick={() => updateFilter('category', item)}
+                  onClick={() => updateFilter('category', item.genre)}
                   className={`w-full rounded-lg px-3 py-2 text-left text-sm transition-colors ${
-                    category === item
+                    category === item.genre
                       ? 'bg-primary text-white'
                       : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container'
                   }`}
                 >
-                  {item}
+                  {item.label}
                 </button>
               ))}
             </div>

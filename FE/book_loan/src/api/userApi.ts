@@ -9,8 +9,14 @@ type UpdateProfilePayload = {
   current_password?: string;
   password?: string;
   password_confirmation?: string;
+  otp?: string;
   notify_due_soon?: boolean;
   notify_new_books?: boolean;
+  notify_borrow_status?: boolean;
+  notify_room_status?: boolean;
+  notify_room_reminder?: boolean;
+  notify_fine_status?: boolean;
+  notify_reservation?: boolean;
 };
 
 type MeResponse = {
@@ -61,12 +67,30 @@ export async function updateMyProfile(payload: UpdateProfilePayload) {
   });
 }
 
-export async function importMembers(file: File) {
+export async function importMembers(file: File, options?: { dry_run?: boolean; allow_partial?: boolean; column_mapping?: string }) {
   const formData = new FormData();
   formData.append('file', file);
+  if (options) {
+    if (options.dry_run !== undefined) formData.append('dry_run', options.dry_run ? '1' : '0');
+    if (options.allow_partial !== undefined) formData.append('allow_partial', options.allow_partial ? '1' : '0');
+    if (options.column_mapping !== undefined) formData.append('column_mapping', options.column_mapping);
+  }
   return apiRequest<{ message: string; success_count: number; errors: string[] }>('/members/import', {
     method: 'POST',
     body: formData,
+  });
+}
+
+export async function sendPasswordOtp() {
+  return apiRequest<{ message: string }>('/me/send-password-otp', {
+    method: 'POST',
+  });
+}
+
+export async function verifyPasswordOtp(otp: string) {
+  return apiRequest<{ message: string }>('/me/verify-password-otp', {
+    method: 'POST',
+    body: { otp },
   });
 }
 

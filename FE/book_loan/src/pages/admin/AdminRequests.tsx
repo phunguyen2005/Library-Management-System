@@ -305,8 +305,20 @@ export default function AdminRequests() {
         r.is_overdue ? 'Có' : 'Không', r.rejection_reason || '',
       ]),
     ];
-    const csv = rows.map((row) => row.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
-    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+    const tsvContent = '\ufeff' + rows.map(row => row.map(v => {
+      const str = String(v).replace(/[\r\n\t]/g, ' ');
+      if (str.includes('"') || str.includes('\t')) {
+        return '"' + str.replace(/"/g, '""') + '"';
+      }
+      return str;
+    }).join('\t')).join('\r\n');
+
+    const buffer = new ArrayBuffer(tsvContent.length * 2);
+    const view = new DataView(buffer);
+    for (let i = 0; i < tsvContent.length; i++) {
+      view.setUint16(i * 2, tsvContent.charCodeAt(i), true);
+    }
+    const blob = new Blob([buffer], { type: 'text/csv;charset=utf-16le;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
@@ -455,7 +467,7 @@ export default function AdminRequests() {
                           <p className="mt-1 max-w-xs text-xs text-red-600">Lý do: {request.rejection_reason}</p>
                         ) : null}
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-1 text-slate-600">
                           <span className="material-symbols-outlined text-[14px]">calendar_today</span>
                           <span className="text-xs font-medium">{request.date}</span>
@@ -463,7 +475,7 @@ export default function AdminRequests() {
                       </td>
                       {/* Feature 1 – Due date + overdue badge */}
                       {tab === 'BORROWED' && (
-                        <td className="px-6 py-4">
+                        <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex flex-col gap-1">
                             <span className="text-xs font-medium text-slate-700">{request.due_date || '—'}</span>
                             {dueBadge}

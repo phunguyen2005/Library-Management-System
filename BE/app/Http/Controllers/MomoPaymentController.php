@@ -41,6 +41,14 @@ class MomoPaymentController extends Controller
             ], 422);
         }
 
+        if ($fine->reason === Fine::REASON_OVERDUE && 
+            $fine->borrowing && 
+            $fine->borrowing->status !== \App\Models\Borrowing::STATUS_RETURNED) {
+            return response()->json([
+                'message' => __('messages.borrow.pay_overdue_requires_returned')
+            ], 422);
+        }
+
         $amount = (int) $fine->amount;
         if ($amount < 1000) {
             return response()->json([
@@ -237,6 +245,16 @@ class MomoPaymentController extends Controller
             return response()->json(['message' => 'Giao dịch này đã được xử lý từ trước.'], 200);
         }
 
+        if (! is_numeric($amount) || (int) $amount !== (int) $payment->amount_paid) {
+            Log::warning("MoMo IPN Amount mismatch", [
+                'ref' => $orderId,
+                'received' => $amount,
+                'expected' => $payment->amount_paid,
+            ]);
+
+            return response()->json(['message' => 'Số tiền thanh toán không hợp lệ.'], 400);
+        }
+
         // TỰ ĐỘNG CẬP NHẬT TRẠNG THÁI (AUTO-CONFIRM)
         DB::transaction(function () use ($payment, $resultCode, $transId, $request) {
             $payment->gateway_response = array_merge($payment->gateway_response ?? [], $request->all());
@@ -366,114 +384,5 @@ class MomoPaymentController extends Controller
         ]);
     }
 
-    /**
-     * Cho phép Sinh viên xác nhận chuyển khoản MoMo thủ công.
-     */
-    public function confirmTransfer(Request $request, int $paymentId)
-    {
-        $student = $request->user();
 
-        $payment = FinePayment::query()
-            ->whereHas('fine', function ($query) use ($student) {
-                $query->where('member_id', $student->member_id);
-            })
-            ->findOrFail($paymentId);
-
-        $payment->status = 'pending_verification';
-        $payment->save();
-
-        return response()->json($payment);
-    }
-
-    /**
-     * Lấy danh sách giao dịch chuyển khoản MoMo đang chờ đối soát.
-     */
-    public function getPendingTransfers(Request $request)
-    {
-        $payments = FinePayment::query()
-            ->with(['fine.member', 'fine.borrowing.book'])
-            ->where('status', 'pending_verification')
-            ->where('method', FinePayment::METHOD_MOMO)
-            ->get();
-
-        $data = $payments->map(function ($payment) {
-            $fine = $payment->fine;
-            $member = $fine?->member;
-            $book = $fine?->borrowing?->book;
-
-            return [
-                'payment_id' => $payment->payment_id,
-                'student_name' => $member?->name,
-                'student_email' => $member?->email,
-                'book_title' => $book?->title ?? 'Tài liệu',
-                'fine_id' => $fine?->fine_id,
-                'amount_paid' => (float) $payment->amount_paid,
-                'created_at' => $payment->created_at?->toIso8601String(),
-            ];
-        });
-
-        return response()->json(['data' => $data]);
-    }
-
-    /**
-     * Từ chối đối soát giao dịch MoMo chuyển khoản thủ công.
-     */
-    public function rejectTransfer(Request $request, int $paymentId)
-    {
-        $librarian = $request->user();
-        $payment = FinePayment::query()->with('fine.member')->findOrFail($paymentId);
-
-        DB::transaction(function () use ($payment, $librarian) {
-            $payment->status = FinePayment::STATUS_FAILED;
-            $payment->save();
-
-            $fine = $payment->fine;
-            if ($fine) {
-                $fine->status = Fine::STATUS_UNPAID;
-                $fine->paid_at = null;
-                $fine->save();
-
-                AuditLoggerService::log(
-                    'reject_momo_transfer',
-                    'Đã từ chối giao dịch chuyển khoản MoMo cho khoản phạt #' . $fine->fine_id . ' của thành viên: ' . ($fine->member?->name ?? ''),
-                    $librarian
-                );
-            }
-        });
-
-        return response()->json(['message' => 'Đã từ chối giao dịch chuyển khoản MoMo.']);
-    }
-
-    /**
-     * Phê duyệt giao dịch MoMo chuyển khoản thủ công.
-     */
-    public function approveTransfer(Request $request, int $paymentId)
-    {
-        $librarian = $request->user();
-        $payment = FinePayment::query()->with('fine.member')->findOrFail($paymentId);
-
-        DB::transaction(function () use ($payment, $librarian) {
-            $payment->status = FinePayment::STATUS_COMPLETED;
-            $payment->collected_by = $librarian->librarian_id;
-            $payment->save();
-
-            $fine = $payment->fine;
-            if ($fine) {
-                $fine->status = Fine::STATUS_PAID;
-                $fine->paid_at = now();
-                $fine->save();
-
-                $fine->member?->notify(new FineStatusNotification($fine->fresh(['borrowing.book']), Fine::STATUS_PAID));
-
-                $bookTitle = $fine->borrowing?->book?->title ?? 'Tài liệu';
-                AuditLoggerService::log(
-                    'collect_fine',
-                    'Đã phê duyệt giao dịch MoMo chuyển khoản ' . number_format((float)$fine->amount) . ' VND từ thành viên: ' . ($fine->member?->name ?? '') . ' cho sách: ' . $bookTitle . ' (Mã phiếu phạt: #' . $fine->fine_id . ')',
-                    $librarian
-                );
-            }
-        });
-
-        return response()->json(['message' => 'Đã phê duyệt giao dịch thanh toán MoMo thành công.']);
-    }
 }

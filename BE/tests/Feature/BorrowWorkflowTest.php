@@ -20,6 +20,8 @@ class BorrowWorkflowTest extends TestCase
         $member = Member::query()->findOrFail(1);
         $token = $member->createToken('member-access', ['role:student']);
 
+        Borrowing::find(1)->update(['due_date' => '2036-04-15']);
+
         $this->withToken($token->plainTextToken)
             ->postJson('/api/requests', ['book_id' => 1])
             ->assertStatus(422)
@@ -89,7 +91,7 @@ class BorrowWorkflowTest extends TestCase
                 'librarian_id' => null,
                 'status' => 'borrowed',
                 'borrow_date' => '2026-04-07',
-                'due_date' => '2026-04-21',
+                'due_date' => '2036-04-21',
                 'return_date' => null,
             ],
             [
@@ -98,7 +100,7 @@ class BorrowWorkflowTest extends TestCase
                 'librarian_id' => null,
                 'status' => 'borrowed',
                 'borrow_date' => '2026-04-07',
-                'due_date' => '2026-04-21',
+                'due_date' => '2036-04-21',
                 'return_date' => null,
             ],
         ]);

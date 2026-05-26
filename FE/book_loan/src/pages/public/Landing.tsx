@@ -831,7 +831,7 @@ export default function Landing() {
         <div className="mx-auto max-w-screen-xl border-t border-slate-900 pt-8 flex flex-col md:flex-row items-center justify-between gap-4 text-xs font-light">
           <p>{t('landing.copyright', { year: new Date().getFullYear() })}</p>
           <p className="text-slate-500 font-extralight uppercase tracking-widest text-[10px]">
-            Designed for HCMUE Midterm Project
+            HCMUE Library Management System
           </p>
         </div>
       </footer>

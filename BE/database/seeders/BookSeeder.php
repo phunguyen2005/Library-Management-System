@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Support\BookClassification;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -607,6 +608,22 @@ class BookSeeder extends Seeder
                 'available_quantity' => 5,
             ],
         ];
+
+        $books = array_map(static function (array $book): array {
+            if (! empty($book['is_digital'])) {
+                return $book;
+            }
+
+            $classification = BookClassification::normalizePhysical(
+                $book['genre'] ?? null,
+                $book['location'] ?? null,
+            ) ?? BookClassification::normalizePhysical(BookClassification::FALLBACK_GENRE, null);
+
+            $book['genre'] = $classification['genre'];
+            $book['location'] = $classification['location'];
+
+            return $book;
+        }, $books);
 
         DB::table('books')->upsert($books, ['book_id'], [
             'title',

@@ -243,7 +243,7 @@ export default function MomoMockCheckout() {
       </main>
 
       <footer className="mt-20 py-6 text-center text-xs text-slate-400 border-t border-slate-200">
-        <p>© 2026 MoMo Sandbox Simulator. Tích hợp cho Midterm Project.</p>
+        <p>© 2026 MoMo Sandbox Simulator. Tích hợp cho Library Management System.</p>
       </footer>
     </div>
   );

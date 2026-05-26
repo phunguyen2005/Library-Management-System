@@ -30,6 +30,9 @@ class DatabaseSeeder extends Seeder
             BorrowingSeeder::class,
             RoomSeeder::class,
             FineSeeder::class,
+            GamifySeeder::class,
+            NewBookImportSeeder::class,
+            AdditionalBookImportSeeder::class,
         ]);
     }
 }

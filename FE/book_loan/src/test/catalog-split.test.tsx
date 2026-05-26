@@ -45,9 +45,20 @@ const unavailableBook: FormattedBook = {
   is_available: false,
 };
 
+const legacyCategoryBook: FormattedBook = {
+  ...borrowableBook,
+  id: 9,
+  book_id: 9,
+  title: 'Legacy Free Category Book',
+  isbn: 'ISBN-9000',
+  category: 'Reference',
+  genre: 'Reference',
+  location: 'Shelf Z',
+};
+
 vi.mock('../api/bookApi', () => ({
-  fetchBooks: () => fetchBooksMock(),
-  fetchBorrowableBooks: () => fetchBorrowableBooksMock(),
+  fetchBooks: (...args: any[]) => fetchBooksMock(...args),
+  fetchBorrowableBooks: (...args: any[]) => fetchBorrowableBooksMock(...args),
 }));
 
 vi.mock('../api/borrowApi', () => ({
@@ -105,6 +116,26 @@ describe('Catalog borrowable split', () => {
     expect(await screen.findByText('Borrowable Catalog Book')).toBeInTheDocument();
     expect(screen.getByLabelText('Bỏ yêu thích Borrowable Catalog Book')).toBeInTheDocument();
     expect(screen.getByText('2 lượt yêu thích')).toBeInTheDocument();
+  });
+
+  it('shows fixed library map classifications instead of free-text book categories', async () => {
+    fetchBorrowableBooksMock.mockResolvedValueOnce({
+      data: [legacyCategoryBook],
+      meta: { total: 1 },
+    });
+    fetchFavoriteBooksMock.mockResolvedValueOnce([]);
+
+    render(
+      <MemoryRouter>
+        <Catalog />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(fetchBorrowableBooksMock).toHaveBeenCalled());
+
+    expect(screen.getByRole('button', { name: 'A - Khoa học Tự nhiên' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'C - Công nghệ - Kỹ thuật' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Reference' })).not.toBeInTheDocument();
   });
 
   it('opens details for unavailable books so students can reserve them', async () => {

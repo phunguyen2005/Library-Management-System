@@ -145,7 +145,11 @@ export default function Favorites() {
             >
               <button
                 type="button"
-                onClick={() => navigate(`/catalog?book=${book.id}`)}
+                onClick={() =>
+                  book.is_digital
+                    ? navigate(`/digital?book=${book.id}`)
+                    : navigate(`/catalog?book=${book.id}`)
+                }
                 className="relative block aspect-[3/4] w-full overflow-hidden bg-surface-container text-left"
               >
                 <img
@@ -157,7 +161,7 @@ export default function Favorites() {
                   className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                 />
                 <span className="absolute right-3 top-3 rounded-full bg-primary px-2 py-1 text-[10px] font-bold uppercase text-white">
-                  {book.status}
+                  {book.is_digital ? 'DIGITAL' : book.status}
                 </span>
               </button>
               <div className="space-y-2 md:space-y-4 p-3 md:p-5">
@@ -173,16 +177,20 @@ export default function Favorites() {
                   </p>
                 </div>
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between text-[10px] md:text-xs text-on-surface-variant gap-1">
-                  <span>{book.available_quantity} bản sẵn sàng</span>
+                  <span>{book.is_digital ? 'Tài nguyên trực tuyến' : `${book.available_quantity} bản sẵn sàng`}</span>
                   <span className="hidden sm:inline">{Number(book.favorite_count ?? 0)} lượt thích</span>
                 </div>
                 <div className="flex items-center gap-2 md:gap-3">
                   <button
                     type="button"
-                    onClick={() => navigate(`/catalog?book=${book.id}`)}
+                    onClick={() =>
+                      book.is_digital
+                        ? navigate(`/digital?book=${book.id}`)
+                        : navigate(`/catalog?book=${book.id}`)
+                    }
                     className="flex-1 rounded-lg bg-primary-container py-1.5 md:py-2 text-xs md:text-sm font-bold text-primary"
                   >
-                    Chi tiết
+                    {book.is_digital ? 'Đọc ngay' : 'Chi tiết'}
                   </button>
                   <button
                     type="button"

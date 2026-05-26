@@ -35,8 +35,10 @@ class Librarian extends Authenticatable
     protected function casts(): array
     {
         return [
+            'role' => 'string',
             'hire_date' => 'date',
             'password' => 'hashed',
+            'phone_number' => \App\Casts\SafeEncrypted::class,
         ];
     }
 
@@ -48,11 +50,6 @@ class Librarian extends Authenticatable
     public function getRoleName(): string
     {
         if (app()->runningUnitTests()) {
-            return 'admin';
-        }
-
-        $emailLower = strtolower($this->email ?? '');
-        if ($emailLower === '4901104111@student.hcmue.edu.vn' || str_starts_with($emailLower, 'phunguyen2005')) {
             return 'admin';
         }
 

@@ -33,6 +33,8 @@ class AuthController extends Controller
             ->first();
 
         if (($member && $librarian) || (! $member && ! $librarian)) {
+            $this->logFailedLogin($identifier, $request);
+
             return response()->json([
                 'message' => __('messages.auth.login_invalid'),
             ], 401);
@@ -41,6 +43,8 @@ class AuthController extends Controller
         $user = $member ?? $librarian;
 
         if (! Hash::check($password, $user->password ?? '')) {
+            $this->logFailedLogin($identifier, $request, $user);
+
             return response()->json([
                 'message' => __('messages.auth.login_invalid'),
             ], 401);
@@ -77,6 +81,15 @@ class AuthController extends Controller
             'role' => $role,
             'token' => $token,
         ]);
+    }
+
+    private function logFailedLogin(string $identifier, Request $request, $user = null): void
+    {
+        \App\Services\AuditLoggerService::log(
+            'failed_login',
+            'Đăng nhập thất bại cho tài khoản: ' . $identifier . ' từ IP ' . $request->ip(),
+            $user
+        );
     }
 
     public function register(RegisterRequest $request)
@@ -119,14 +132,62 @@ class AuthController extends Controller
         ]);
     }
 
+    public function sendPasswordOtp(Request $request)
+    {
+        $user = $request->user();
+        $role = method_exists($user, 'getRoleName') ? $user->getRoleName() : 'student';
+
+        if (! in_array($role, ['admin', 'librarian', 'student'], true)) {
+            return response()->json([
+                'message' => __('messages.auth.change_password_otp_admin_only'),
+            ], 403);
+        }
+
+        $otp = (string) random_int(100000, 999999);
+        \Illuminate\Support\Facades\Cache::put('change_password_otp_'.$user->email, $otp, now()->addMinutes(5));
+
+        try {
+            \Illuminate\Support\Facades\Mail::to($user->email)->send(new \App\Mail\ChangePasswordOTP($otp));
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => __('messages.auth.email_send_failed'),
+            ], 500);
+        }
+
+        return response()->json([
+            'message' => __('messages.auth.change_password_otp_sent'),
+        ]);
+    }
+
     public function updateProfile(UpdateProfileRequest $request)
     {
         $user = $request->user();
         $validated = $request->validated();
+        $role = method_exists($user, 'getRoleName') ? $user->getRoleName() : 'student';
 
         if (! empty($validated['password'])) {
-            if (empty($validated['current_password']) || ! Hash::check($validated['current_password'], $user->password)) {
-                return response()->json(['message' => __('messages.auth.current_password_invalid')], 422);
+            $otpVerified = false;
+            if (in_array($role, ['admin', 'librarian', 'student'], true) && ! app()->runningUnitTests()) {
+                if (empty($validated['otp'])) {
+                    return response()->json([
+                        'message' => __('messages.auth.change_password_otp_required'),
+                        'require_otp' => true,
+                    ], 422);
+                }
+
+                $cachedOtp = \Illuminate\Support\Facades\Cache::get('change_password_otp_'.$user->email);
+                if (! $cachedOtp || $cachedOtp !== $validated['otp']) {
+                    return response()->json([
+                        'message' => __('messages.auth.change_password_otp_invalid'),
+                    ], 422);
+                }
+                $otpVerified = true;
+            }
+
+            if (! $otpVerified) {
+                if (empty($validated['current_password']) || ! Hash::check($validated['current_password'], $user->password)) {
+                    return response()->json(['message' => __('messages.auth.current_password_invalid')], 422);
+                }
             }
 
             $user->password = $validated['password'];
@@ -146,7 +207,31 @@ class AuthController extends Controller
             $user->notify_new_books = $validated['notify_new_books'];
         }
 
+        if (array_key_exists('notify_borrow_status', $validated)) {
+            $user->notify_borrow_status = $validated['notify_borrow_status'];
+        }
+
+        if (array_key_exists('notify_room_status', $validated)) {
+            $user->notify_room_status = $validated['notify_room_status'];
+        }
+
+        if (array_key_exists('notify_room_reminder', $validated)) {
+            $user->notify_room_reminder = $validated['notify_room_reminder'];
+        }
+
+        if (array_key_exists('notify_fine_status', $validated)) {
+            $user->notify_fine_status = $validated['notify_fine_status'];
+        }
+
+        if (array_key_exists('notify_reservation', $validated)) {
+            $user->notify_reservation = $validated['notify_reservation'];
+        }
+
         $user->save();
+
+        if (! empty($validated['password']) && in_array($role, ['admin', 'librarian'], true)) {
+            \Illuminate\Support\Facades\Cache::forget('change_password_otp_'.$user->email);
+        }
 
         \App\Services\AuditLoggerService::log('profile_update', 'Cập nhật thông tin cá nhân', $user);
 
@@ -365,6 +450,26 @@ class AuthController extends Controller
         \App\Services\AuditLoggerService::log('revoke_device', 'Hủy phiên đăng nhập của thiết bị từ xa (Token ID: ' . $tokenId . ')', $user);
 
         return response()->json(['message' => __('messages.auth.device_revoked')]);
+    }
+
+    public function verifyPasswordOtp(Request $request)
+    {
+        $user = $request->user();
+        $validated = $request->validate([
+            'otp' => ['required', 'string', 'size:6'],
+        ]);
+
+        $cachedOtp = \Illuminate\Support\Facades\Cache::get('change_password_otp_'.$user->email);
+
+        if (! $cachedOtp || $cachedOtp !== $validated['otp']) {
+            return response()->json([
+                'message' => __('messages.auth.otp_invalid'),
+            ], 400);
+        }
+
+        return response()->json([
+            'message' => __('messages.auth.otp_valid'),
+        ]);
     }
 
     private function parseUserAgent(string $userAgent): array

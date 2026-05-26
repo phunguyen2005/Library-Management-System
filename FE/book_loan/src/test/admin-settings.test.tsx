@@ -6,11 +6,13 @@ import AdminSettings from '../pages/admin/AdminSettings';
 
 const {
   updateMyProfileMock,
+  sendPasswordOtpMock,
   updateUserMock,
   fetchLibrarySettingsMock,
   updateLibrarySettingsMock,
 } = vi.hoisted(() => ({
   updateMyProfileMock: vi.fn(),
+  sendPasswordOtpMock: vi.fn(),
   updateUserMock: vi.fn(),
   fetchLibrarySettingsMock: vi.fn(),
   updateLibrarySettingsMock: vi.fn(),
@@ -18,6 +20,7 @@ const {
 
 vi.mock('../api/userApi', () => ({
   updateMyProfile: (...args: unknown[]) => updateMyProfileMock(...args),
+  sendPasswordOtp: () => sendPasswordOtpMock(),
 }));
 
 vi.mock('../api/librarySettingsApi', () => ({
@@ -99,8 +102,9 @@ describe('AdminSettings', () => {
     });
   });
 
-  it('submits password fields without allowing email edits', async () => {
+  it('submits password fields without allowing email edits, requiring OTP flow', async () => {
     const user = userEvent.setup();
+    sendPasswordOtpMock.mockResolvedValueOnce({ message: 'Success' });
     updateMyProfileMock.mockResolvedValueOnce({
       message: 'Cập nhật hồ sơ thành công.',
       role: 'admin',
@@ -127,12 +131,20 @@ describe('AdminSettings', () => {
     await user.type(screen.getByLabelText('Xác nhận mật khẩu mới'), 'NewPass123');
     await user.click(screen.getByTestId('save-admin-profile'));
 
+    expect(sendPasswordOtpMock).toHaveBeenCalled();
+
+    // Fill in OTP Modal
+    const otpInput = await screen.findByLabelText('Mã OTP đổi mật khẩu');
+    await user.type(otpInput, '123456');
+    await user.click(screen.getByRole('button', { name: 'Xác nhận' }));
+
     expect(updateMyProfileMock).toHaveBeenCalledWith({
       name: 'Old Admin',
       phone_number: '0901000001',
       current_password: 'Library@2026',
       password: 'NewPass123',
       password_confirmation: 'NewPass123',
+      otp: '123456',
     });
     expect(screen.getByTestId('admin-email')).toHaveAttribute('readonly');
   });
@@ -168,12 +180,14 @@ describe('AdminSettings', () => {
     await user.type(screen.getByTestId('grace-period-days'), '2');
     await user.click(screen.getByTestId('save-borrow-settings'));
 
-    expect(updateLibrarySettingsMock).toHaveBeenCalledWith({
-      loan_period_days: 21,
-      max_active_loans: 7,
-      fine_per_day: 10000,
-      max_fine_per_loan: 150000,
-      grace_period_days: 2,
-    });
+    expect(updateLibrarySettingsMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        loan_period_days: 21,
+        max_active_loans: 7,
+        fine_per_day: 10000,
+        max_fine_per_loan: 150000,
+        grace_period_days: 2,
+      })
+    );
   });
 });

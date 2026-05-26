@@ -1,6 +1,6 @@
 # Book Loan Backend
 
-Laravel 12 API for the Book Loan Midterm system.
+Laravel 12 API for the Library Management System.
 
 ## Stack
 

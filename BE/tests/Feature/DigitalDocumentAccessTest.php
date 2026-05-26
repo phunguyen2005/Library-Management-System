@@ -7,6 +7,7 @@ use App\Models\Librarian;
 use App\Models\Member;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
 use Tests\TestCase;
@@ -19,7 +20,10 @@ class DigitalDocumentAccessTest extends TestCase
 
     public function test_digital_document_payload_includes_signed_access_links(): void
     {
-        $response = $this->getJson('/api/digital-documents')
+        $member = Member::query()->findOrFail(1);
+        $token = $member->createToken('student-digital-access', ['role:student'])->plainTextToken;
+
+        $response = $this->withToken($token)->getJson('/api/digital-documents')
             ->assertOk();
 
         $payload = $response->json();
@@ -67,7 +71,10 @@ class DigitalDocumentAccessTest extends TestCase
             'is_available' => true,
         ]);
 
-        $documentIds = collect($this->getJson('/api/digital-documents')
+        $member = Member::query()->findOrFail(1);
+        $token = $member->createToken('student-digital-access', ['role:student'])->plainTextToken;
+
+        $documentIds = collect($this->withToken($token)->getJson('/api/digital-documents')
             ->assertOk()
             ->json('data'))
             ->pluck('book_id');
@@ -75,7 +82,71 @@ class DigitalDocumentAccessTest extends TestCase
         $this->assertFalse($documentIds->contains($book->book_id));
     }
 
-    public function test_signed_digital_document_route_serves_preview_and_updates_count(): void
+    public function test_digital_download_counts_are_calculated_from_user_access_events_not_seeded_column(): void
+    {
+        $book = Book::query()
+            ->where('is_digital', true)
+            ->where('download_count', '>', 0)
+            ->firstOrFail();
+        $member = Member::query()->findOrFail(1);
+        $token = $member->createToken('student-real-download-counts', ['role:student'])->plainTextToken;
+
+        $bookPayload = collect($this->withToken($token)
+            ->getJson('/api/books?is_digital=true&limit=1000')
+            ->assertOk()
+            ->json('data'))
+            ->firstWhere('book_id', $book->book_id);
+        $documentResponse = $this->withToken($token)
+            ->getJson('/api/digital-documents')
+            ->assertOk();
+        $documentPayload = collect($documentResponse->json('data') ?? $documentResponse->json())
+            ->firstWhere('book_id', $book->book_id);
+
+        $this->assertSame(0, $bookPayload['download_count']);
+        $this->assertSame(0, $documentPayload['download_count']);
+    }
+
+    public function test_signed_digital_document_download_records_member_access_and_updates_real_count(): void
+    {
+        $this->assertTrue(
+            Schema::hasTable('digital_document_accesses'),
+            'Digital document downloads should be stored as first-class user access records.',
+        );
+
+        if (! Schema::hasTable('digital_document_accesses')) {
+            return;
+        }
+
+        $member = Member::query()->findOrFail(1);
+        $token = $member->createToken('student-real-download-audit', ['role:student'])->plainTextToken;
+
+        $documentResponse = $this->withToken($token)
+            ->getJson('/api/digital-documents')
+            ->assertOk();
+        $document = collect($documentResponse->json('data') ?? $documentResponse->json())
+            ->first();
+        $book = Book::query()->findOrFail($document['book_id']);
+
+        $this->get($document['download_url'])
+            ->assertOk();
+
+        $this->assertDatabaseHas('digital_document_accesses', [
+            'book_id' => $book->book_id,
+            'member_id' => $member->member_id,
+            'access_type' => 'download',
+        ]);
+
+        $refreshedDocumentResponse = $this->withToken($token)
+            ->getJson('/api/digital-documents')
+            ->assertOk();
+        $refreshedDocument = collect($refreshedDocumentResponse->json('data') ?? $refreshedDocumentResponse->json())
+            ->firstWhere('book_id', $book->book_id);
+
+        $this->assertSame(1, $refreshedDocument['download_count']);
+        $this->assertSame(1, $book->fresh()->download_count);
+    }
+
+    public function test_signed_digital_document_route_serves_preview_and_records_preview_access(): void
     {
         $book = Book::query()->where('is_digital', true)->firstOrFail();
         $initialDownloads = $book->download_count;
@@ -90,10 +161,11 @@ class DigitalDocumentAccessTest extends TestCase
 
         $this->assertStringStartsWith('%PDF-1.4', $response->getContent());
 
-        $this->assertDatabaseHas('books', [
+        $this->assertDatabaseHas('digital_document_accesses', [
             'book_id' => $book->book_id,
-            'download_count' => $initialDownloads + 1,
+            'access_type' => 'preview',
         ]);
+        $this->assertSame($initialDownloads, $book->fresh()->download_count);
     }
 
     public function test_admin_can_upload_digital_file_for_book(): void

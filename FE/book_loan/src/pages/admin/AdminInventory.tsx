@@ -23,6 +23,38 @@ import { applyImageFallback } from '../../lib/display';
 import { getErrorMessage, isUnauthorizedError } from '../../lib/errors';
 import { emitToast } from '../../notifications/events';
 import type { FormattedBook } from '../../types/book';
+import { AnimatePresence } from 'framer-motion';
+import CSVImportWizard from '../../components/CSVImportWizard';
+import CSVExportSelector from '../../components/CSVExportSelector';
+
+const EXPECTED_FIELDS = [
+  { key: 'title', label: 'Tên sách / Tiêu đề', required: true, fallbacks: ['ten_sach', 'title', 'tieu de', 'ten'] },
+  { key: 'author', label: 'Tác giả', required: true, fallbacks: ['tac_gia', 'author', 'tac gia'] },
+  { key: 'genre', label: 'Thể loại / Thư mục', required: false, fallbacks: ['the_loai', 'genre', 'the loai', 'danh muc'] },
+  { key: 'published_year', label: 'Năm xuất bản', required: false, fallbacks: ['published_year', 'nam_xuat_ban', 'nam xb', 'published year'] },
+  { key: 'location', label: 'Vị trí kệ', required: false, fallbacks: ['vi_tri', 'location', 'ke', 'vi tri'] },
+  { key: 'quantity', label: 'Số lượng bản', required: false, fallbacks: ['so_luong', 'quantity', 'so luong'] },
+  { key: 'is_digital', label: 'Sách số / Tài nguyên (1/0)', required: false, fallbacks: ['sach_so', 'is_digital', 'sach so'] },
+];
+
+const SAMPLE_CSV_PHYSICAL = "\uFEFFten_sach,tac_gia,the_loai,nam_xuat_ban,vi_tri,so_luong,sach_so\nĐắc Nhân Tâm,Dale Carnegie,Triết học & Tâm lý học,2020,Kệ J1,5,0\nLược sử thời gian,Stephen Hawking,Khoa học Tự nhiên,2018,Kệ A1,3,0";
+const SAMPLE_CSV_DIGITAL = "\uFEFFten_sach,tac_gia,the_loai,nam_xuat_ban,vi_tri,so_luong,sach_so\nGiáo trình Triết học Mác - Lênin,Bộ Giáo dục và Đào tạo,Giáo trình,2021,,0,1\nBáo cáo Phát triển Bền vững,Tổng cục Thống kê,Báo cáo,2025,,0,1";
+
+const AVAILABLE_EXPORT_COLUMNS = [
+  { key: 'book_id', label: 'Mã tài liệu' },
+  { key: 'title', label: 'Tên tài liệu' },
+  { key: 'author', label: 'Tác giả' },
+  { key: 'genre', label: 'Thể loại / Danh mục' },
+  { key: 'published_year', label: 'Năm xuất bản' },
+  { key: 'location', label: 'Vị trí kệ' },
+  { key: 'total_quantity', label: 'Tổng số lượng bản' },
+  { key: 'available_quantity', label: 'Bản khả dụng' },
+  { key: 'is_digital', label: 'Loại tài liệu' },
+  { key: 'download_count', label: 'Lượt tải số' },
+];
+
+const DEFAULT_EXPORT_COLUMNS = ['book_id', 'title', 'author', 'genre', 'location', 'total_quantity', 'available_quantity'];
+
 
 type InventoryTab = 'borrow' | 'digital';
 
@@ -131,60 +163,49 @@ export default function AdminInventory() {
   const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
   const [aiActionId, setAiActionId] = useState<number | null>(null);
 
-  // --- CSV Import state ---
+  // --- CSV Import/Export state ---
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
-  const [importFile, setImportFile] = useState<File | null>(null);
-  const [isImporting, setIsImporting] = useState(false);
-  const [importErrors, setImportErrors] = useState<string[]>([]);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
-  const handleImportSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!importFile) return;
-
-    setIsImporting(true);
-    setImportErrors([]);
-
+  const handleExportBooks = (columns: string[]) => {
+    const sessionStr = localStorage.getItem('auth_session');
+    if (!sessionStr) return;
     try {
-      const response = await importBooks(importFile);
-      emitToast({
-        tone: 'success',
-        title: 'Nhập dữ liệu thành công',
-        message: response.message,
-      });
-      setIsImportModalOpen(false);
-      setImportFile(null);
-      await loadBooks(false);
-    } catch (error: unknown) {
-      if (isUnauthorizedError(error)) {
-        return;
-      }
-      const errDetails = (error as any).details;
-      if (errDetails && Array.isArray(errDetails.errors)) {
-        setImportErrors(errDetails.errors);
-      } else {
-        const message = getErrorMessage(error, 'Không thể nhập dữ liệu sách.');
-        emitToast({ tone: 'error', title: 'Lỗi nhập dữ liệu', message });
-      }
-    } finally {
-      setIsImporting(false);
-    }
-  };
+      const token = JSON.parse(sessionStr).token;
+      emitToast({ tone: 'info', title: 'Xuất dữ liệu', message: 'Đang khởi tạo tải dữ liệu...' });
 
-  const downloadTemplate = () => {
-    // Generate appropriate headers based on current active tab
-    const isDigital = activeTab === 'digital';
-    const csvContent = isDigital
-      ? "\uFEFFten_sach,tac_gia,the_loai,nam_xuat_ban,vi_tri,so_luong,sach_so\nGiáo trình Triết học Mác - Lênin,Bộ Giáo dục và Đào tạo,Giáo trình,2021,,0,1\nBáo cáo Phát triển Bền vững,Tổng cục Thống kê,Báo cáo,2025,,0,1"
-      : "\uFEFFten_sach,tac_gia,the_loai,nam_xuat_ban,vi_tri,so_luong,sach_so\nĐắc Nhân Tâm,Dale Carnegie,Kỹ năng sống,2020,Kệ A1,5,0\nLược sử thời gian,Stephen Hawking,Khoa học,2018,Kệ B2,3,0";
-      
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", isDigital ? "mau_nhap_tai_nguyen_so.csv" : "mau_nhap_sach_muon.csv");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+      let exportUrl = 'http://localhost:8000/api/reports/export-books';
+      const params: Record<string, string> = {
+        columns: columns.join(','),
+      };
+      if (searchTerm) {
+        params.query = searchTerm;
+      }
+      if (activeTab === 'digital') {
+        params.is_digital = '1';
+      } else if (activeTab === 'borrow') {
+        params.is_digital = '0';
+      }
+      exportUrl += '?' + new URLSearchParams(params).toString();
+
+      fetch(exportUrl, { headers: { Authorization: `Bearer ${token}` } })
+        .then((res) => { if (!res.ok) throw new Error('Yêu cầu xuất tệp dữ liệu thất bại.'); return res.blob(); })
+        .then((blob) => {
+          const url = window.URL.createObjectURL(blob);
+          const a = Object.assign(document.createElement('a'), {
+            href: url,
+            download: `xuat-kho-sach-${new Date().toISOString().slice(0, 10)}.csv`,
+          });
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          window.URL.revokeObjectURL(url);
+          emitToast({ tone: 'success', title: 'Thành công', message: 'Tải xuống tệp CSV thành công.' });
+        })
+        .catch((err: Error) => emitToast({ tone: 'error', title: 'Thất bại', message: err.message }));
+    } catch {
+      emitToast({ tone: 'error', title: 'Lỗi', message: 'Không thể xác thực để xuất dữ liệu.' });
+    }
   };
 
   const [totalPages, setTotalPages] = useState(1);
@@ -516,6 +537,14 @@ export default function AdminInventory() {
           >
             <span aria-hidden="true" className="material-symbols-outlined text-sm">upload_file</span>
             Nhập từ CSV
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsExportModalOpen(true)}
+            className="flex items-center gap-2 rounded-xl bg-surface-container-high px-5 py-2.5 font-medium text-slate-700 transition-all hover:bg-slate-200 hover:-translate-y-0.5"
+          >
+            <span aria-hidden="true" className="material-symbols-outlined text-sm">download</span>
+            Xuất CSV
           </button>
           <button
             type="button"
@@ -995,135 +1024,32 @@ export default function AdminInventory() {
         </div>
       )}
 
-      {isImportModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-xl overflow-hidden rounded-2xl bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-surface-container bg-slate-50 p-6">
-              <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                <span className="material-symbols-outlined text-primary">upload_file</span>
-                Nhập danh sách sách từ CSV ({activeTab === 'digital' ? 'Tài nguyên số' : 'Sách mượn'})
-              </h3>
-              <button
-                type="button"
-                onClick={() => { setIsImportModalOpen(false); setImportErrors([]); setImportFile(null); }}
-                className="text-slate-400 hover:text-slate-600 transition-colors"
-                aria-label="Đóng"
-              >
-                <span aria-hidden="true" className="material-symbols-outlined">close</span>
-              </button>
-            </div>
-            
-            <form onSubmit={handleImportSubmit} className="p-6 space-y-6">
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
-                <p className="text-xs font-bold text-slate-700 uppercase tracking-wider">Cấu trúc cột tệp CSV mẫu:</p>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs border-collapse">
-                    <thead>
-                      <tr className="border-b border-slate-200 text-slate-500 font-bold">
-                        <th className="pb-2">Tên sách *</th>
-                        <th className="pb-2">Tác giả *</th>
-                        <th className="pb-2">Thể loại</th>
-                        <th className="pb-2">Năm XB</th>
-                        <th className="pb-2">Vị trí kệ</th>
-                        <th className="pb-2">Số lượng</th>
-                        <th className="pb-2">Sách số</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr className="text-slate-600">
-                        <td className="pt-2 font-mono">ten_sach / title</td>
-                        <td className="pt-2 font-mono">tac_gia / author</td>
-                        <td className="pt-2 font-mono">the_loai / genre</td>
-                        <td className="pt-2 font-mono">nam_xuat_ban / published_year</td>
-                        <td className="pt-2 font-mono">vi_tri / location</td>
-                        <td className="pt-2 font-mono">so_luong / quantity</td>
-                        <td className="pt-2 font-mono">sach_so / is_digital</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-                <div className="flex justify-between items-center pt-2">
-                  <span className="text-[10px] text-slate-500">
-                    * Bắt buộc. Để `sach_so` là 1 nếu là tài nguyên số, 0 nếu là sách mượn.
-                  </span>
-                  <button
-                    type="button"
-                    onClick={downloadTemplate}
-                    className="text-xs font-bold text-primary hover:text-primary-hover flex items-center gap-1 transition-colors"
-                  >
-                    <span className="material-symbols-outlined text-[14px]">download</span>
-                    Tải file mẫu
-                  </button>
-                </div>
-              </div>
+      <AnimatePresence>
+        {isImportModalOpen && (
+          <CSVImportWizard
+            isOpen={isImportModalOpen}
+            onClose={() => setIsImportModalOpen(false)}
+            onImportSuccess={() => void loadBooks(false)}
+            entityType="book"
+            importApiCall={importBooks}
+            expectedFields={EXPECTED_FIELDS}
+            sampleCSV={isDigitalTab ? SAMPLE_CSV_DIGITAL : SAMPLE_CSV_PHYSICAL}
+            sampleFileName={isDigitalTab ? "mau_nhap_tai_nguyen_so.csv" : "mau_nhap_sach_muon.csv"}
+          />
+        )}
 
-              <div className="space-y-2">
-                <label className="block text-xs font-bold text-slate-600">Chọn tệp tin CSV (.csv):</label>
-                <div className="border-2 border-dashed border-slate-200 hover:border-primary/50 transition-colors rounded-xl p-6 text-center cursor-pointer relative group">
-                  <input
-                    type="file"
-                    accept=".csv,text/csv"
-                    required
-                    onChange={(e) => setImportFile(e.target.files?.[0] || null)}
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                  />
-                  <div className="space-y-2 pointer-events-none">
-                    <span className="material-symbols-outlined text-4xl text-slate-400 group-hover:text-primary transition-colors">
-                      cloud_upload
-                    </span>
-                    <p className="text-sm font-semibold text-slate-700">
-                      {importFile ? importFile.name : 'Kéo thả tệp tin hoặc nhấp vào đây để chọn'}
-                    </p>
-                    <p className="text-xs text-slate-400">Chỉ chấp nhận tệp tin định dạng .csv tối đa 4MB</p>
-                  </div>
-                </div>
-              </div>
-
-              {importErrors.length > 0 && (
-                <div className="bg-red-50 border border-red-200 rounded-xl p-4 max-h-40 overflow-y-auto space-y-1">
-                  <p className="text-xs font-bold text-red-800 flex items-center gap-1">
-                    <span className="material-symbols-outlined text-[16px]">error</span>
-                    Dữ liệu không hợp lệ. Vui lòng sửa các lỗi sau:
-                  </p>
-                  <ul className="list-disc pl-5 text-xs text-red-700 space-y-0.5">
-                    {importErrors.map((err, i) => (
-                      <li key={i}>{err}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => { setIsImportModalOpen(false); setImportErrors([]); setImportFile(null); }}
-                  disabled={isImporting}
-                  className="rounded-xl bg-slate-100 px-5 py-2.5 font-bold text-slate-600 transition-colors hover:bg-slate-200 disabled:opacity-50"
-                >
-                  Hủy
-                </button>
-                <button
-                  type="submit"
-                  disabled={isImporting || !importFile}
-                  className="rounded-xl bg-primary px-5 py-2.5 font-bold text-white shadow-md shadow-primary/20 transition-opacity hover:opacity-90 disabled:opacity-50 flex items-center gap-1.5"
-                >
-                  {isImporting ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      Đang xử lý...
-                    </>
-                  ) : (
-                    <>
-                      <span className="material-symbols-outlined text-[16px]">check_circle</span>
-                      Bắt đầu Nhập
-                    </>
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+        {isExportModalOpen && (
+          <CSVExportSelector
+            isOpen={isExportModalOpen}
+            onClose={() => setIsExportModalOpen(false)}
+            onExport={handleExportBooks}
+            availableColumns={AVAILABLE_EXPORT_COLUMNS}
+            defaultColumns={DEFAULT_EXPORT_COLUMNS}
+            title={isDigitalTab ? "Xuất kho Tài nguyên số" : "Xuất kho Sách mượn"}
+            description="Lọc và xuất danh sách các ấn phẩm/tài liệu ra tệp CSV để lưu trữ hoặc phân tích."
+          />
+        )}
+      </AnimatePresence>
 
       {showScanner && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/80 p-4 backdrop-blur-sm">

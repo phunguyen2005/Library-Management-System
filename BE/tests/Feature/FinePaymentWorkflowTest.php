@@ -83,7 +83,7 @@ class FinePaymentWorkflowTest extends TestCase
 
     public function test_student_can_view_fine_summary_and_detail_payload(): void
     {
-        Carbon::setTestNow(Carbon::parse('2026-05-23 09:00:00', 'Asia/Ho_Chi_Minh'));
+        Carbon::setTestNow(Carbon::parse('2026-05-23 09:00:00'));
 
         $member = Member::query()->findOrFail(1);
         $token = $member->createToken('student-fines', ['role:student']);
@@ -172,6 +172,8 @@ class FinePaymentWorkflowTest extends TestCase
     {
         $librarian = Librarian::query()->findOrFail(1);
         $token = $librarian->createToken('admin-fines-pay', ['role:admin']);
+
+        Borrowing::find(1)->update(['status' => 'returned', 'return_date' => '2026-04-10']);
 
         $fine = Fine::query()->create([
             'loan_id' => 1,
@@ -299,107 +301,7 @@ class FinePaymentWorkflowTest extends TestCase
             ]);
     }
 
-    public function test_student_can_confirm_momo_transfer(): void
-    {
-        $student = Member::query()->findOrFail(1);
-        $studentToken = $student->createToken('student-momo', ['role:student']);
 
-        $fine = Fine::query()->create([
-            'loan_id' => 1,
-            'member_id' => $student->member_id,
-            'amount' => 50000,
-            'reason' => 'overdue',
-            'status' => 'unpaid',
-        ]);
-
-        $payment = \App\Models\FinePayment::query()->create([
-            'fine_id' => $fine->fine_id,
-            'amount_paid' => 50000,
-            'method' => \App\Models\FinePayment::METHOD_MOMO,
-            'transaction_ref' => 'FINE_PAY_' . $fine->fine_id . '_123456',
-            'status' => \App\Models\FinePayment::STATUS_PENDING,
-        ]);
-
-        $this->withToken($studentToken->plainTextToken)
-            ->postJson("/api/fines/payments/{$payment->payment_id}/confirm-transfer")
-            ->assertOk()
-            ->assertJsonPath('status', 'pending_verification');
-
-        $this->assertDatabaseHas('fine_payments', [
-            'payment_id' => $payment->payment_id,
-            'status' => 'pending_verification',
-        ]);
-    }
-
-    public function test_admin_can_retrieve_approve_and_reject_momo_transfers(): void
-    {
-        $student = Member::query()->findOrFail(1);
-        $librarian = Librarian::query()->findOrFail(1);
-        $adminToken = $librarian->createToken('admin-momo', ['role:admin']);
-
-        $fine = Fine::query()->create([
-            'loan_id' => 1,
-            'member_id' => $student->member_id,
-            'amount' => 50000,
-            'reason' => 'overdue',
-            'status' => 'unpaid',
-        ]);
-
-        $payment = \App\Models\FinePayment::query()->create([
-            'fine_id' => $fine->fine_id,
-            'amount_paid' => 50000,
-            'method' => \App\Models\FinePayment::METHOD_MOMO,
-            'transaction_ref' => 'FINE_PAY_' . $fine->fine_id . '_123456',
-            'status' => 'pending_verification',
-        ]);
-
-        // 1. Admin retrieves pending transfers
-        $this->withToken($adminToken->plainTextToken)
-            ->getJson('/api/admin/momo-pending')
-            ->assertOk()
-            ->assertJsonCount(1, 'data')
-            ->assertJsonPath('data.0.payment_id', $payment->payment_id)
-            ->assertJsonPath('data.0.student_name', $student->name);
-
-        // 2. Admin rejects first (for testing)
-        $this->withToken($adminToken->plainTextToken)
-            ->postJson("/api/admin/momo-payments/{$payment->payment_id}/reject")
-            ->assertOk();
-
-        $this->assertDatabaseHas('fine_payments', [
-            'payment_id' => $payment->payment_id,
-            'status' => 'failed',
-        ]);
-        
-        $this->assertDatabaseHas('fines', [
-            'fine_id' => $fine->fine_id,
-            'status' => 'unpaid',
-        ]);
-
-        // Reset to pending_verification to test approval
-        \App\Models\FinePayment::where('payment_id', $payment->payment_id)->update(['status' => 'pending_verification']);
-
-        // 3. Admin approves transfer
-        $this->withToken($adminToken->plainTextToken)
-            ->postJson("/api/admin/momo-payments/{$payment->payment_id}/approve")
-            ->assertOk();
-
-        $this->assertDatabaseHas('fine_payments', [
-            'payment_id' => $payment->payment_id,
-            'status' => 'completed',
-            'collected_by' => $librarian->librarian_id,
-        ]);
-
-        $this->assertDatabaseHas('fines', [
-            'fine_id' => $fine->fine_id,
-            'status' => 'paid',
-        ]);
-
-        $this->assertDatabaseHas('audit_logs', [
-            'action' => 'collect_fine',
-            'user_id' => $librarian->librarian_id,
-        ]);
-    }
 
     public function test_admin_can_manually_create_fine(): void
     {

@@ -68,6 +68,15 @@ class ReviewController extends Controller
 
         $review->load(['member:member_id,name']);
 
+        // Award XP and points
+        app(\App\Services\GamifyService::class)->awardXpAndPoints(
+            $member,
+            30,
+            10,
+            'review_post',
+            'Đánh giá sách thành công: ' . $book->title
+        );
+
         // Format book's new rating to send back
         $avgRating = (float) round($book->reviews()->avg('rating') ?? 0, 1);
         $reviewsCount = (int) $book->reviews()->count();

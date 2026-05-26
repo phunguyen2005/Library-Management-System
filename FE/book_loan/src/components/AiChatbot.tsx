@@ -1,9 +1,167 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { sendChatMessage, type ChatMessage } from '../api/aiApi';
+import { streamChatMessage, type ChatMessage } from '../api/aiApi';
+import { fetchBookDetail } from '../api/bookApi';
+import { requestBorrow } from '../api/borrowApi';
+import { reserveBook } from '../api/reservationApi';
+import { applyImageFallback } from '../lib/display';
 import { getErrorMessage } from '../lib/errors';
 import { emitToast } from '../notifications/events';
 import { motion, AnimatePresence } from 'motion/react';
+import type { FormattedBook } from '../types/book';
+
+// Custom inline card sub-component for rich previews and actions
+function InlineBookCard({ bookId }: { bookId: number }) {
+  const [book, setBook] = useState<FormattedBook | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    fetchBookDetail(bookId)
+      .then((data) => {
+        if (active) {
+          setBook(data);
+          setLoading(false);
+        }
+      })
+      .catch((err) => {
+        console.error('Error fetching book detail:', err);
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [bookId]);
+
+  const handleBorrow = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!book) return;
+    setActionLoading(true);
+    try {
+      const response = await requestBorrow(book.id);
+      emitToast({
+        tone: 'success',
+        title: 'Thành công',
+        message: response.message || `Đã gửi yêu cầu mượn cuốn: ${book.title}`,
+      });
+      const updated = await fetchBookDetail(book.id);
+      setBook(updated);
+    } catch (error: unknown) {
+      const message = getErrorMessage(error, 'Lỗi khi yêu cầu mượn sách');
+      emitToast({ tone: 'error', title: 'Lỗi mượn sách', message });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleReserve = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!book) return;
+    setActionLoading(true);
+    try {
+      const response = await reserveBook(book.id);
+      emitToast({
+        tone: 'success',
+        title: 'Thành công',
+        message: response.message || `Đặt chỗ thành công cuốn: ${book.title}`,
+      });
+      const updated = await fetchBookDetail(book.id);
+      setBook(updated);
+    } catch (error: unknown) {
+      const message = getErrorMessage(error, 'Lỗi khi đặt chỗ sách');
+      emitToast({ tone: 'error', title: 'Lỗi đặt chỗ', message });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex gap-3 bg-surface-container/60 border border-surface-container-high p-3 rounded-xl max-w-sm animate-pulse my-2">
+        <div className="w-16 h-24 bg-surface-container rounded-md shrink-0" />
+        <div className="flex-1 space-y-2 py-1">
+          <div className="h-3 bg-surface-container rounded w-3/4" />
+          <div className="h-2.5 bg-surface-container rounded w-1/2" />
+          <div className="h-5 bg-surface-container rounded w-1/3 mt-2" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!book) {
+    return (
+      <div className="text-xs text-outline italic my-2">
+        Không tìm thấy thông tin cuốn sách #{bookId}
+      </div>
+    );
+  }
+
+  return (
+    <div 
+      onClick={() => {
+        window.location.href = `/catalog?book=${book.id}`;
+      }}
+      className="flex gap-3 bg-surface-bright border border-surface-container-high p-3 rounded-xl max-w-sm shadow-sm hover:shadow-md transition-all hover:scale-[1.01] cursor-pointer my-2 text-on-surface"
+    >
+      <img
+        src={book.cover}
+        alt={book.title}
+        onError={(event) => applyImageFallback(event.currentTarget)}
+        className="w-16 h-24 object-cover rounded-md bg-surface-container shrink-0"
+      />
+      <div className="flex-1 flex flex-col justify-between min-w-0">
+        <div>
+          <h4 className="text-xs font-bold text-on-surface line-clamp-2 leading-tight" title={book.title}>
+            {book.title}
+          </h4>
+          <p className="text-[10px] text-on-surface-variant truncate mt-0.5">{book.author}</p>
+          <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-primary/10 text-primary">
+              {book.is_digital ? 'Tài liệu số' : 'Sách vật lý'}
+            </span>
+            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded text-white ${book.is_available ? 'bg-green-600' : 'bg-red-500'}`}>
+              {book.is_available ? 'Còn sách' : 'Hết sách'}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex gap-2 mt-2">
+          {book.is_digital ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                window.location.href = `/catalog?book=${book.id}`;
+              }}
+              className="text-[10px] bg-primary hover:bg-primary/95 text-white px-2.5 py-1 rounded-lg font-bold transition-colors cursor-pointer"
+            >
+              Đọc online
+            </button>
+          ) : book.is_available ? (
+            <button
+              type="button"
+              disabled={actionLoading}
+              onClick={handleBorrow}
+              className="text-[10px] bg-primary hover:bg-primary/95 text-white px-2.5 py-1 rounded-lg font-bold transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {actionLoading ? 'Đang gửi...' : 'Mượn ngay'}
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled={actionLoading}
+              onClick={handleReserve}
+              className="text-[10px] bg-amber-600 hover:bg-amber-700 text-white px-2.5 py-1 rounded-lg font-bold transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {actionLoading ? 'Đang gửi...' : 'Đặt chỗ trước'}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function AiChatbot() {
   const [isOpen, setIsOpen] = useState(false);
@@ -35,15 +193,33 @@ export default function AiChatbot() {
     setInputText('');
     setIsLoading(true);
 
+    // Append an empty placeholder for the incoming AI message
+    setMessages((prev) => [...prev, { sender: 'ai', text: '' }]);
+
+    let accumulatedText = '';
+
     try {
-      const activeHistory = messages.slice(-10); // Keep last 10 messages for context
-      const response = await sendChatMessage(text, activeHistory);
-      
-      setMessages((prev) => [
-        ...prev,
-        { sender: 'ai', text: response.response },
-      ]);
+      const activeHistory = [...messages, userMsg].slice(-10); // Keep last 10 messages
+      await streamChatMessage(text, activeHistory, (chunk) => {
+        accumulatedText += chunk;
+        setMessages((prev) => {
+          const next = [...prev];
+          if (next.length > 0) {
+            next[next.length - 1] = { sender: 'ai', text: accumulatedText };
+          }
+          return next;
+        });
+      });
     } catch (error: unknown) {
+      // Remove empty placeholder if nothing generated
+      setMessages((prev) => {
+        const next = [...prev];
+        if (next.length > 0 && next[next.length - 1].text === '') {
+          next.pop();
+        }
+        return next;
+      });
+
       const message = getErrorMessage(error, 'Đã xảy ra sự cố khi kết nối với AI.');
       setMessages((prev) => [
         ...prev,
@@ -58,14 +234,11 @@ export default function AiChatbot() {
     }
   };
 
-  // Helper to parse message text and render custom elements (like book links [ID: 5])
   const renderMessageContent = (text: string) => {
-    // Basic Markdown bullet points, bold text
     const lines = text.split('\n');
     return lines.map((line, idx) => {
       let content: React.ReactNode = line;
 
-      // Replace bold text **bold**
       const boldRegex = /\*\*(.*?)\*\*/g;
       if (boldRegex.test(line)) {
         const parts = line.split(boldRegex);
@@ -77,44 +250,25 @@ export default function AiChatbot() {
         });
       }
 
-      // Detect [ID: X] pattern
       const idRegex = /\[ID:\s*(\d+)\]/g;
       const hasId = idRegex.test(line);
 
       if (hasId) {
-        // Find all matches
         const matches = [...line.matchAll(idRegex)];
         
         return (
-          <div key={idx} className="my-1.5 flex flex-col space-y-1">
+          <div key={idx} className="my-2 flex flex-col space-y-1.5">
             <p className="text-sm leading-relaxed">{content}</p>
-            <div className="flex flex-wrap gap-1.5 mt-1">
+            <div className="flex flex-col space-y-2 mt-1">
               {matches.map((match, mIdx) => {
                 const bookId = Number(match[1]);
-                return (
-                  <button
-                    key={mIdx}
-                    type="button"
-                    onClick={() => {
-                      setSearchParams({ book: String(bookId) });
-                      // If user is not on Catalog, suggest redirection or handle locally
-                      if (window.location.pathname !== '/catalog') {
-                        window.location.href = `/catalog?book=${bookId}`;
-                      }
-                    }}
-                    className="inline-flex max-w-fit items-center gap-1.5 rounded-xl bg-surface-bright border border-surface-container-high px-3 py-1.5 text-xs font-medium text-primary shadow-sm transition-all hover:bg-surface hover:text-primary focus:ring-2 focus:ring-primary/20 active:scale-95 cursor-pointer"
-                  >
-                    <span className="material-symbols-outlined text-[16px]">menu_book</span>
-                    <span>Xem chi tiết sách #{bookId}</span>
-                  </button>
-                );
+                return <InlineBookCard key={mIdx} bookId={bookId} />;
               })}
             </div>
           </div>
         );
       }
 
-      // Render standard list item
       if (line.trim().startsWith('* ') || line.trim().startsWith('- ')) {
         return (
           <li key={idx} className="ml-4 list-disc text-sm leading-relaxed my-0.5">
@@ -131,15 +285,39 @@ export default function AiChatbot() {
     });
   };
 
-  const SUGGESTED_CHIPS = [
-    { label: '🔍 Tìm sách lập trình Web', query: 'Tìm cho tôi sách về lập trình Web' },
-    { label: '📋 Quy trình mượn sách', query: 'Quy trình mượn trả sách như thế nào?' },
-    { label: 'Đặt chỗ trước khi hết sách', query: 'Tính năng đặt chỗ trước hoạt động ra sao?' },
-  ];
+  const getDynamicSuggestedChips = (lastMessageText: string) => {
+    const text = lastMessageText.toLowerCase();
+    if (text.includes('mượn') || text.includes('trả') || text.includes('quy trình')) {
+      return [
+        { label: '⏰ Thời hạn mượn tối đa?', query: 'Thời gian tối đa mượn một cuốn sách là bao lâu?' },
+        { label: '💰 Trả sách trễ hạn bị phạt thế nào?', query: 'Mức phạt tiền quá hạn cụ thể như thế nào?' },
+        { label: '🔄 Cách gia hạn mượn sách?', query: 'Quy trình gia hạn mượn sách ra sao?' }
+      ];
+    }
+    if (text.includes('đặt chỗ') || text.includes('hàng đợi') || text.includes('hết sách')) {
+      return [
+        { label: '❌ Cách hủy đặt chỗ trước?', query: 'Tôi muốn hủy đăng ký đặt chỗ trước sách' },
+        { label: '📈 Xem danh sách đặt chỗ của tôi?', query: 'Tôi xem danh sách đặt chỗ ở đâu?' }
+      ];
+    }
+    if (text.includes('phòng tự học') || text.includes('đặt phòng') || text.includes('học nhóm')) {
+      return [
+        { label: '🔑 Check-in nhận phòng tự học?', query: 'Hướng dẫn check-in phòng tự học khi tới giờ' },
+        { label: '🚫 Cách hủy phòng tự học đã đặt?', query: 'Hủy lịch đặt phòng đã đặt nhóm thế nào?' }
+      ];
+    }
+    return [
+      { label: '🔍 Tìm sách lập trình Web', query: 'Tìm cho tôi sách về lập trình Web' },
+      { label: '📋 Quy trình mượn sách', query: 'Quy trình mượn trả sách như thế nào?' },
+      { label: 'Đặt chỗ trước khi hết sách', query: 'Tính năng đặt chỗ trước hoạt động ra sao?' }
+    ];
+  };
+
+  const lastAiMessage = [...messages].reverse().find(m => m.sender === 'ai' && m.text.trim() !== '');
+  const suggestedChips = lastAiMessage ? getDynamicSuggestedChips(lastAiMessage.text) : [];
 
   return (
     <>
-      {/* Floating Action Button */}
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
@@ -149,7 +327,6 @@ export default function AiChatbot() {
         <span className="material-symbols-outlined text-3xl animate-pulse">smart_toy</span>
       </button>
 
-      {/* Slide-in Chat Drawer */}
       <AnimatePresence>
         {isOpen && (
           <motion.div
@@ -159,7 +336,6 @@ export default function AiChatbot() {
             transition={{ type: 'spring', damping: 25, stiffness: 220 }}
             className="fixed inset-y-0 right-0 z-50 flex w-full flex-col border-l border-surface-container-high bg-surface-bright shadow-2xl sm:max-w-md"
           >
-            {/* Header */}
             <header className="flex h-16 items-center justify-between border-b border-surface-container-high px-6 bg-surface">
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary text-2xl">smart_toy</span>
@@ -180,7 +356,6 @@ export default function AiChatbot() {
               </button>
             </header>
 
-            {/* Message Thread */}
             <div className="custom-scrollbar flex-1 overflow-y-auto p-6 space-y-4">
               {messages.map((msg, index) => (
                 <div
@@ -188,7 +363,7 @@ export default function AiChatbot() {
                   className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
                   <div
-                    className={`max-w-[85%] rounded-2xl p-4 text-sm scholar-shadow ${
+                    className={`max-w-[85%] rounded-2xl p-4 text-sm scholar-shadow relative group ${
                       msg.sender === 'user'
                         ? 'bg-primary text-white rounded-tr-none'
                         : 'bg-surface-container text-on-surface rounded-tl-none border border-surface-container-high'
@@ -199,14 +374,14 @@ export default function AiChatbot() {
                 </div>
               ))}
 
-              {isLoading && (
+              {isLoading && messages[messages.length - 1]?.text === '' && (
                 <div className="flex justify-start animate-pulse">
                   <div className="max-w-[85%] rounded-2xl rounded-tl-none p-4 text-sm bg-surface-container border border-surface-container-high">
                     <div className="flex items-center gap-2 text-on-surface-variant">
                       <span className="h-1.5 w-1.5 bg-on-surface-variant rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
                       <span className="h-1.5 w-1.5 bg-on-surface-variant rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
                       <span className="h-1.5 w-1.5 bg-on-surface-variant rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                      <span className="text-xs font-semibold ml-1">AI đang suy nghĩ...</span>
+                      <span className="text-xs font-semibold ml-1">AI đang soạn tin nhắn...</span>
                     </div>
                   </div>
                 </div>
@@ -214,13 +389,12 @@ export default function AiChatbot() {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Input area */}
             <div className="border-t border-surface-container-high bg-surface p-4">
-              {messages.length === 1 && (
-                <div className="mb-4 flex flex-col gap-2">
+              {suggestedChips.length > 0 && !isLoading && (
+                <div className="mb-4 flex flex-col gap-2 animate-fade-in">
                   <p className="text-[10px] font-bold uppercase tracking-widest text-outline">Gợi ý câu hỏi nhanh:</p>
                   <div className="flex flex-col gap-1.5">
-                    {SUGGESTED_CHIPS.map((chip, idx) => (
+                    {suggestedChips.map((chip, idx) => (
                       <button
                         key={idx}
                         type="button"
@@ -252,7 +426,7 @@ export default function AiChatbot() {
                 <button
                   type="submit"
                   disabled={!inputText.trim() || isLoading}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+                  className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer shrink-0"
                 >
                   <span className="material-symbols-outlined text-lg">send</span>
                 </button>
