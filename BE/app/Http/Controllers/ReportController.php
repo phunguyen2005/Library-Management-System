@@ -82,8 +82,13 @@ class ReportController extends Controller
         $range = $this->getDateRange($request);
 
         // 1. Biểu đồ mượn trả theo từng tháng
+        $driver = DB::connection()->getDriverName();
+        $dateSelect = $driver === 'sqlite'
+            ? "strftime('%Y-%m', borrow_date)"
+            : "DATE_FORMAT(borrow_date, '%Y-%m')";
+
         $trendQuery = Borrowing::query()
-            ->selectRaw("strftime('%Y-%m', borrow_date) as month, count(*) as count");
+            ->selectRaw("{$dateSelect} as month, count(*) as count");
 
         if ($range) {
             // When a filter is active, show breakdown within that period
@@ -151,8 +156,13 @@ class ReportController extends Controller
         $byMethodVnpay = (float) ($byMethod['vnpay'] ?? 0);
 
         // 3.1 Xu hướng doanh thu phạt (daily revenue trends)
+        $driver = DB::connection()->getDriverName();
+        $dateSelect = $driver === 'sqlite'
+            ? "strftime('%Y-%m-%d', created_at)"
+            : "DATE_FORMAT(created_at, '%Y-%m-%d')";
+
         $revenueTrendQuery = \App\Models\FinePayment::where('status', 'completed')
-            ->selectRaw("strftime('%Y-%m-%d', created_at) as date, sum(amount_paid) as total");
+            ->selectRaw("{$dateSelect} as date, sum(amount_paid) as total");
         if ($range) {
             $revenueTrendQuery->whereBetween('created_at', $range);
         } else {
