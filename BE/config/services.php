@@ -22,6 +22,10 @@ return [
         'key' => env('RESEND_KEY'),
     ],
 
+    'brevo' => [
+        'key' => env('BREVO_KEY'),
+    ],
+
     'google' => [
         'client_id' => env('GOOGLE_CLIENT_ID'),
         'client_secret' => env('GOOGLE_CLIENT_SECRET'),

@@ -5,8 +5,11 @@ namespace App\Providers;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
+use Symfony\Component\Mailer\Bridge\Brevo\Transport\BrevoTransportFactory;
+use Symfony\Component\Mailer\Transport\Dsn;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -29,6 +32,17 @@ class AppServiceProvider extends ServiceProvider
             $identifier = trim((string) ($request->input('identifier') ?? $request->input('email') ?? ''));
 
             return Limit::perMinute(5)->by($request->ip().'|'.$identifier);
+        });
+
+        // Đăng ký Brevo mail transport (HTTP API, không bị Render Free chặn)
+        Mail::extend('brevo', function (array $config) {
+            $factory = new BrevoTransportFactory();
+            $dsn = new Dsn(
+                'brevo+api',
+                'default',
+                config('services.brevo.key')
+            );
+            return $factory->create($dsn);
         });
     }
 }
