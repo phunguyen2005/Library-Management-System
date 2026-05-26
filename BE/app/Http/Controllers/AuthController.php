@@ -146,18 +146,19 @@ class AuthController extends Controller
         $otp = (string) random_int(100000, 999999);
         \Illuminate\Support\Facades\Cache::put('change_password_otp_'.$user->email, $otp, now()->addMinutes(5));
 
+        $mailSent = true;
         try {
             \Illuminate\Support\Facades\Mail::to($user->email)->send(new \App\Mail\ChangePasswordOTP($otp));
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error('sendPasswordOtp mail error: ' . $e->getMessage());
-            return response()->json([
-                'message' => __('messages.auth.email_send_failed'),
-                'debug' => config('app.debug') ? $e->getMessage() : null,
-            ], 500);
+            $mailSent = false;
         }
 
         return response()->json([
-            'message' => __('messages.auth.change_password_otp_sent'),
+            'message' => $mailSent
+                ? __('messages.auth.change_password_otp_sent')
+                : 'Mã OTP đã được tạo. Nếu email không đến, hãy liên hệ quản trị viên.',
+            'mail_sent' => $mailSent,
         ]);
     }
 
@@ -329,18 +330,19 @@ class AuthController extends Controller
         $otp = (string) random_int(100000, 999999);
         \Illuminate\Support\Facades\Cache::put('forgot_otp_'.$email, $otp, now()->addMinutes(5));
 
+        $mailSent = true;
         try {
             \Illuminate\Support\Facades\Mail::to($email)->send(new \App\Mail\ForgotPasswordOTP($otp));
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error('forgotPassword mail error: ' . $e->getMessage());
-            return response()->json([
-                'message' => __('messages.auth.email_send_failed'),
-                'debug' => config('app.debug') ? $e->getMessage() : null,
-            ], 500);
+            $mailSent = false;
         }
 
         return response()->json([
-            'message' => __('messages.auth.password_reset_otp_sent'),
+            'message' => $mailSent
+                ? __('messages.auth.password_reset_otp_sent')
+                : 'Mã OTP đã được tạo. Nếu email không đến, hãy liên hệ quản trị viên.',
+            'mail_sent' => $mailSent,
         ]);
     }
 
