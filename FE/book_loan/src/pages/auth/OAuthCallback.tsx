@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
+import { API_BASE_URL } from '../../api/client';
 
 export default function OAuthCallback() {
   const navigate = useNavigate();
@@ -30,7 +31,7 @@ export default function OAuthCallback() {
       try {
         // 2. Fetch user profile using the new token
         // We use a manual fetch/apiRequest here because we don't have it in context yet
-        const response = await fetch('http://localhost:8000/api/me', {
+        const response = await fetch(`${API_BASE_URL}/me`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Accept': 'application/json',

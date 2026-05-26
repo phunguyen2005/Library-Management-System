@@ -8,6 +8,7 @@ import LanguageToggle from '../../components/LanguageToggle';
 import logo from '../../assets/logo.png';
 import { ApiError, getErrorMessage } from '../../lib/errors';
 import LoginHelpModal from '../../components/LoginHelpModal';
+import { API_BASE_URL } from '../../api/client';
 
 export default function Login() {
   const { t } = useTranslation();
@@ -309,7 +310,7 @@ export default function Login() {
               <div className="flex gap-4">
                 <button
                   type="button"
-                  onClick={() => window.location.href = 'http://localhost:8000/api/auth/google/redirect'}
+                  onClick={() => window.location.href = `${API_BASE_URL}/auth/google/redirect`}
                   className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white py-3 font-semibold text-slate-600 transition-all hover:bg-slate-50 hover:text-slate-900 active:scale-[0.98]"
                 >
                   <svg className="h-5 w-5" viewBox="0 0 24 24">
@@ -334,7 +335,7 @@ export default function Login() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => window.location.href = 'http://localhost:8000/api/auth/github/redirect'}
+                  onClick={() => window.location.href = `${API_BASE_URL}/auth/github/redirect`}
                   className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white py-3 font-semibold text-slate-600 transition-all hover:bg-slate-50 hover:text-slate-900 active:scale-[0.98]"
                 >
                   <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
