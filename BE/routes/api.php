@@ -171,6 +171,10 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/reports/export-books', [\App\Http\Controllers\ReportController::class, 'exportBooks']);
             Route::get('/reports/export-members', [\App\Http\Controllers\ReportController::class, 'exportMembers']);
             Route::get('/reports/export-fines', [\App\Http\Controllers\ReportController::class, 'exportFines']);
+            Route::get('/reports/export-overdue', [\App\Http\Controllers\ReportController::class, 'exportOverdue']);
+            Route::get('/reports/export-circulation', [\App\Http\Controllers\ReportController::class, 'exportCirculation']);
+            Route::get('/reports/export-assets', [\App\Http\Controllers\ReportController::class, 'exportAssets']);
+            Route::get('/reports/export-digital', [\App\Http\Controllers\ReportController::class, 'exportDigital']);
             Route::get('/reports/fines-detail', [\App\Http\Controllers\ReportController::class, 'finesDetail']);
         });
 

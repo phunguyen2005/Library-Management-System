@@ -1,7 +1,7 @@
 import React, { startTransition, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Scanner } from '@yudiel/react-qr-scanner';
-import { generateBookMetadata } from '../../api/aiApi';
+import { generateBookMetadata, generateAllBooksMetadata } from '../../api/aiApi';
 import {
   addBorrowableBook,
   addDigitalResource,
@@ -23,6 +23,7 @@ import { applyImageFallback } from '../../lib/display';
 import { getErrorMessage, isUnauthorizedError } from '../../lib/errors';
 import { emitToast } from '../../notifications/events';
 import type { FormattedBook } from '../../types/book';
+import { BOOK_CLASSIFICATIONS, getDefaultShelfForCategory, findClassification, getShelvesForCategory } from '../../lib/bookClassification';
 import { AnimatePresence } from 'framer-motion';
 import CSVImportWizard from '../../components/CSVImportWizard';
 import CSVExportSelector from '../../components/CSVExportSelector';
@@ -164,6 +165,7 @@ export default function AdminInventory() {
   const [bookToDelete, setBookToDelete] = useState<FormattedBook | null>(null);
   const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
   const [aiActionId, setAiActionId] = useState<number | null>(null);
+  const [isGeneratingAll, setIsGeneratingAll] = useState(false);
 
   // --- CSV Import/Export state ---
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -384,6 +386,29 @@ export default function AdminInventory() {
     }
   };
 
+  const handleGenerateAllAiMetadata = async () => {
+    setIsGeneratingAll(true);
+
+    try {
+      const response = await generateAllBooksMetadata();
+      await loadBooks(false);
+      emitToast({
+        tone: 'success',
+        title: 'Đã tạo metadata AI hàng loạt',
+        message: response.message,
+      });
+    } catch (error: unknown) {
+      if (isUnauthorizedError(error)) {
+        return;
+      }
+
+      const message = getErrorMessage(error, 'Không thể tạo metadata AI hàng loạt.');
+      emitToast({ tone: 'error', title: 'Không thể tạo metadata AI hàng loạt', message });
+    } finally {
+      setIsGeneratingAll(false);
+    }
+  };
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
 
@@ -513,50 +538,85 @@ export default function AdminInventory() {
             Quản lý kho sách vật lý tách riêng khỏi các tệp PDF/âm thanh tải xuống.
           </p>
         </div>
-        <div className="flex gap-3">
-          {activeTab === 'borrow' ? (
-            <>
-              <button
-                type="button"
-                onClick={() => setShowScanner(true)}
-                className="flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 font-medium text-white transition-all hover:bg-indigo-700 shadow-md shadow-indigo-600/20 hover:-translate-y-0.5"
-              >
-                <span className="material-symbols-outlined text-sm">qr_code_scanner</span>
-                Quét mã vạch
-              </button>
-              <button
-                type="button"
-                onClick={handlePrintBarcodes}
-                className="flex items-center gap-2 rounded-xl bg-surface-container px-5 py-2.5 font-medium text-on-surface transition-all hover:bg-surface-container-high"
-              >
-                <span className="material-symbols-outlined text-sm">print</span>
-                In mã vạch
-              </button>
-            </>
-          ) : null}
-          <button
-            type="button"
-            onClick={() => setIsImportModalOpen(true)}
-            className="flex items-center gap-2 rounded-xl bg-surface-container-high px-5 py-2.5 font-medium text-slate-700 transition-all hover:bg-slate-200 hover:-translate-y-0.5"
-          >
-            <span aria-hidden="true" className="material-symbols-outlined text-sm">upload_file</span>
-            Nhập từ CSV
-          </button>
-          <button
-            type="button"
-            onClick={() => setIsExportModalOpen(true)}
-            className="flex items-center gap-2 rounded-xl bg-surface-container-high px-5 py-2.5 font-medium text-slate-700 transition-all hover:bg-slate-200 hover:-translate-y-0.5"
-          >
-            <span aria-hidden="true" className="material-symbols-outlined text-sm">download</span>
-            Xuất CSV
-          </button>
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Unified Actions Toolbar */}
+          <div className="flex flex-wrap items-center gap-1.5 rounded-2xl border border-surface-container-high/60 bg-surface-container-lowest/80 p-1.5 backdrop-blur-sm scholar-shadow">
+            {/* Conditional scanner and barcode actions */}
+            {activeTab === 'borrow' && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setShowScanner(true)}
+                  className="flex h-9 items-center gap-1.5 px-3 rounded-xl text-indigo-600 transition-all hover:bg-indigo-50 dark:hover:bg-indigo-950/30 hover:scale-[1.03] active:scale-[0.97] cursor-pointer"
+                  title="Quét mã vạch"
+                >
+                  <span className="material-symbols-outlined text-[20px]">qr_code_scanner</span>
+                  <span className="text-xs font-bold uppercase tracking-wider hidden lg:inline">Quét mã</span>
+                </button>
+                
+                <button
+                  type="button"
+                  onClick={handlePrintBarcodes}
+                  className="flex h-9 items-center gap-1.5 px-3 rounded-xl text-slate-600 dark:text-slate-300 transition-all hover:bg-slate-100 dark:hover:bg-slate-800/40 hover:scale-[1.03] active:scale-[0.97] cursor-pointer"
+                  title="In nhãn mã vạch"
+                >
+                  <span className="material-symbols-outlined text-[20px]">print</span>
+                  <span className="text-xs font-bold uppercase tracking-wider hidden lg:inline">In mã vạch</span>
+                </button>
+                
+                <div className="h-5 w-[1px] bg-surface-container-high/80 mx-1 hidden lg:block" />
+              </>
+            )}
+
+            {/* Import CSV */}
+            <button
+              type="button"
+              onClick={() => setIsImportModalOpen(true)}
+              className="flex h-9 items-center gap-1.5 px-3 rounded-xl text-emerald-600 transition-all hover:bg-emerald-50 dark:hover:bg-emerald-950/30 hover:scale-[1.03] active:scale-[0.97] cursor-pointer"
+              title="Nhập sách từ tệp CSV"
+            >
+              <span aria-hidden="true" className="material-symbols-outlined text-[20px]">upload_file</span>
+              <span className="text-xs font-bold uppercase tracking-wider hidden sm:inline">Nhập CSV</span>
+            </button>
+
+            {/* Export CSV */}
+            <button
+              type="button"
+              onClick={() => setIsExportModalOpen(true)}
+              className="flex h-9 items-center gap-1.5 px-3 rounded-xl text-blue-600 transition-all hover:bg-blue-50 dark:hover:bg-blue-950/30 hover:scale-[1.03] active:scale-[0.97] cursor-pointer"
+              title="Xuất sách ra tệp CSV"
+            >
+              <span aria-hidden="true" className="material-symbols-outlined text-[20px]">file_download</span>
+              <span className="text-xs font-bold uppercase tracking-wider hidden sm:inline">Xuất CSV</span>
+            </button>
+
+            <div className="h-5 w-[1px] bg-surface-container-high/80 mx-1" />
+
+            {/* AI Generator Button */}
+            <button
+              type="button"
+              disabled={isGeneratingAll}
+              onClick={handleGenerateAllAiMetadata}
+              className={`flex h-9 items-center gap-1.5 px-3 rounded-xl text-purple-600 transition-all hover:bg-purple-50 dark:hover:bg-purple-950/30 hover:scale-[1.03] active:scale-[0.97] disabled:cursor-wait disabled:opacity-60 cursor-pointer ${
+                isGeneratingAll ? 'bg-purple-50 animate-pulse' : ''
+              }`}
+              title={isGeneratingAll ? "Đang xử lý AI..." : "Tạo Tóm tắt & Nhãn AI cho toàn bộ sách"}
+            >
+              <span className={`material-symbols-outlined text-[20px] ${isGeneratingAll ? 'animate-spin' : ''}`}>
+                {isGeneratingAll ? 'progress_activity' : 'auto_awesome'}
+              </span>
+              <span className="text-xs font-bold uppercase tracking-wider hidden md:inline">Tạo AI tất cả</span>
+            </button>
+          </div>
+
+          {/* Primary Action Button: Add */}
           <button
             type="button"
             aria-label={isDigitalTab ? 'Thêm tài nguyên số' : 'Thêm sách mượn'}
             onClick={openAddModal}
-            className="flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 font-medium text-white shadow-lg shadow-primary/20 transition-all hover:-translate-y-0.5"
+            className="flex h-11 items-center gap-2 rounded-2xl bg-primary px-5 font-semibold text-white shadow-md shadow-primary/20 transition-all hover:-translate-y-0.5 hover:scale-[1.02] active:scale-[0.98] cursor-pointer shrink-0"
           >
-            <span className="material-symbols-outlined text-sm">add</span>
+            <span className="material-symbols-outlined text-[20px]">add_circle</span>
             {isDigitalTab ? 'Thêm tài nguyên số' : 'Thêm sách mượn'}
           </button>
         </div>
@@ -850,22 +910,39 @@ export default function AdminInventory() {
                   <label htmlFor="book-category" className="mb-1 block text-xs font-bold text-slate-600">
                     {isDigitalTab ? 'Loại tài nguyên (Tự động)' : 'Danh mục'} <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    id="book-category"
-                    required
-                    type="text"
-                    disabled={isDigitalTab}
-                    placeholder={isDigitalTab ? 'Tự động từ định dạng tệp' : ''}
-                    value={formData.category}
-                    onChange={(event) =>
-                      setFormData({ ...formData, category: event.target.value })
-                    }
-                    className={`w-full rounded-lg border border-slate-200 px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20 ${
-                      isDigitalTab
-                        ? 'bg-slate-100 text-slate-500 cursor-not-allowed font-medium'
-                        : 'bg-slate-50'
-                    }`}
-                  />
+                  {isDigitalTab ? (
+                    <input
+                      id="book-category"
+                      required
+                      type="text"
+                      disabled
+                      placeholder="Tự động từ định dạng tệp"
+                      value={formData.category}
+                      className="w-full rounded-lg border border-slate-200 bg-slate-100 text-slate-500 px-4 py-2 outline-none cursor-not-allowed font-medium"
+                    />
+                  ) : (
+                    <select
+                      id="book-category"
+                      required
+                      aria-label="Danh mục"
+                      value={findClassification(formData.category).genre}
+                      onChange={(event) => {
+                        const nextCategory = event.target.value;
+                        setFormData({
+                          ...formData,
+                          category: nextCategory,
+                          location: getDefaultShelfForCategory(nextCategory),
+                        });
+                      }}
+                      className="w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20 text-sm"
+                    >
+                      {BOOK_CLASSIFICATIONS.map((classification) => (
+                        <option key={classification.code} value={classification.genre}>
+                          {classification.label}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
 
                 {!isDigitalTab ? (
@@ -884,15 +961,12 @@ export default function AdminInventory() {
                         className="w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20 text-sm"
                       >
                         <option value="">Chọn kệ...</option>
-                        {Object.entries(SHELF_LABELS).map(([code, label]) => {
-                          const shelfVal = `Kệ ${code}`;
-                          return (
-                            <option key={code} value={shelfVal}>
-                              {shelfVal} ({label})
-                            </option>
-                          );
-                        })}
-                        {formData.location && !Object.keys(SHELF_LABELS).some(code => `Kệ ${code}` === formData.location) && (
+                        {getShelvesForCategory(formData.category).map((shelf) => (
+                          <option key={shelf.code} value={shelf.value}>
+                            {shelf.label}
+                          </option>
+                        ))}
+                        {formData.location && !getShelvesForCategory(formData.category).some(shelf => shelf.value === formData.location) && (
                           <option value={formData.location}>
                             {formData.location} (Hiện tại)
                           </option>

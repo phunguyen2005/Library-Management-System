@@ -31,6 +31,72 @@ const AVAILABLE_EXPORT_COLUMNS_FINES = [
 
 const DEFAULT_EXPORT_COLUMNS_FINES = ['fine_id', 'student_name', 'amount', 'status', 'payment_method', 'paid_at'];
 
+const AVAILABLE_EXPORT_COLUMNS_OVERDUE = [
+  { key: 'member_id', label: 'Mã sinh viên' },
+  { key: 'member_name', label: 'Họ và tên' },
+  { key: 'email', label: 'Địa chỉ Email' },
+  { key: 'phone', label: 'Số điện thoại' },
+  { key: 'book_title', label: 'Tên sách' },
+  { key: 'loan_id', label: 'Mã phiếu mượn' },
+  { key: 'borrow_date', label: 'Ngày mượn' },
+  { key: 'due_date', label: 'Hạn trả' },
+  { key: 'days_overdue', label: 'Số ngày quá hạn' },
+  { key: 'accrued_fine', label: 'Phạt lũy kế (VND)' },
+  { key: 'status', label: 'Trạng thái' }
+];
+
+const DEFAULT_EXPORT_COLUMNS_OVERDUE = [
+  'member_id', 'member_name', 'book_title', 'due_date', 'days_overdue', 'accrued_fine'
+];
+
+const AVAILABLE_EXPORT_COLUMNS_CIRCULATION = [
+  { key: 'book_id', label: 'Mã tài liệu' },
+  { key: 'title', label: 'Tên tài liệu' },
+  { key: 'genre', label: 'Thể loại' },
+  { key: 'total_quantity', label: 'Tổng số bản sách' },
+  { key: 'total_borrows', label: 'Tổng số lượt mượn' },
+  { key: 'avg_borrow_days', label: 'Số ngày mượn TB' },
+  { key: 'turn_rate', label: 'Hệ số xoay vòng kho' },
+  { key: 'last_borrowed_at', label: 'Lượt mượn cuối' },
+  { key: 'circulation_status', label: 'Đánh giá lưu thông' }
+];
+
+const DEFAULT_EXPORT_COLUMNS_CIRCULATION = [
+  'book_id', 'title', 'total_quantity', 'total_borrows', 'turn_rate', 'circulation_status'
+];
+
+const AVAILABLE_EXPORT_COLUMNS_ASSETS = [
+  { key: 'book_id', label: 'Mã tài sản' },
+  { key: 'title', label: 'Tên tài liệu' },
+  { key: 'unit_price', label: 'Nguyên giá (VND)' },
+  { key: 'total_quantity', label: 'Tổng bản đăng ký' },
+  { key: 'good_quantity', label: 'Số bản tốt' },
+  { key: 'damaged_quantity', label: 'Số bản hỏng' },
+  { key: 'lost_quantity', label: 'Số bản đã mất' },
+  { key: 'depreciation_rate', label: 'Tỷ lệ khấu hao (%)' },
+  { key: 'current_value', label: 'Giá trị tài sản (VND)' }
+];
+
+const DEFAULT_EXPORT_COLUMNS_ASSETS = [
+  'book_id', 'title', 'unit_price', 'total_quantity', 'good_quantity', 'current_value'
+];
+
+const AVAILABLE_EXPORT_COLUMNS_DIGITAL = [
+  { key: 'book_id', label: 'Mã tài nguyên số' },
+  { key: 'title', label: 'Tên tài liệu' },
+  { key: 'author', label: 'Tác giả' },
+  { key: 'genre', label: 'Thể loại' },
+  { key: 'file_format', label: 'Định dạng tệp' },
+  { key: 'file_size', label: 'Dung lượng tệp' },
+  { key: 'download_count', label: 'Số lượt tải về' },
+  { key: 'online_views', label: 'Số lượt xem online' },
+  { key: 'average_rating', label: 'Đánh giá học giả' }
+];
+
+const DEFAULT_EXPORT_COLUMNS_DIGITAL = [
+  'book_id', 'title', 'file_format', 'download_count', 'online_views', 'average_rating'
+];
+
 import {
   DonutChart,
   TrendLineChart,
@@ -207,6 +273,10 @@ export default function AdminReports() {
   };
 
   // ── Export CSV ──────────────────────────────────────────────────────────────
+  type ExportReportType = 'system_overview' | 'overdue' | 'circulation' | 'assets' | 'digital';
+  const [activeExportType, setActiveExportType] = useState<ExportReportType | null>(null);
+  const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
+
   const handleExportCSV = () => {
     const token = getStoredToken();
     if (!token) {
@@ -241,6 +311,63 @@ export default function AdminReports() {
         .catch((err: Error) => emitToast({ tone: 'error', title: 'Thất bại', message: err.message }));
     } catch {
       emitToast({ tone: 'error', title: 'Lỗi', message: 'Không thể xác thực để tải báo cáo.' });
+    }
+  };
+
+  const handleExportProfessionalReport = (columns: string[]) => {
+    if (!activeExportType) return;
+    const token = getStoredToken();
+    if (!token) {
+      emitToast({ tone: 'error', title: 'Lỗi', message: 'Không thể xác thực để xuất dữ liệu.' });
+      return;
+    }
+    try {
+      emitToast({ tone: 'info', title: 'Xuất dữ liệu', message: 'Đang khởi tạo tải báo cáo nghiệp vụ...' });
+
+      const endpointMap: Record<ExportReportType, string> = {
+        system_overview: 'export',
+        overdue: 'export-overdue',
+        circulation: 'export-circulation',
+        assets: 'export-assets',
+        digital: 'export-digital',
+      };
+
+      const filenameMap: Record<ExportReportType, string> = {
+        system_overview: 'bao-cao-thong-ke',
+        overdue: 'bao-cao-qua-han',
+        circulation: 'luu-thong-kho-sach',
+        assets: 'bao-cao-tai-san',
+        digital: 'hieu-suat-tai-nguyen-so',
+      };
+
+      let exportUrl = `${API_BASE_URL}/reports/${endpointMap[activeExportType]}`;
+      const params: Record<string, string> = {
+        columns: columns.join(','),
+      };
+      if (activeFilter) {
+        params.filter_type = activeFilter.filter_type;
+        params.filter_value = activeFilter.filter_value;
+      }
+      exportUrl += '?' + new URLSearchParams(params).toString();
+
+      fetch(exportUrl, { headers: { Authorization: `Bearer ${token}` } })
+        .then((res) => { if (!res.ok) throw new Error('Yêu cầu xuất tệp dữ liệu thất bại.'); return res.blob(); })
+        .then((blob) => {
+          const url = window.URL.createObjectURL(blob);
+          const a = Object.assign(document.createElement('a'), {
+            href: url,
+            download: `${filenameMap[activeExportType]}-${new Date().toISOString().slice(0, 10)}.csv`,
+          });
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          window.URL.revokeObjectURL(url);
+          emitToast({ tone: 'success', title: 'Thành công', message: 'Tải xuống tệp CSV thành công.' });
+          setActiveExportType(null);
+        })
+        .catch((err: Error) => emitToast({ tone: 'error', title: 'Thất bại', message: err.message }));
+    } catch {
+      emitToast({ tone: 'error', title: 'Lỗi', message: 'Không thể xác thực để tải dữ liệu.' });
     }
   };
 
@@ -301,15 +428,84 @@ export default function AdminReports() {
             Thống kê tình hình mượn trả, chỉ số tài chính và tổng quan hệ thống.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={handleExportCSV}
-          disabled={isLoading || !data}
-          className="flex items-center gap-2 rounded-xl bg-primary hover:bg-primary-hover px-5 py-2.5 font-bold text-white shadow-lg shadow-primary/20 transition-all hover:-translate-y-0.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
-        >
-          <span className="material-symbols-outlined text-[16px]">file_download</span>
-          Xuất CSV
-        </button>
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setIsExportMenuOpen(!isExportMenuOpen)}
+            disabled={isLoading || !data}
+            className="flex items-center gap-2 rounded-xl bg-primary hover:bg-primary-hover px-5 py-2.5 font-bold text-white shadow-lg shadow-primary/20 transition-all hover:-translate-y-0.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+          >
+            <span className="material-symbols-outlined text-[16px]">file_download</span>
+            Tải báo cáo nghiệp vụ
+            <span className="material-symbols-outlined text-[16px] transition-transform duration-200" style={{ transform: isExportMenuOpen ? 'rotate(180deg)' : 'none' }}>expand_more</span>
+          </button>
+
+          {isExportMenuOpen && (
+            <>
+              <div 
+                className="fixed inset-0 z-10" 
+                onClick={() => setIsExportMenuOpen(false)} 
+              />
+              <div className="absolute right-0 mt-2 w-72 rounded-xl border border-border bg-surface py-2 shadow-xl z-20 animate-in fade-in slide-in-from-top-1 duration-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsExportMenuOpen(false);
+                    handleExportCSV();
+                  }}
+                  className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[18px] text-slate-400">dashboard</span>
+                  Báo cáo tổng quan hệ thống
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsExportMenuOpen(false);
+                    setActiveExportType('overdue');
+                  }}
+                  className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[18px] text-slate-400">warning</span>
+                  Độc giả quá hạn &amp; Vi phạm
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsExportMenuOpen(false);
+                    setActiveExportType('circulation');
+                  }}
+                  className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[18px] text-slate-400">sync_alt</span>
+                  Tần suất lưu thông sách
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsExportMenuOpen(false);
+                    setActiveExportType('assets');
+                  }}
+                  className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[18px] text-slate-400">inventory_2</span>
+                  Kiểm kê &amp; Khấu hao tài sản
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsExportMenuOpen(false);
+                    setActiveExportType('digital');
+                  }}
+                  className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[18px] text-slate-400">menu_book</span>
+                  Thư viện số &amp; Tài nguyên
+                </button>
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       {/* ── Filter bar ────────────────────────────────────────────────────── */}
@@ -891,6 +1087,54 @@ export default function AdminReports() {
             defaultColumns={DEFAULT_EXPORT_COLUMNS_FINES}
             title="Xuất báo cáo Giao dịch thu phạt"
             description="Lọc và xuất nhật ký giao dịch nộp phạt thô ra tệp CSV để đối chiếu tài chính."
+          />
+        )}
+
+        {activeExportType === 'overdue' && (
+          <CSVExportSelector
+            isOpen={activeExportType === 'overdue'}
+            onClose={() => setActiveExportType(null)}
+            onExport={handleExportProfessionalReport}
+            availableColumns={AVAILABLE_EXPORT_COLUMNS_OVERDUE}
+            defaultColumns={DEFAULT_EXPORT_COLUMNS_OVERDUE}
+            title="Xuất báo cáo Độc giả Quá hạn &amp; Vi phạm"
+            description="Lọc và xuất danh sách sinh viên đang giữ sách quá hạn cùng phí phạt lũy kế liên đới."
+          />
+        )}
+
+        {activeExportType === 'circulation' && (
+          <CSVExportSelector
+            isOpen={activeExportType === 'circulation'}
+            onClose={() => setActiveExportType(null)}
+            onExport={handleExportProfessionalReport}
+            availableColumns={AVAILABLE_EXPORT_COLUMNS_CIRCULATION}
+            defaultColumns={DEFAULT_EXPORT_COLUMNS_CIRCULATION}
+            title="Xuất báo cáo Tần suất lưu thông sách"
+            description="Lọc và xuất hiệu suất xoay vòng kho sách vật lý, xác định sách lưu thông cao hoặc sách tồn kho lâu."
+          />
+        )}
+
+        {activeExportType === 'assets' && (
+          <CSVExportSelector
+            isOpen={activeExportType === 'assets'}
+            onClose={() => setActiveExportType(null)}
+            onExport={handleExportProfessionalReport}
+            availableColumns={AVAILABLE_EXPORT_COLUMNS_ASSETS}
+            defaultColumns={DEFAULT_EXPORT_COLUMNS_ASSETS}
+            title="Xuất báo cáo Kiểm kê &amp; Khấu hao tài sản"
+            description="Xuất giá trị kho sách vật lý thực tế, tính toán khấu hao qua số năm xuất bản và giá trị hao hụt do mất/hỏng."
+          />
+        )}
+
+        {activeExportType === 'digital' && (
+          <CSVExportSelector
+            isOpen={activeExportType === 'digital'}
+            onClose={() => setActiveExportType(null)}
+            onExport={handleExportProfessionalReport}
+            availableColumns={AVAILABLE_EXPORT_COLUMNS_DIGITAL}
+            defaultColumns={DEFAULT_EXPORT_COLUMNS_DIGITAL}
+            title="Xuất báo cáo Thư viện số &amp; Tài nguyên"
+            description="Xuất hiệu suất tải về, lượt đọc trực tuyến và đánh giá chất lượng đối với tài nguyên số PDF/E-books."
           />
         )}
       </AnimatePresence>
