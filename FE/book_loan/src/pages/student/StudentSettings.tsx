@@ -39,6 +39,7 @@ export default function StudentSettings() {
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
   const [otpError, setOtpError] = useState<string | null>(null);
   const [resendingOtp, setResendingOtp] = useState(false);
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
 
   useEffect(() => {
     if (showPasswordModal && otpCountdown > 0) {
@@ -56,7 +57,9 @@ export default function StudentSettings() {
   const handleOpenPasswordModal = async () => {
     try {
       setFeedback(null);
+      setIsSendingOtp(true);
       await sendPasswordOtp();
+      setIsSendingOtp(false);
       setOtpCountdown(300);
       setIsOtpVerified(false);
       setPasswordForm({
@@ -73,6 +76,7 @@ export default function StudentSettings() {
         message: 'Vui lòng kiểm tra email của bạn để nhận mã xác thực.',
       });
     } catch (error: unknown) {
+      setIsSendingOtp(false);
       const message = getErrorMessage(error, 'Không thể gửi mã xác thực OTP.');
       setFeedback({ tone: 'error', message });
       emitToast({
@@ -371,9 +375,10 @@ export default function StudentSettings() {
             <button
               type="button"
               onClick={handleOpenPasswordModal}
-              className="w-full sm:w-auto text-center text-xs font-bold text-primary hover:text-white bg-white border border-primary hover:bg-primary px-4 py-2 rounded-xl transition-all shadow-sm cursor-pointer"
+              disabled={isSendingOtp}
+              className="w-full sm:w-auto text-center text-xs font-bold text-primary hover:text-white bg-white border border-primary hover:bg-primary px-4 py-2 rounded-xl transition-all shadow-sm cursor-pointer disabled:opacity-50 disabled:cursor-wait"
             >
-              Thay đổi mật khẩu
+              {isSendingOtp ? 'Đang gửi mã...' : 'Thay đổi mật khẩu'}
             </button>
           </div>
         </section>
