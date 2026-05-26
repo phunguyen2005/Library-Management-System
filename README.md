@@ -499,5 +499,5 @@ A comprehensive suite of feature tests covers critical workflows, database trans
 
 ## 👨‍💻 Development Team
 
-Developed by **TTVP Group** — Midterm Project Presentation.
+Developed by **TTVP Group** — PhP Project Presentation.
 Licensed under the [MIT License](LICENSE).
