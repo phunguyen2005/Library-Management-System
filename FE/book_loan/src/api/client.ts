@@ -1,5 +1,5 @@
-import { getStoredToken } from '../auth/storage';
-import { emitAuthExpired, emitToast } from '../notifications/events';
+import { getStoredToken, getStoredRefreshToken, getStoredSession, setStoredSession } from '../auth/storage';
+import { emitAuthExpired, emitToast, emitAuthRefreshed } from '../notifications/events';
 import { ApiError } from '../lib/errors';
 import i18n, { getCurrentLanguage } from '../i18n';
 
@@ -92,6 +92,61 @@ function invalidateResponseCache(path?: string) {
   responseCache.clear();
 }
 
+let refreshPromise: Promise<string> | null = null;
+
+async function refreshAccessToken(): Promise<string> {
+  if (refreshPromise) {
+    return refreshPromise;
+  }
+
+  refreshPromise = (async () => {
+    try {
+      const session = getStoredSession();
+      const refreshToken = getStoredRefreshToken();
+
+      const url = `${API_BASE_URL}/refresh`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'Accept-Language': getCurrentLanguage(),
+        },
+        credentials: 'include',
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Refresh token request failed');
+      }
+
+      const data = await response.json();
+      if (!data.token) {
+        throw new Error('No access token returned from refresh API');
+      }
+
+      if (session) {
+        const nextSession = {
+          ...session,
+          token: data.token,
+          refreshToken: data.refresh_token || session.refreshToken,
+        };
+        setStoredSession(nextSession);
+        emitAuthRefreshed(nextSession);
+      }
+
+      return data.token as string;
+    } catch (error) {
+      refreshPromise = null;
+      throw error;
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+
+  return refreshPromise;
+}
+
 async function performRequest<T>(
   url: string,
   options: RequestOptions,
@@ -126,12 +181,15 @@ async function performRequest<T>(
           : fallbackMessage;
 
     if (response.status === 401 && token) {
-      emitToast({
-        tone: 'error',
-        title: i18n.t('api.sessionExpiredTitle'),
-        message: i18n.t('api.sessionExpiredMessage'),
-      });
-      emitAuthExpired(message || i18n.t('api.sessionExpiredFallback'));
+      const hasRefreshToken = Boolean(getStoredRefreshToken());
+      if (!hasRefreshToken) {
+        emitToast({
+          tone: 'error',
+          title: i18n.t('api.sessionExpiredTitle'),
+          message: i18n.t('api.sessionExpiredMessage'),
+        });
+        emitAuthExpired(message || i18n.t('api.sessionExpiredFallback'));
+      }
     }
 
     throw new ApiError(message, { status: response.status, details: payload });
@@ -143,7 +201,7 @@ async function performRequest<T>(
 export async function apiRequest<T>(path: string, options: ApiOptions = {}): Promise<T> {
   const { auth = true, ...requestOptions } = options;
   const headers = new Headers(requestOptions.headers);
-  const token = auth ? getStoredToken() : null;
+  let token = auth ? getStoredToken() : null;
   const method = (requestOptions.method || 'GET').toUpperCase();
   const url = buildRequestUrl(path);
 
@@ -164,45 +222,74 @@ export async function apiRequest<T>(path: string, options: ApiOptions = {}): Pro
     headers.set('Authorization', `Bearer ${token}`);
   }
 
-  if (method === 'GET' && !requestOptions.signal) {
-    const cacheKey = `${language}:${token ?? 'guest'}:${url}`;
-    const cached = responseCache.get(cacheKey);
+  const runRequest = async (): Promise<T> => {
+    if (method === 'GET' && !requestOptions.signal) {
+      const cacheKey = `${language}:${token ?? 'guest'}:${url}`;
+      const cached = responseCache.get(cacheKey);
 
-    if (cached && cached.expiresAt > Date.now()) {
-      if (cached.promise) {
-        return cached.promise as Promise<T>;
+      if (cached && cached.expiresAt > Date.now()) {
+        if (cached.promise) {
+          return cached.promise as Promise<T>;
+        }
+
+        if ('value' in cached) {
+          return cached.value as T;
+        }
       }
 
-      if ('value' in cached) {
-        return cached.value as T;
-      }
-    }
+      const promise = performRequest<T>(url, requestOptions, headers, token)
+        .then((payload) => {
+          responseCache.set(cacheKey, {
+            expiresAt: Date.now() + GET_CACHE_TTL_MS,
+            value: payload,
+          });
 
-    const promise = performRequest<T>(url, requestOptions, headers, token)
-      .then((payload) => {
-        responseCache.set(cacheKey, {
-          expiresAt: Date.now() + GET_CACHE_TTL_MS,
-          value: payload,
+          return payload;
+        })
+        .catch((error) => {
+          responseCache.delete(cacheKey);
+          throw error;
         });
 
-        return payload;
-      })
-      .catch((error) => {
-        responseCache.delete(cacheKey);
-        throw error;
+      responseCache.set(cacheKey, {
+        expiresAt: Date.now() + GET_CACHE_TTL_MS,
+        promise,
       });
 
-    responseCache.set(cacheKey, {
-      expiresAt: Date.now() + GET_CACHE_TTL_MS,
-      promise,
-    });
+      return promise;
+    }
 
-    return promise;
+    const payload = await performRequest<T>(url, requestOptions, headers, token);
+    invalidateResponseCache(path);
+    return payload;
+  };
+
+  try {
+    return await runRequest();
+  } catch (error: unknown) {
+    if (
+      error instanceof ApiError &&
+      error.status === 401 &&
+      auth &&
+      getStoredRefreshToken()
+    ) {
+      try {
+        const newToken = await refreshAccessToken();
+        token = newToken;
+        headers.set('Authorization', `Bearer ${newToken}`);
+        return await runRequest();
+      } catch (refreshErr) {
+        emitToast({
+          tone: 'error',
+          title: i18n.t('api.sessionExpiredTitle'),
+          message: i18n.t('api.sessionExpiredMessage'),
+        });
+        emitAuthExpired(error.message || i18n.t('api.sessionExpiredFallback'));
+        throw error;
+      }
+    }
+    throw error;
   }
-
-  const payload = await performRequest<T>(url, requestOptions, headers, token);
-  invalidateResponseCache(path);
-  return payload;
 }
 
 export { API_BASE_URL };

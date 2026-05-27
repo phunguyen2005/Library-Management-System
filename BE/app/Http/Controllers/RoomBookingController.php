@@ -25,13 +25,32 @@ class RoomBookingController extends Controller
     public function store(RoomBookingStoreRequest $request): JsonResponse
     {
         $validated = $request->validated();
-        $member = $request->user();
+        $user = $request->user();
+        $settings = LibrarySetting::singleton();
+
+        // Check if librarian is booking on behalf of a student
+        if ($user instanceof \App\Models\Librarian) {
+            if (!$user->hasPermission('manage_rooms')) {
+                return response()->json([
+                    'message' => 'Bạn không có quyền đăng ký phòng học.'
+                ], 403);
+            }
+            $memberId = $validated['member_id'] ?? null;
+            if (!$memberId) {
+                return response()->json([
+                    'message' => 'Thủ thư phải cung cấp ID sinh viên (member_id) để đặt phòng.'
+                ], 422);
+            }
+            $member = Member::findOrFail($memberId);
+        } else {
+            $member = $user;
+        }
+
         $roomId = (int) $validated['room_id'];
         $dateStr = $validated['date'];
         $startTimeStr = $validated['start_time'];
         $endTimeStr = $validated['end_time'];
-
-        $settings = LibrarySetting::singleton();
+        $isWalkin = filter_var($validated['is_walkin'] ?? false, FILTER_VALIDATE_BOOLEAN);
 
         // 1. Verify room exists and is bookable
         $room = Room::bookable()->findOrFail($roomId);
@@ -45,8 +64,8 @@ class RoomBookingController extends Controller
             ], 422);
         }
 
-        // 3. Validate group size
-        $minGroupSize = (int) ($settings->room_min_group_size ?? LibrarySetting::DEFAULT_ROOM_MIN_GROUP_SIZE);
+        // 3. Validate group size (Bypass for walk-in)
+        $minGroupSize = $isWalkin ? 1 : (int) ($settings->room_min_group_size ?? LibrarySetting::DEFAULT_ROOM_MIN_GROUP_SIZE);
         if ($validated['group_size'] < $minGroupSize) {
             return response()->json([
                 'message' => "Số lượng người đăng ký tối thiểu cho phòng học nhóm là {$minGroupSize} người."
@@ -69,16 +88,18 @@ class RoomBookingController extends Controller
             ], 422);
         }
 
-        // 5. Validate advance booking window
-        $advanceDays = (int) ($settings->room_advance_booking_days ?? LibrarySetting::DEFAULT_ROOM_ADVANCE_BOOKING_DAYS);
-        $maxDate = now()->addDays($advanceDays)->format('Y-m-d');
-        if ($dateStr > $maxDate) {
-            return response()->json([
-                'message' => "Bạn chỉ được đặt phòng trước tối đa {$advanceDays} ngày."
-            ], 422);
+        // 5. Validate advance booking window (Bypass for walk-in)
+        if (!$isWalkin) {
+            $advanceDays = (int) ($settings->room_advance_booking_days ?? LibrarySetting::DEFAULT_ROOM_ADVANCE_BOOKING_DAYS);
+            $maxDate = now()->addDays($advanceDays)->format('Y-m-d');
+            if ($dateStr > $maxDate) {
+                return response()->json([
+                    'message' => "Bạn chỉ được đặt phòng trước tối đa {$advanceDays} ngày."
+                ], 422);
+            }
         }
 
-        return DB::transaction(function () use ($roomId, $member, $dateStr, $startTimeStr, $endTimeStr, $validated, $settings) {
+        return DB::transaction(function () use ($roomId, $member, $user, $dateStr, $startTimeStr, $endTimeStr, $durationHours, $isWalkin, $validated, $settings) {
             $roomLocked = Room::query()->bookable()->lockForUpdate()->findOrFail($roomId);
             $memberLocked = Member::query()->lockForUpdate()->findOrFail($member->member_id);
 
@@ -102,6 +123,31 @@ class RoomBookingController extends Controller
                 ], 422);
             }
 
+            // 6.5 Check student weekly quota (max hours per week)
+            $startOfWeek = Carbon::parse($dateStr)->startOfWeek()->format('Y-m-d');
+            $endOfWeek = Carbon::parse($dateStr)->endOfWeek()->format('Y-m-d');
+            
+            $weeklyBookings = RoomBooking::where('member_id', $memberLocked->member_id)
+                ->whereBetween('date', [$startOfWeek, $endOfWeek])
+                ->whereIn('status', [RoomBooking::STATUS_APPROVED, RoomBooking::STATUS_PENDING, RoomBooking::STATUS_COMPLETED])
+                ->lockForUpdate()
+                ->get();
+                
+            $weeklyHours = 0.0;
+            foreach ($weeklyBookings as $wb) {
+                $wbDateStr = $wb->date instanceof \DateTimeInterface ? $wb->date->format('Y-m-d') : $wb->date;
+                $wbStart = Carbon::parse($wbDateStr . ' ' . $wb->start_time);
+                $wbEnd = Carbon::parse($wbDateStr . ' ' . $wb->end_time);
+                $weeklyHours += $wbStart->diffInMinutes($wbEnd) / 60.0;
+            }
+            
+            $maxHoursPerWeek = (float) ($settings->room_max_hours_per_week ?? 4);
+            if ($weeklyHours + $durationHours > $maxHoursPerWeek) {
+                return response()->json([
+                    'message' => "Tổng thời gian đặt phòng trong tuần này của bạn vượt quá hạn ngạch cho phép là {$maxHoursPerWeek} tiếng (Đã đặt: {$weeklyHours} tiếng, Đăng ký thêm: {$durationHours} tiếng)."
+                ], 422);
+            }
+
             // 7. Check overlap conflicts
             $hasConflict = RoomBooking::hasConflict($roomLocked->room_id, $dateStr, $startTimeStr, $endTimeStr);
             if ($hasConflict) {
@@ -112,9 +158,9 @@ class RoomBookingController extends Controller
 
             // 8. Create booking
             $requiresApproval = (bool) ($settings->room_booking_requires_approval ?? LibrarySetting::DEFAULT_ROOM_BOOKING_REQUIRES_APPROVAL);
-            $status = $requiresApproval ? RoomBooking::STATUS_PENDING : RoomBooking::STATUS_APPROVED;
+            $status = $isWalkin ? RoomBooking::STATUS_APPROVED : ($requiresApproval ? RoomBooking::STATUS_PENDING : RoomBooking::STATUS_APPROVED);
 
-            $booking = RoomBooking::create([
+            $bookingData = [
                 'room_id' => $roomLocked->room_id,
                 'member_id' => $memberLocked->member_id,
                 'date' => $dateStr,
@@ -124,23 +170,34 @@ class RoomBookingController extends Controller
                 'group_size' => $validated['group_size'],
                 'status' => $status,
                 'booking_code' => RoomBooking::generateBookingCode(),
-            ]);
+                'is_walkin' => $isWalkin,
+            ];
 
+            if ($isWalkin) {
+                $bookingData['check_in_at'] = now();
+            }
+
+            $booking = RoomBooking::create($bookingData);
+
+            $logDesc = $isWalkin
+                ? 'Đã đặt phòng walk-in ' . $roomLocked->name . ' và check-in ngay lập tức (' . substr($startTimeStr, 0, 5) . '-' . substr($endTimeStr, 0, 5) . ')'
+                : 'Đã đăng ký đặt phòng ' . $roomLocked->name . ' vào ngày ' . $dateStr . ' (' . substr($startTimeStr, 0, 5) . '-' . substr($endTimeStr, 0, 5) . ')';
+                
             AuditLoggerService::log(
                 'room_booking_create',
-                'Đã đăng ký đặt phòng ' . $roomLocked->name . ' vào ngày ' . $dateStr . ' (' . substr($startTimeStr, 0, 5) . '-' . substr($endTimeStr, 0, 5) . ')',
-                $member
+                $logDesc,
+                $user
             );
 
             // Send notification to member
             try {
-                $member->notify(new RoomBookingStatusNotification($booking, $status));
+                $memberLocked->notify(new RoomBookingStatusNotification($booking, $status));
             } catch (\Exception $e) {
                 // Ignore
             }
 
-            // If requires approval, notify admins
-            if ($requiresApproval) {
+            // If requires approval and not walkin, notify admins
+            if ($requiresApproval && !$isWalkin) {
                 try {
                     Librarian::all()->each(fn($lib) => $lib->notify(new NewRoomBookingRequestNotification($booking)));
                 } catch (\Exception $e) {

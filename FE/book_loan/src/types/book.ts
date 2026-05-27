@@ -18,7 +18,8 @@ export interface BookApiRecord {
   digital_file_name?: string | null;
   download_count?: number | null;
   total_quantity?: number | null;
-  available_quantity?: number | null;
+   available_quantity?: number | null;
+  repairing_quantity?: number | null;
   is_available?: boolean | number;
   favorite_count?: number | null;
   is_favorite?: boolean | number;
@@ -44,6 +45,7 @@ export interface FormattedBook {
   cover: string;
   quantity: number;
   available_quantity: number;
+  repairing_quantity?: number;
   published_year?: number;
   is_available: boolean;
   is_digital: boolean;

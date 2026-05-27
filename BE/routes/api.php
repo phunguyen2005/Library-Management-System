@@ -28,6 +28,7 @@ Route::middleware('throttle:auth')->group(function () {
     Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
     Route::post('/verify-forgot-password-otp', [AuthController::class, 'verifyForgotPasswordOtp']);
     Route::post('/reset-password', [AuthController::class, 'resetPassword']);
+    Route::post('/refresh', [AuthController::class, 'refresh']);
 });
 
 Route::get('/auth/{provider}/redirect', [\App\Http\Controllers\OAuthController::class, 'redirect']);
@@ -71,6 +72,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/ai/chat-stream', [\App\Http\Controllers\AiChatController::class, 'chatStream']);
         Route::get('/ai/recommendations', [\App\Http\Controllers\AiChatController::class, 'recommendations']);
     });
+    // Room Booking Creation (shared for students and librarians/admins)
+    Route::post('/room-bookings', [RoomBookingController::class, 'store']);
     Route::get('/gamify/leaderboard', [GamifyController::class, 'leaderboard']);
 
     Route::middleware('role:student')->group(function () {
@@ -94,7 +97,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/fines/payments/{paymentId}/status', [\App\Http\Controllers\MomoPaymentController::class, 'checkStatus']);
         
         // Room Bookings
-        Route::post('/room-bookings', [RoomBookingController::class, 'store']);
         Route::get('/room-bookings/me', [RoomBookingController::class, 'myBookings']);
         Route::delete('/room-bookings/{id}/cancel', [RoomBookingController::class, 'cancel']);
         Route::post('/room-bookings/{id}/check-out', [RoomBookingController::class, 'checkOut']);
@@ -128,6 +130,7 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::put('/books/{book}', [BookController::class, 'update']);
             Route::post('/books/{book}/digital-file', [BookController::class, 'uploadDigitalFile']);
             Route::delete('/books/{book}', [BookController::class, 'destroy']);
+            Route::post('/books/{bookId}/complete-repair', [BookController::class, 'completeRepair']);
         });
 
         // Borrow Requests, Returns & cash payments

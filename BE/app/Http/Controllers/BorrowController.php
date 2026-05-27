@@ -333,8 +333,11 @@ class BorrowController extends Controller
                 }
             }
 
-            if ($book && $condition !== 'lost') {
+            if ($book && $condition === 'good') {
                 self::processNextInQueue($book->book_id);
+            } elseif ($book && $condition === 'damaged') {
+                $book->repairing_quantity = ($book->repairing_quantity ?? 0) + 1;
+                $book->save();
             } elseif ($book && $condition === 'lost') {
                 // Lost book: do NOT restore inventory (book is gone)
                 $book->total_quantity = max(0, $book->total_quantity - 1);

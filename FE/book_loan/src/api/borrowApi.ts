@@ -206,3 +206,12 @@ export async function extendLoan(loanId: number, extraDays: number) {
     },
   );
 }
+
+export async function completeBookRepair(bookId: number) {
+  return apiRequest<{ message: string; book: any }>(
+    `/books/${bookId}/complete-repair`,
+    {
+      method: 'POST',
+    },
+  );
+}

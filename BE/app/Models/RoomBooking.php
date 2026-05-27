@@ -33,6 +33,7 @@ class RoomBooking extends Model
         'check_out_at',
         'booking_code',
         'reminder_sent',
+        'is_walkin',
     ];
 
     protected function casts(): array
@@ -43,6 +44,7 @@ class RoomBooking extends Model
             'check_out_at' => 'datetime',
             'group_size' => 'integer',
             'reminder_sent' => 'boolean',
+            'is_walkin' => 'boolean',
         ];
     }
 

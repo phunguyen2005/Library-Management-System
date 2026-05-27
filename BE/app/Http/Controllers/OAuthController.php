@@ -14,7 +14,7 @@ use Laravel\Socialite\Facades\Socialite;
 
 class OAuthController extends Controller
 {
-    private const SUPPORTED_PROVIDERS = ['google', 'github'];
+    private const SUPPORTED_PROVIDERS = ['google', 'github', 'microsoft'];
 
     public function redirect(string $provider)
     {
@@ -53,6 +53,14 @@ class OAuthController extends Controller
             $email = ($socialUser->getNickname() ?? 'github_user') . '@github.com';
         }
 
+        if ($provider === 'microsoft') {
+            $emailLower = strtolower($email);
+            if (! str_ends_with($emailLower, '@student.hcmue.edu.vn') && ! str_ends_with($emailLower, '@hcmue.edu.vn')) {
+                return redirect($this->frontendOAuthCallback(['error' => 'EmailDomainNotAllowed']));
+            }
+        }
+
+
         $user = Librarian::where('email', $email)->first();
         $isLibrarian = true;
 
@@ -84,9 +92,17 @@ class OAuthController extends Controller
         }
 
         $role = $user->getRoleName();
-        $tokenResult = $user->createToken($role . '-session', ['role:' . $role]);
+        $tokenResult = $user->createToken($role . '-session', ['role:' . $role], now()->addMinutes(15));
         $token = $tokenResult->plainTextToken;
         $tokenId = $tokenResult->accessToken->id;
+
+        $plainRefreshToken = \Illuminate\Support\Str::random(64);
+        \App\Models\RefreshToken::create([
+            'user_id' => $isLibrarian ? $user->librarian_id : $user->member_id,
+            'user_type' => $role,
+            'token_hash' => hash('sha256', $plainRefreshToken),
+            'expires_at' => now()->addDays(7),
+        ]);
 
         AuditLoggerService::log('login', 'Đăng nhập thành công qua ' . ucfirst($provider), $user);
         LoginHistory::create([
@@ -98,7 +114,20 @@ class OAuthController extends Controller
             'token_id' => $tokenId,
         ]);
 
-        return redirect($this->frontendOAuthCallback(['token' => $token]));
+        return redirect($this->frontendOAuthCallback([
+            'token' => $token,
+            'refresh_token' => $plainRefreshToken,
+        ]))->cookie(
+            'refresh_token',
+            $plainRefreshToken,
+            60 * 24 * 7,
+            '/',
+            null,
+            false,
+            true,
+            false,
+            'Lax'
+        );
     }
 
     private function oauthStateCacheKey(string $provider, string $state): string

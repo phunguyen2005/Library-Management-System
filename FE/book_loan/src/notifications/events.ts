@@ -32,3 +32,21 @@ export function emitAuthExpired(message: string) {
     }),
   );
 }
+
+export const AUTH_REFRESHED_EVENT = 'book-loan:auth-refreshed';
+
+export type AuthRefreshedEventDetail = {
+  session: unknown;
+};
+
+export function emitAuthRefreshed(session: unknown) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  window.dispatchEvent(
+    new CustomEvent<AuthRefreshedEventDetail>(AUTH_REFRESHED_EVENT, {
+      detail: { session },
+    }),
+  );
+}

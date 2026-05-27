@@ -10,8 +10,11 @@ import {
   rejectRoomBooking, 
   adminCheckInRoomBooking, 
   checkInRoomBooking,
-  fetchRoomBookingStats 
+  fetchRoomBookingStats,
+  createRoomBooking
 } from '../../api/roomBookingApi';
+import { getAllMembers } from '../../api/userApi';
+import { MemberApiRecord } from '../../types/member';
 import { Room, RoomBooking, RoomBookingStats, RoomStatus } from '../../types/roomBooking';
 import { getErrorMessage } from '../../lib/errors';
 import { emitToast } from '../../notifications/events';
@@ -54,6 +57,37 @@ export default function AdminRoomBookings() {
   const [checkInCode, setCheckInCode] = useState('');
   const [checkingIn, setCheckingIn] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
+
+  // Admin Walk-in Booking States
+  const [showWalkinModal, setShowWalkinModal] = useState(false);
+  const [walkinStudentSearch, setWalkinStudentSearch] = useState('');
+  const [walkinMembersList, setWalkinMembersList] = useState<MemberApiRecord[]>([]);
+  const [loadingMembers, setLoadingMembers] = useState(false);
+  const [walkinSelectedMember, setWalkinSelectedMember] = useState<MemberApiRecord | null>(null);
+  const [walkinSelectedRoomId, setWalkinSelectedRoomId] = useState<number | ''>('');
+  const [walkinDuration, setWalkinDuration] = useState(60);
+  const [walkinGroupSize, setWalkinGroupSize] = useState(1);
+  const [walkinPurpose, setWalkinPurpose] = useState('');
+  const [submittingWalkin, setSubmittingWalkin] = useState(false);
+
+  useEffect(() => {
+    if (showWalkinModal && walkinStudentSearch.trim()) {
+      const delayDebounce = setTimeout(async () => {
+        try {
+          setLoadingMembers(true);
+          const res = await getAllMembers(1, walkinStudentSearch.trim());
+          setWalkinMembersList(res.data || []);
+        } catch (e) {
+          // Ignore
+        } finally {
+          setLoadingMembers(false);
+        }
+      }, 300);
+      return () => clearTimeout(delayDebounce);
+    } else {
+      setWalkinMembersList([]);
+    }
+  }, [walkinStudentSearch, showWalkinModal]);
 
   // Load Rooms
   const loadRooms = async () => {
@@ -135,6 +169,48 @@ export default function AdminRoomBookings() {
       emitToast({ tone: 'error', title: 'Check-in thất bại', message: getErrorMessage(err, 'Mã không hợp lệ.') });
     } finally {
       setCheckingIn(false);
+    }
+  };
+
+  // Handle Admin walk-in booking on behalf of student
+  const handleAdminWalkinSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!walkinSelectedRoomId || !walkinSelectedMember) {
+      emitToast({ tone: 'error', title: 'Lỗi', message: 'Vui lòng điền đầy đủ thông tin phòng và sinh viên.' });
+      return;
+    }
+
+    try {
+      setSubmittingWalkin(true);
+      const now = new Date();
+      const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      
+      const end = new Date(now.getTime() + walkinDuration * 60 * 1000);
+      const endStr = `${String(end.getHours()).padStart(2, '0')}:${String(end.getMinutes()).padStart(2, '0')}`;
+
+      await createRoomBooking({
+        room_id: Number(walkinSelectedRoomId),
+        member_id: walkinSelectedMember.member_id,
+        is_walkin: true,
+        date: now.toISOString().split('T')[0],
+        start_time: timeStr,
+        end_time: endStr,
+        group_size: walkinGroupSize,
+        purpose: walkinPurpose.trim() || undefined,
+      });
+
+      emitToast({ tone: 'success', title: 'Thành công', message: 'Đăng ký phòng Walk-in cho sinh viên thành công!' });
+      setShowWalkinModal(false);
+      setWalkinStudentSearch('');
+      setWalkinSelectedMember(null);
+      setWalkinSelectedRoomId('');
+      setWalkinPurpose('');
+      setWalkinGroupSize(1);
+      void loadBookings(1);
+    } catch (err: any) {
+      emitToast({ tone: 'error', title: 'Thất bại', message: getErrorMessage(err, 'Đã xảy ra lỗi.') });
+    } finally {
+      setSubmittingWalkin(false);
     }
   };
 
@@ -451,6 +527,17 @@ export default function AdminRoomBookings() {
               >
                 <span className="material-symbols-outlined text-sm">qr_code_scanner</span>
                 Quét mã QR Check-in
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowWalkinModal(true);
+                  void loadRooms();
+                }}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium px-5 py-2.5 rounded-xl transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-sm">bolt</span>
+                Đăng ký Walk-in cho SV
               </button>
             </form>
           </div>
@@ -978,6 +1065,170 @@ export default function AdminRoomBookings() {
             <div className="bg-slate-50 p-4 text-center text-xs text-slate-500">
               Đưa mã QR trên lịch hẹn đặt phòng của sinh viên vào khung camera để check-in tự động.
             </div>
+          </div>
+        </div>
+      )}
+      {/* Walk-in Booking Modal for Admin */}
+      {showWalkinModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-lg bg-white rounded-3xl scholar-shadow p-8 space-y-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-start">
+              <div>
+                <h3 className="text-xl font-bold text-slate-800">Đăng ký Walk-in cho Sinh viên</h3>
+                <p className="text-xs text-slate-500 mt-1">Đăng ký và check-in ngay lập tức cho sinh viên tại quầy.</p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowWalkinModal(false);
+                  setWalkinStudentSearch('');
+                  setWalkinSelectedMember(null);
+                  setWalkinSelectedRoomId('');
+                  setWalkinPurpose('');
+                }}
+                className="text-slate-400 hover:text-slate-600 border border-slate-200 rounded-full p-1 cursor-pointer"
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            <form onSubmit={handleAdminWalkinSubmit} className="space-y-4">
+              {/* Member Search */}
+              <div className="space-y-2 relative">
+                <span className="block text-xs font-bold uppercase tracking-wider text-slate-500">Tìm kiếm sinh viên</span>
+                {walkinSelectedMember ? (
+                  <div className="flex items-center justify-between border border-emerald-200 bg-emerald-50/50 rounded-xl p-3">
+                    <div>
+                      <div className="font-bold text-sm text-slate-800">{walkinSelectedMember.name}</div>
+                      <div className="text-xs text-slate-500">Mã SV: {walkinSelectedMember.member_id} | {walkinSelectedMember.email}</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setWalkinSelectedMember(null)}
+                      className="text-xs font-bold text-red-600 hover:underline cursor-pointer"
+                    >
+                      Thay đổi
+                    </button>
+                  </div>
+                ) : (
+                  <div>
+                    <input
+                      type="text"
+                      placeholder="Tìm theo tên hoặc email..."
+                      value={walkinStudentSearch}
+                      onChange={(e) => setWalkinStudentSearch(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+                    />
+                    {loadingMembers && (
+                      <div className="absolute right-3 top-9 text-xs text-slate-400">Đang tìm...</div>
+                    )}
+                    {walkinMembersList.length > 0 && (
+                      <div className="absolute z-10 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-48 overflow-y-auto divide-y divide-slate-100">
+                        {walkinMembersList.map((m) => (
+                          <div
+                            key={m.member_id}
+                            onClick={() => {
+                              setWalkinSelectedMember(m);
+                              setWalkinStudentSearch('');
+                              setWalkinMembersList([]);
+                            }}
+                            className="p-3 hover:bg-slate-50 cursor-pointer transition-colors text-left"
+                          >
+                            <div className="font-semibold text-sm text-slate-800">{m.name}</div>
+                            <div className="text-xs text-slate-500">Mã: {m.member_id} | {m.email}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Room Selection */}
+              <label className="space-y-1 block">
+                <span className="block text-xs font-bold uppercase tracking-wider text-slate-500">Chọn phòng học</span>
+                <select
+                  required
+                  value={walkinSelectedRoomId}
+                  onChange={(e) => setWalkinSelectedRoomId(Number(e.target.value))}
+                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20 bg-white"
+                >
+                  <option value="">Chọn phòng trống...</option>
+                  {rooms.filter(r => r.status === 'active' && r.is_active).map((r) => (
+                    <option key={r.room_id} value={r.room_id}>
+                      {r.name} ({r.location} - Sức chứa: {r.capacity})
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                {/* Duration */}
+                <label className="space-y-1 block">
+                  <span className="block text-xs font-bold uppercase tracking-wider text-slate-500">Thời lượng sử dụng</span>
+                  <select
+                    value={walkinDuration}
+                    onChange={(e) => setWalkinDuration(Number(e.target.value))}
+                    className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20 bg-white"
+                  >
+                    <option value={30}>30 phút</option>
+                    <option value={60}>1 tiếng</option>
+                    <option value={90}>1.5 tiếng</option>
+                    <option value={120}>2 tiếng</option>
+                    <option value={150}>2.5 tiếng</option>
+                    <option value={180}>3 tiếng</option>
+                  </select>
+                </label>
+
+                {/* Group size */}
+                <label className="space-y-1 block">
+                  <span className="block text-xs font-bold uppercase tracking-wider text-slate-500">Số lượng thành viên</span>
+                  <input
+                    type="number"
+                    required
+                    min={1}
+                    value={walkinGroupSize}
+                    onChange={(e) => setWalkinGroupSize(Number(e.target.value))}
+                    className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+                  />
+                </label>
+              </div>
+
+              {/* Purpose */}
+              <label className="space-y-1 block">
+                <span className="block text-xs font-bold uppercase tracking-wider text-slate-500">Mục đích sử dụng</span>
+                <textarea
+                  placeholder="Làm việc nhóm, tự học, thảo luận..."
+                  rows={2}
+                  value={walkinPurpose}
+                  onChange={(e) => setWalkinPurpose(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+                />
+              </label>
+
+              {/* Actions */}
+              <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowWalkinModal(false);
+                    setWalkinStudentSearch('');
+                    setWalkinSelectedMember(null);
+                    setWalkinSelectedRoomId('');
+                    setWalkinPurpose('');
+                  }}
+                  className="border border-slate-200 text-slate-600 text-sm font-bold px-6 py-2.5 rounded-xl hover:bg-slate-50 transition-all cursor-pointer"
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingWalkin || !walkinSelectedMember || !walkinSelectedRoomId}
+                  className="bg-primary text-white text-sm font-bold px-8 py-2.5 rounded-xl shadow-md transition-all hover:bg-opacity-90 disabled:opacity-60 cursor-pointer"
+                >
+                  {submittingWalkin ? 'Đang đăng ký...' : 'Xác nhận đặt phòng'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

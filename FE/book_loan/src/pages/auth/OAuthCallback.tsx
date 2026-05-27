@@ -14,6 +14,7 @@ export default function OAuthCallback() {
       // 1. Get token from URL params
       const params = new URLSearchParams(location.search);
       const token = params.get('token');
+      const refreshToken = params.get('refresh_token');
       const error = params.get('error');
 
       if (error) {
@@ -49,6 +50,7 @@ export default function OAuthCallback() {
           user: data.user,
           role: data.role || 'student',
           token: token,
+          refreshToken: refreshToken || undefined,
         });
 
         // 4. Redirect

@@ -35,6 +35,8 @@ export default function RoomBookingPage() {
   const [endTime, setEndTime] = useState('11:00');
   const [groupSize, setGroupSize] = useState(4);
   const [purpose, setPurpose] = useState('');
+  const [isWalkinBooking, setIsWalkinBooking] = useState(false);
+  const [walkinDuration, setWalkinDuration] = useState(60);
 
   // Detail Modal
   const [activeDetail, setActiveDetail] = useState<BookingRecord | null>(null);
@@ -112,6 +114,7 @@ export default function RoomBookingPage() {
         end_time: endTime,
         group_size: groupSize,
         purpose: purpose.trim() || undefined,
+        is_walkin: isWalkinBooking,
       });
 
       emitToast({ 
@@ -119,7 +122,7 @@ export default function RoomBookingPage() {
         title: 'Thành công', 
         message: res.status === 'pending' 
           ? 'Đã gửi yêu cầu đặt phòng, vui lòng chờ duyệt!' 
-          : 'Đặt phòng học nhóm thành công!' 
+          : (isWalkinBooking ? 'Đặt phòng Walk-in thành công và đã check-in!' : 'Đặt phòng học nhóm thành công!') 
       });
 
       setSelectedRoom(null);
@@ -284,16 +287,41 @@ export default function RoomBookingPage() {
                     )}
                   </div>
 
-                  <button
-                    onClick={() => {
-                      setSelectedRoom(room);
-                      setBookingDate(nowDateString());
-                    }}
-                    className="w-full mt-6 bg-primary text-white font-medium py-2.5 rounded-xl shadow-xs transition-all hover:bg-opacity-95 hover:shadow-md cursor-pointer flex items-center justify-center gap-1"
-                  >
-                    <span className="material-symbols-outlined text-sm">event_available</span>
-                    Đặt phòng này
-                  </button>
+                  <div className="flex gap-2 mt-6">
+                    <button
+                      onClick={() => {
+                        setSelectedRoom(room);
+                        setBookingDate(nowDateString());
+                        setIsWalkinBooking(false);
+                        setStartTime('09:00');
+                        setEndTime('11:00');
+                        setGroupSize(2);
+                      }}
+                      className="flex-1 bg-slate-100 text-slate-700 hover:bg-slate-200 font-semibold py-2.5 rounded-xl transition-all text-xs cursor-pointer flex items-center justify-center gap-1 border border-slate-200/50"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">event_available</span>
+                      Đặt trước
+                    </button>
+                    <button
+                      onClick={() => {
+                        setSelectedRoom(room);
+                        setBookingDate(nowDateString());
+                        setIsWalkinBooking(true);
+                        const now = new Date();
+                        const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+                        setStartTime(timeStr);
+                        const later = new Date(now.getTime() + 60 * 60 * 1000);
+                        const endStr = `${String(later.getHours()).padStart(2, '0')}:${String(later.getMinutes()).padStart(2, '0')}`;
+                        setEndTime(endStr);
+                        setWalkinDuration(60);
+                        setGroupSize(1);
+                      }}
+                      className="flex-1 bg-primary text-white font-semibold py-2.5 rounded-xl shadow-xs transition-all hover:bg-opacity-95 hover:shadow-md text-xs cursor-pointer flex items-center justify-center gap-1"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">bolt</span>
+                      Đặt nhanh (Walk-in)
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -430,7 +458,9 @@ export default function RoomBookingPage() {
           <div className="w-full max-w-2xl bg-white rounded-3xl scholar-shadow p-8 space-y-6 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-start">
               <div>
-                <h3 className="text-xl font-bold text-slate-800">Đăng ký đặt phòng</h3>
+                <h3 className="text-xl font-bold text-slate-800">
+                  {isWalkinBooking ? 'Đặt phòng nhanh (Walk-in)' : 'Đăng ký đặt phòng'}
+                </h3>
                 <p className="text-sm text-slate-500 mt-1">{selectedRoom.name} — {selectedRoom.location}</p>
               </div>
               <button
@@ -442,34 +472,99 @@ export default function RoomBookingPage() {
             </div>
 
             <form onSubmit={handleBookingSubmit} className="space-y-6">
-              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                {/* Date Selection */}
-                <label className="space-y-2 block">
-                  <span className="block text-xs font-bold uppercase tracking-wider text-slate-500">Ngày đặt phòng</span>
-                  <input
-                    type="date"
-                    required
-                    min={nowDateString()}
-                    value={bookingDate}
-                    onChange={(e) => setBookingDate(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20"
-                  />
-                </label>
+              {isWalkinBooking ? (
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                  {/* Date Selection (ReadOnly today) */}
+                  <label className="space-y-2 block">
+                    <span className="block text-xs font-bold uppercase tracking-wider text-slate-500">Ngày sử dụng</span>
+                    <input
+                      type="date"
+                      readOnly
+                      value={bookingDate}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none text-slate-500 cursor-not-allowed"
+                    />
+                  </label>
 
-                {/* Group size */}
-                <label className="space-y-2 block">
-                  <span className="block text-xs font-bold uppercase tracking-wider text-slate-500">Số lượng thành viên</span>
-                  <input
-                    type="number"
-                    required
-                    min={1}
-                    max={selectedRoom.capacity}
-                    value={groupSize}
-                    onChange={(e) => setGroupSize(Number(e.target.value))}
-                    className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20"
-                  />
-                </label>
-              </div>
+                  {/* Start time (ReadOnly now) */}
+                  <label className="space-y-2 block">
+                    <span className="block text-xs font-bold uppercase tracking-wider text-slate-500">Giờ bắt đầu</span>
+                    <input
+                      type="text"
+                      readOnly
+                      value={startTime}
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none text-slate-500 cursor-not-allowed"
+                    />
+                  </label>
+
+                  {/* Duration Selection */}
+                  <label className="space-y-2 block">
+                    <span className="block text-xs font-bold uppercase tracking-wider text-slate-500">Thời gian sử dụng</span>
+                    <select
+                      value={walkinDuration}
+                      onChange={(e) => {
+                        const durationMin = Number(e.target.value);
+                        setWalkinDuration(durationMin);
+                        const [h, m] = startTime.split(':').map(Number);
+                        const start = new Date();
+                        start.setHours(h, m, 0, 0);
+                        const end = new Date(start.getTime() + durationMin * 60 * 1000);
+                        setEndTime(`${String(end.getHours()).padStart(2, '0')}:${String(end.getMinutes()).padStart(2, '0')}`);
+                      }}
+                      className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20 bg-white"
+                    >
+                      <option value={30}>30 phút</option>
+                      <option value={60}>1 tiếng</option>
+                      <option value={90}>1.5 tiếng</option>
+                      <option value={120}>2 tiếng</option>
+                      <option value={150}>2.5 tiếng</option>
+                      <option value={180}>3 tiếng</option>
+                    </select>
+                  </label>
+
+                  {/* Group size */}
+                  <label className="space-y-2 block">
+                    <span className="block text-xs font-bold uppercase tracking-wider text-slate-500">Số lượng thành viên</span>
+                    <input
+                      type="number"
+                      required
+                      min={1}
+                      max={selectedRoom.capacity}
+                      value={groupSize}
+                      onChange={(e) => setGroupSize(Number(e.target.value))}
+                      className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+                    />
+                  </label>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                  {/* Date Selection */}
+                  <label className="space-y-2 block">
+                    <span className="block text-xs font-bold uppercase tracking-wider text-slate-500">Ngày đặt phòng</span>
+                    <input
+                      type="date"
+                      required
+                      min={nowDateString()}
+                      value={bookingDate}
+                      onChange={(e) => setBookingDate(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+                    />
+                  </label>
+
+                  {/* Group size */}
+                  <label className="space-y-2 block">
+                    <span className="block text-xs font-bold uppercase tracking-wider text-slate-500">Số lượng thành viên</span>
+                    <input
+                      type="number"
+                      required
+                      min={1}
+                      max={selectedRoom.capacity}
+                      value={groupSize}
+                      onChange={(e) => setGroupSize(Number(e.target.value))}
+                      className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+                    />
+                  </label>
+                </div>
+              )}
 
               {/* Time selection schedule visualizer */}
               <div className="space-y-2">
@@ -505,33 +600,35 @@ export default function RoomBookingPage() {
                 )}
               </div>
 
-              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                {/* Start Time Selection */}
-                <label className="space-y-2 block">
-                  <span className="block text-xs font-bold uppercase tracking-wider text-slate-500">Giờ bắt đầu</span>
-                  <input
-                    type="time"
-                    required
-                    step={1800} // Snaps to 30 mins
-                    value={startTime}
-                    onChange={(e) => setStartTime(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20"
-                  />
-                </label>
+              {!isWalkinBooking && (
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                  {/* Start Time Selection */}
+                  <label className="space-y-2 block">
+                    <span className="block text-xs font-bold uppercase tracking-wider text-slate-500">Giờ bắt đầu</span>
+                    <input
+                      type="time"
+                      required
+                      step={1800} // Snaps to 30 mins
+                      value={startTime}
+                      onChange={(e) => setStartTime(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+                    />
+                  </label>
 
-                {/* End Time Selection */}
-                <label className="space-y-2 block">
-                  <span className="block text-xs font-bold uppercase tracking-wider text-slate-500">Giờ kết thúc</span>
-                  <input
-                    type="time"
-                    required
-                    step={1800}
-                    value={endTime}
-                    onChange={(e) => setEndTime(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20"
-                  />
-                </label>
-              </div>
+                  {/* End Time Selection */}
+                  <label className="space-y-2 block">
+                    <span className="block text-xs font-bold uppercase tracking-wider text-slate-500">Giờ kết thúc</span>
+                    <input
+                      type="time"
+                      required
+                      step={1800}
+                      value={endTime}
+                      onChange={(e) => setEndTime(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+                    />
+                  </label>
+                </div>
+              )}
 
               {/* Purpose */}
               <label className="space-y-2 block">

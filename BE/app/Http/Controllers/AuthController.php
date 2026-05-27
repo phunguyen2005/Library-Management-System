@@ -60,9 +60,17 @@ class AuthController extends Controller
             ], 403);
         }
 
-        $tokenResult = $user->createToken($role.'-session', ['role:'.$role]);
+        $tokenResult = $user->createToken($role.'-session', ['role:'.$role], now()->addMinutes(15));
         $token = $tokenResult->plainTextToken;
         $tokenId = $tokenResult->accessToken->id;
+
+        $plainRefreshToken = \Illuminate\Support\Str::random(64);
+        \App\Models\RefreshToken::create([
+            'user_id' => $user->member_id ?? $user->librarian_id,
+            'user_type' => $role,
+            'token_hash' => hash('sha256', $plainRefreshToken),
+            'expires_at' => now()->addDays(7),
+        ]);
 
         \App\Services\AuditLoggerService::log('login', 'Đăng nhập thành công', $user);
 
@@ -80,7 +88,18 @@ class AuthController extends Controller
             'user' => AuthenticatedUserResource::make($user),
             'role' => $role,
             'token' => $token,
-        ]);
+            'refresh_token' => $plainRefreshToken,
+        ])->cookie(
+            'refresh_token',
+            $plainRefreshToken,
+            60 * 24 * 7,
+            '/',
+            null,
+            false,
+            true,
+            false,
+            'Lax'
+        );
     }
 
     private function logFailedLogin(string $identifier, Request $request, $user = null): void
@@ -249,11 +268,79 @@ class AuthController extends Controller
     {
         \App\Services\AuditLoggerService::log('logout', 'Đăng xuất khỏi hệ thống');
 
-        $request->user()?->currentAccessToken()?->delete();
+        $user = $request->user();
+        if ($user) {
+            $user->currentAccessToken()?->delete();
+
+            $plainRefreshToken = $request->cookie('refresh_token') ?? $request->input('refresh_token');
+            if ($plainRefreshToken) {
+                \App\Models\RefreshToken::where('token_hash', hash('sha256', $plainRefreshToken))->delete();
+            }
+        }
 
         return response()->json([
             'message' => __('messages.auth.logout_success'),
+        ])->withoutCookie('refresh_token');
+    }
+
+    public function refresh(Request $request)
+    {
+        $plainRefreshToken = $request->cookie('refresh_token') ?? $request->input('refresh_token');
+
+        if (!$plainRefreshToken) {
+            return response()->json(['message' => 'Refresh token is required.'], 401);
+        }
+
+        $hash = hash('sha256', $plainRefreshToken);
+        $refreshTokenModel = \App\Models\RefreshToken::where('token_hash', $hash)->first();
+
+        if (!$refreshTokenModel || $refreshTokenModel->expires_at->isPast()) {
+            if ($refreshTokenModel) {
+                $refreshTokenModel->delete();
+            }
+            return response()->json(['message' => 'Refresh token is invalid or expired.'], 401);
+        }
+
+        $role = $refreshTokenModel->user_type;
+        if ($role === 'student') {
+            $user = Member::find($refreshTokenModel->user_id);
+        } else {
+            $user = Librarian::find($refreshTokenModel->user_id);
+        }
+
+        if (!$user) {
+            $refreshTokenModel->delete();
+            return response()->json(['message' => 'User not found.'], 401);
+        }
+
+        $refreshTokenModel->delete();
+        
+        $newPlainRefreshToken = \Illuminate\Support\Str::random(64);
+        \App\Models\RefreshToken::create([
+            'user_id' => $user->member_id ?? $user->librarian_id,
+            'user_type' => $role,
+            'token_hash' => hash('sha256', $newPlainRefreshToken),
+            'expires_at' => now()->addDays(7),
         ]);
+
+        $tokenResult = $user->createToken($role.'-session', ['role:'.$role], now()->addMinutes(15));
+        $token = $tokenResult->plainTextToken;
+
+        return response()->json([
+            'message' => 'Token refreshed successfully.',
+            'token' => $token,
+            'refresh_token' => $newPlainRefreshToken,
+        ])->cookie(
+            'refresh_token',
+            $newPlainRefreshToken,
+            60 * 24 * 7,
+            '/',
+            null,
+            false,
+            true,
+            false,
+            'Lax'
+        );
     }
 
     public function verifyOtp(VerifyOtpRequest $request)
@@ -278,14 +365,34 @@ class AuthController extends Controller
 
         \Illuminate\Support\Facades\Cache::forget('otp_'.$validated['email']);
 
-        $token = $user->createToken('student-session', ['role:student'])->plainTextToken;
+        $tokenResult = $user->createToken('student-session', ['role:student'], now()->addMinutes(15));
+        $token = $tokenResult->plainTextToken;
+
+        $plainRefreshToken = \Illuminate\Support\Str::random(64);
+        \App\Models\RefreshToken::create([
+            'user_id' => $user->member_id,
+            'user_type' => 'student',
+            'token_hash' => hash('sha256', $plainRefreshToken),
+            'expires_at' => now()->addDays(7),
+        ]);
 
         return response()->json([
             'message' => __('messages.auth.otp_valid'),
             'user' => AuthenticatedUserResource::make($user),
             'role' => 'student',
             'token' => $token,
-        ]);
+            'refresh_token' => $plainRefreshToken,
+        ])->cookie(
+            'refresh_token',
+            $plainRefreshToken,
+            60 * 24 * 7,
+            '/',
+            null,
+            false,
+            true,
+            false,
+            'Lax'
+        );
     }
 
     public function resendOtp(ResendOtpRequest $request)

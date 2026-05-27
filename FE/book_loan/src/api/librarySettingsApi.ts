@@ -7,6 +7,7 @@ export type LibrarySettings = {
   max_fine_per_loan: number;
   grace_period_days: number;
   room_max_hours_per_booking: number;
+  room_max_hours_per_week: number;
   room_max_bookings_per_day: number;
   room_advance_booking_days: number;
   room_min_group_size: number;
@@ -25,6 +26,7 @@ export type LibrarySettingsPayload = {
   max_fine_per_loan: number;
   grace_period_days: number;
   room_max_hours_per_booking: number;
+  room_max_hours_per_week: number;
   room_max_bookings_per_day: number;
   room_advance_booking_days: number;
   room_min_group_size: number;

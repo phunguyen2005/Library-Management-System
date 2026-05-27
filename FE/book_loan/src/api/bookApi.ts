@@ -63,6 +63,7 @@ export function normalizeBook(book: BookApiRecord): FormattedBook {
     cover: getCoverUrl(book.cover),
     quantity: totalQuantity || 0,
     available_quantity: availableQuantity,
+    repairing_quantity: Number(book.repairing_quantity ?? 0),
     published_year: book.published_year || undefined,
     is_available: isAvailable,
     is_digital: isDigital,

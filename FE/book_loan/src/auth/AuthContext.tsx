@@ -2,7 +2,7 @@ import React, { createContext, useEffect, useContext, useMemo, useState } from '
 import { logoutUser } from '../api/authApi';
 import { getMyProfile } from '../api/userApi';
 import { ApiError } from '../lib/errors';
-import { AUTH_EXPIRED_EVENT } from '../notifications/events';
+import { AUTH_EXPIRED_EVENT, AUTH_REFRESHED_EVENT } from '../notifications/events';
 import {
   type AuthSession,
   type AuthUser,
@@ -37,9 +37,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsAuthReady(true);
     };
 
-    window.addEventListener(AUTH_EXPIRED_EVENT, handleAuthExpired as EventListener);
+    const handleAuthRefreshed = (e: Event) => {
+      const customEvent = e as CustomEvent<{ session: AuthSession }>;
+      if (customEvent.detail?.session) {
+        setSessionState(customEvent.detail.session);
+      }
+    };
 
-    return () => window.removeEventListener(AUTH_EXPIRED_EVENT, handleAuthExpired as EventListener);
+    window.addEventListener(AUTH_EXPIRED_EVENT, handleAuthExpired as EventListener);
+    window.addEventListener(AUTH_REFRESHED_EVENT, handleAuthRefreshed as EventListener);
+
+    return () => {
+      window.removeEventListener(AUTH_EXPIRED_EVENT, handleAuthExpired as EventListener);
+      window.removeEventListener(AUTH_REFRESHED_EVENT, handleAuthRefreshed as EventListener);
+    };
   }, []);
 
   useEffect(() => {

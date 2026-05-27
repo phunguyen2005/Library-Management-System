@@ -20,6 +20,7 @@ class LibrarySettingUpdateRequest extends FormRequest
             'max_fine_per_loan' => ['required', 'numeric', 'min:0', 'max:10000000'],
             'grace_period_days' => ['required', 'integer', 'min:0', 'max:30'],
             'room_max_hours_per_booking' => ['required', 'integer', 'min:1', 'max:12'],
+            'room_max_hours_per_week' => ['required', 'integer', 'min:1', 'max:168'],
             'room_max_bookings_per_day' => ['required', 'integer', 'min:1', 'max:10'],
             'room_advance_booking_days' => ['required', 'integer', 'min:1', 'max:30'],
             'room_min_group_size' => ['required', 'integer', 'min:1', 'max:20'],

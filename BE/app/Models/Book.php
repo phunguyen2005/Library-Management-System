@@ -38,6 +38,7 @@ class Book extends Model
         'download_count',
         'total_quantity',
         'available_quantity',
+        'repairing_quantity',
     ];
 
     protected function casts(): array
@@ -49,6 +50,7 @@ class Book extends Model
             'download_count' => 'integer',
             'total_quantity' => 'integer',
             'available_quantity' => 'integer',
+            'repairing_quantity' => 'integer',
             'ai_tags' => 'array',
             'ai_summary_generated_at' => 'datetime',
         ];

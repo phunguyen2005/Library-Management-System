@@ -31,6 +31,8 @@ export async function createRoomBooking(payload: {
   end_time: string;
   purpose?: string;
   group_size: number;
+  is_walkin?: boolean;
+  member_id?: number;
 }) {
   return apiRequest<RoomBooking>('/room-bookings', {
     method: 'POST',

@@ -30,6 +30,7 @@ class BookResource extends JsonResource
             'download_count' => $this->realDownloadCount(),
             'total_quantity' => $this->total_quantity,
             'available_quantity' => $this->available_quantity,
+            'repairing_quantity' => (int) ($this->repairing_quantity ?? 0),
             'is_available' => (bool) $this->is_available,
             'favorite_count' => (int) ($this->favorite_count ?? $this->favoritedBy()->count()),
             'is_favorite' => (bool) ($this->is_favorite ?? false),

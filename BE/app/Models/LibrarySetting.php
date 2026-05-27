@@ -15,6 +15,7 @@ class LibrarySetting extends Model
     public const DEFAULT_LOST_BOOK_FEE = 200000;
     public const DEFAULT_PICKUP_DEADLINE_HOURS = 48;
     public const DEFAULT_ROOM_MAX_HOURS_PER_BOOKING = 3;
+    public const DEFAULT_ROOM_MAX_HOURS_PER_WEEK = 4;
     public const DEFAULT_ROOM_MAX_BOOKINGS_PER_DAY = 2;
     public const DEFAULT_ROOM_ADVANCE_BOOKING_DAYS = 7;
     public const DEFAULT_ROOM_MIN_GROUP_SIZE = 2;
@@ -45,6 +46,7 @@ class LibrarySetting extends Model
         'lost_book_fee',
         'pickup_deadline_hours',
         'room_max_hours_per_booking',
+        'room_max_hours_per_week',
         'room_max_bookings_per_day',
         'room_advance_booking_days',
         'room_min_group_size',
@@ -67,6 +69,7 @@ class LibrarySetting extends Model
             'lost_book_fee' => 'decimal:2',
             'pickup_deadline_hours' => 'integer',
             'room_max_hours_per_booking' => 'integer',
+            'room_max_hours_per_week' => 'integer',
             'room_max_bookings_per_day' => 'integer',
             'room_advance_booking_days' => 'integer',
             'room_min_group_size' => 'integer',
@@ -103,6 +106,7 @@ class LibrarySetting extends Model
                 'lost_book_fee' => self::DEFAULT_LOST_BOOK_FEE,
                 'pickup_deadline_hours' => self::DEFAULT_PICKUP_DEADLINE_HOURS,
                 'room_max_hours_per_booking' => self::DEFAULT_ROOM_MAX_HOURS_PER_BOOKING,
+                'room_max_hours_per_week' => self::DEFAULT_ROOM_MAX_HOURS_PER_WEEK,
                 'room_max_bookings_per_day' => self::DEFAULT_ROOM_MAX_BOOKINGS_PER_DAY,
                 'room_advance_booking_days' => self::DEFAULT_ROOM_ADVANCE_BOOKING_DAYS,
                 'room_min_group_size' => self::DEFAULT_ROOM_MIN_GROUP_SIZE,

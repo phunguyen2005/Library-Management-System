@@ -166,6 +166,7 @@ export default function AdminInventory() {
   const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
   const [aiActionId, setAiActionId] = useState<number | null>(null);
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
+  const [repairActionId, setRepairActionId] = useState<number | null>(null);
 
   // --- CSV Import/Export state ---
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -406,6 +407,28 @@ export default function AdminInventory() {
       emitToast({ tone: 'error', title: 'Không thể tạo metadata AI hàng loạt', message });
     } finally {
       setIsGeneratingAll(false);
+    }
+  };
+
+  const handleCompleteRepair = async (book: FormattedBook) => {
+    setRepairActionId(book.id);
+    try {
+      const { completeBookRepair } = await import('../../api/borrowApi');
+      const response = await completeBookRepair(book.id);
+      await loadBooks(false);
+      emitToast({
+        tone: 'success',
+        title: 'Hoàn tất sửa sách',
+        message: response.message,
+      });
+    } catch (error: unknown) {
+      if (isUnauthorizedError(error)) {
+        return;
+      }
+      const message = getErrorMessage(error, 'Không thể hoàn thành sửa sách.');
+      emitToast({ tone: 'error', title: 'Lỗi', message });
+    } finally {
+      setRepairActionId(null);
     }
   };
 
@@ -793,6 +816,19 @@ export default function AdminInventory() {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-1">
+                        {!isDigitalTab && book.repairing_quantity > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => handleCompleteRepair(book)}
+                            disabled={repairActionId === book.id}
+                            className="rounded-lg p-2 text-amber-600 transition-all hover:bg-amber-50 disabled:cursor-wait disabled:opacity-60"
+                            title="Hoàn thành sửa sách"
+                          >
+                            <span className="material-symbols-outlined text-[18px]">
+                              {repairActionId === book.id ? 'progress_activity' : 'build'}
+                            </span>
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={() => handleGenerateAiMetadata(book)}

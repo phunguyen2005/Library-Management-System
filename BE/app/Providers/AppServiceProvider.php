@@ -28,6 +28,11 @@ class AppServiceProvider extends ServiceProvider
     {
         JsonResource::withoutWrapping();
 
+        \Laravel\Socialite\Facades\Socialite::extend('microsoft', function ($app) {
+            $config = $app['config']['services.microsoft'];
+            return \Laravel\Socialite\Facades\Socialite::buildProvider(\App\Socialite\MicrosoftProvider::class, $config);
+        });
+
         RateLimiter::for('auth', function (Request $request): Limit {
             $identifier = trim((string) ($request->input('identifier') ?? $request->input('email') ?? ''));
 

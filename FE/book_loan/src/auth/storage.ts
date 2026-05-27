@@ -26,6 +26,7 @@ export type AuthUser = {
 
 export type AuthSession = {
   token: string;
+  refreshToken?: string;
   role: UserRole;
   user: AuthUser;
 };
@@ -57,4 +58,8 @@ export function clearStoredSession() {
 
 export function getStoredToken() {
   return getStoredSession()?.token ?? null;
+}
+
+export function getStoredRefreshToken() {
+  return getStoredSession()?.refreshToken ?? null;
 }

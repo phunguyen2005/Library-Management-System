@@ -670,4 +670,50 @@ class BookController extends Controller
             ], 500);
         }
     }
+
+    public function completeRepair(Request $request, int $bookId)
+    {
+        $librarian = $request->user();
+
+        $book = DB::transaction(function () use ($bookId, $librarian) {
+            $book = Book::query()->lockForUpdate()->findOrFail($bookId);
+
+            if (($book->repairing_quantity ?? 0) <= 0) {
+                abort(response()->json([
+                    'message' => 'Không có bản sao nào của sách này đang ở trạng thái sửa chữa.'
+                ], 422));
+            }
+
+            // Decrement repairing
+            $book->repairing_quantity = max(0, $book->repairing_quantity - 1);
+            $book->save();
+
+            // Trigger reservations queue check to release or assign to next student
+            \App\Http\Controllers\BorrowController::processNextInQueue($book->book_id);
+
+            \App\Services\AuditLoggerService::log(
+                'book_repair_complete',
+                'Hoàn tất sửa chữa 1 bản sao sách: ' . $book->title . ' (ID: ' . $book->book_id . ')',
+                $librarian
+            );
+
+            return $book;
+        });
+
+        // Bump cache
+        $this->bookCache->bump();
+
+        $book = $book->fresh();
+
+        $book->loadCount([
+            'favoritedBy as favorite_count',
+            'digitalDownloads as digital_downloads_count',
+            'reviews as reviews_count',
+        ])->loadAvg('reviews', 'rating');
+
+        return response()->json([
+            'message' => 'Đã hoàn tất sửa chữa sách và đưa trở lại kệ.',
+            'book' => new BookResource($book),
+        ]);
+    }
 }

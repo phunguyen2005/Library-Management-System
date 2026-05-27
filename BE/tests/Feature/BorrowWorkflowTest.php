@@ -220,4 +220,66 @@ class BorrowWorkflowTest extends TestCase
                 'message' => 'Chỉ có thể từ chối yêu cầu đang chờ duyệt.',
             ]);
     }
+
+    public function test_return_book_damaged_increments_repairing_quantity_and_creates_fine(): void
+    {
+        $librarian = Librarian::query()->findOrFail(1);
+        $token = $librarian->createToken('librarian-access', ['role:admin']);
+
+        $loan = Borrowing::find(1);
+        $loan->update(['status' => 'borrowed', 'due_date' => today()->addDays(7)->toDateString()]);
+        
+        $book = $loan->book;
+        $initialTotal = $book->total_quantity;
+        $initialAvailable = $book->available_quantity;
+        $initialRepairing = $book->repairing_quantity ?? 0;
+
+        $this->withToken($token->plainTextToken)
+            ->postJson("/api/requests/{$loan->loan_id}/return", [
+                'condition' => 'damaged',
+                'condition_note' => 'Bị rách nhiều trang'
+            ])
+            ->assertOk()
+            ->assertJsonPath('loan.status', 'returned');
+
+        $this->assertDatabaseHas('fines', [
+            'loan_id' => $loan->loan_id,
+            'reason' => 'damaged',
+            'status' => 'unpaid'
+        ]);
+
+        $this->assertDatabaseHas('books', [
+            'book_id' => $book->book_id,
+            'total_quantity' => $initialTotal,
+            'available_quantity' => $initialAvailable,
+            'repairing_quantity' => $initialRepairing + 1,
+        ]);
+    }
+
+    public function test_admin_complete_repair_restores_inventory(): void
+    {
+        $librarian = Librarian::query()->findOrFail(1);
+        $token = $librarian->createToken('librarian-access', ['role:admin']);
+
+        $loan = Borrowing::find(1);
+        $book = $loan->book;
+        $book->update([
+            'total_quantity' => 5,
+            'available_quantity' => 2,
+            'repairing_quantity' => 1
+        ]);
+
+        $this->withToken($token->plainTextToken)
+            ->postJson("/api/books/{$book->book_id}/complete-repair")
+            ->assertOk()
+            ->assertJsonPath('book.repairing_quantity', 0)
+            ->assertJsonPath('book.available_quantity', 3);
+
+        $this->assertDatabaseHas('books', [
+            'book_id' => $book->book_id,
+            'total_quantity' => 5,
+            'available_quantity' => 3,
+            'repairing_quantity' => 0,
+        ]);
+    }
 }

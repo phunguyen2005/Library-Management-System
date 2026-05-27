@@ -13,6 +13,7 @@ const defaultSettings: LibrarySettings = {
   max_fine_per_loan: 200000,
   grace_period_days: 0,
   room_max_hours_per_booking: 3,
+  room_max_hours_per_week: 4,
   room_max_bookings_per_day: 2,
   room_advance_booking_days: 7,
   room_min_group_size: 2,
@@ -116,6 +117,7 @@ export default function AdminSettings() {
           max_fine_per_loan: data.max_fine_per_loan ?? 200000,
           grace_period_days: data.grace_period_days ?? 0,
           room_max_hours_per_booking: data.room_max_hours_per_booking ?? 3,
+          room_max_hours_per_week: data.room_max_hours_per_week ?? 4,
           room_max_bookings_per_day: data.room_max_bookings_per_day ?? 2,
           room_advance_booking_days: data.room_advance_booking_days ?? 7,
           room_min_group_size: data.room_min_group_size ?? 2,
@@ -275,6 +277,7 @@ export default function AdminSettings() {
         max_fine_per_loan: settings.max_fine_per_loan,
         grace_period_days: settings.grace_period_days,
         room_max_hours_per_booking: settings.room_max_hours_per_booking,
+        room_max_hours_per_week: settings.room_max_hours_per_week,
         room_max_bookings_per_day: settings.room_max_bookings_per_day,
         room_advance_booking_days: settings.room_advance_booking_days,
         room_min_group_size: settings.room_min_group_size,
@@ -293,6 +296,7 @@ export default function AdminSettings() {
         max_fine_per_loan: response.max_fine_per_loan,
         grace_period_days: response.grace_period_days,
         room_max_hours_per_booking: response.room_max_hours_per_booking,
+        room_max_hours_per_week: response.room_max_hours_per_week,
         room_max_bookings_per_day: response.room_max_bookings_per_day,
         room_advance_booking_days: response.room_advance_booking_days,
         room_min_group_size: response.room_min_group_size,
@@ -681,6 +685,26 @@ export default function AdminSettings() {
                       setSettings({
                         ...settings,
                         room_max_hours_per_booking: Number(event.target.value) || 0,
+                      })
+                    }
+                    disabled={isSavingSettings}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-slate-50"
+                  />
+                </label>
+                <label className="space-y-2">
+                  <span className="block text-xs font-bold uppercase tracking-widest text-slate-500">
+                    Thời gian sử dụng tối đa/tuần (tiếng)
+                  </span>
+                  <input
+                    aria-label="Thời gian đặt tối đa tuần"
+                    type="number"
+                    min={1}
+                    max={168}
+                    value={settings.room_max_hours_per_week}
+                    onChange={(event) =>
+                      setSettings({
+                        ...settings,
+                        room_max_hours_per_week: Number(event.target.value) || 0,
                       })
                     }
                     disabled={isSavingSettings}
