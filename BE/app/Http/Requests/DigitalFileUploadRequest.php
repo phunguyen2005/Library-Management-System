@@ -30,6 +30,7 @@ class DigitalFileUploadRequest extends FormRequest
             'file.file'       => 'Tệp tải lên không hợp lệ.',
             'file.extensions' => 'Định dạng tệp không được hỗ trợ. Chỉ chấp nhận: PDF, EPUB, MP3, WAV, M4A, PPT, PPTX.',
             'file.max'        => 'Kích thước tệp vượt quá giới hạn 50 MB.',
+            'file.uploaded'   => 'Tệp quá lớn hoặc upload thất bại. Vui lòng kiểm tra kết nối và kích thước tệp (tối đa 50 MB).',
         ];
     }
 }
