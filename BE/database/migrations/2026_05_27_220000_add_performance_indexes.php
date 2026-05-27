@@ -1,0 +1,64 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::table('fines', function (Blueprint $table) {
+            $table->index(['member_id', 'status']);
+            $table->index('status');
+            $table->index('reason');
+            $table->index('created_at');
+        });
+
+        Schema::table('fine_payments', function (Blueprint $table) {
+            $table->index(['status', 'method']);
+            $table->index(['status', 'created_at']);
+        });
+
+        Schema::table('borrowing', function (Blueprint $table) {
+            $table->index('due_date');
+            $table->index('return_date');
+        });
+
+        Schema::table('audit_logs', function (Blueprint $table) {
+            $table->index('created_at');
+        });
+
+        Schema::table('members', function (Blueprint $table) {
+            $table->index('xp');
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::table('fines', function (Blueprint $table) {
+            $table->dropIndex(['member_id', 'status']);
+            $table->dropIndex(['status']);
+            $table->dropIndex(['reason']);
+            $table->dropIndex(['created_at']);
+        });
+
+        Schema::table('fine_payments', function (Blueprint $table) {
+            $table->dropIndex(['status', 'method']);
+            $table->dropIndex(['status', 'created_at']);
+        });
+
+        Schema::table('borrowing', function (Blueprint $table) {
+            $table->dropIndex(['due_date']);
+            $table->dropIndex(['return_date']);
+        });
+
+        Schema::table('audit_logs', function (Blueprint $table) {
+            $table->dropIndex(['created_at']);
+        });
+
+        Schema::table('members', function (Blueprint $table) {
+            $table->dropIndex(['xp']);
+        });
+    }
+};

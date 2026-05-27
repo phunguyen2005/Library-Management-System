@@ -4,7 +4,7 @@ import { ApiError } from '../lib/errors';
 import i18n, { getCurrentLanguage } from '../i18n';
 
 const DEFAULT_API_BASE_URL = 'http://localhost:8000/api';
-const GET_CACHE_TTL_MS = 15_000;
+const GET_CACHE_TTL_MS = 60_000;
 
 const rawBaseUrl =
   (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim() || DEFAULT_API_BASE_URL;
@@ -30,7 +30,65 @@ function buildRequestUrl(path: string) {
   return `${API_BASE_URL}${path.startsWith('/') ? path : `/${path}`}`;
 }
 
-function invalidateResponseCache() {
+function invalidateResponseCache(path?: string) {
+  if (!path) {
+    responseCache.clear();
+    return;
+  }
+
+  const normalizedPath = path.toLowerCase();
+
+  // If it's a settings update
+  if (normalizedPath.includes('/settings') || normalizedPath.includes('/library-settings')) {
+    for (const key of responseCache.keys()) {
+      if (key.includes('/settings') || key.includes('/library-settings')) {
+        responseCache.delete(key);
+      }
+    }
+    return;
+  }
+
+  // If it's a book mutate (e.g. edit book, import, review)
+  if (normalizedPath.includes('/books') || normalizedPath.includes('/reviews') || normalizedPath.includes('/favorites')) {
+    for (const key of responseCache.keys()) {
+      if (key.includes('/books') || key.includes('/reviews') || key.includes('/favorites') || key.includes('/reports')) {
+        responseCache.delete(key);
+      }
+    }
+    return;
+  }
+
+  // If it's a borrowing/request mutate
+  if (normalizedPath.includes('/requests') || normalizedPath.includes('/borrow')) {
+    for (const key of responseCache.keys()) {
+      if (key.includes('/requests') || key.includes('/books') || key.includes('/reports')) {
+        responseCache.delete(key);
+      }
+    }
+    return;
+  }
+
+  // If it's room bookings
+  if (normalizedPath.includes('/room-bookings') || normalizedPath.includes('/rooms')) {
+    for (const key of responseCache.keys()) {
+      if (key.includes('/room-bookings') || key.includes('/rooms') || key.includes('/reports')) {
+        responseCache.delete(key);
+      }
+    }
+    return;
+  }
+
+  // If it's fine payment
+  if (normalizedPath.includes('/fines') || normalizedPath.includes('/pay') || normalizedPath.includes('/momo') || normalizedPath.includes('/vnpay')) {
+    for (const key of responseCache.keys()) {
+      if (key.includes('/fines') || key.includes('/requests') || key.includes('/reports')) {
+        responseCache.delete(key);
+      }
+    }
+    return;
+  }
+
+  // Default: clear everything
   responseCache.clear();
 }
 
@@ -143,7 +201,7 @@ export async function apiRequest<T>(path: string, options: ApiOptions = {}): Pro
   }
 
   const payload = await performRequest<T>(url, requestOptions, headers, token);
-  invalidateResponseCache();
+  invalidateResponseCache(path);
   return payload;
 }
 

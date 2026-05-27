@@ -33,8 +33,8 @@ class BookResource extends JsonResource
             'is_available' => (bool) $this->is_available,
             'favorite_count' => (int) ($this->favorite_count ?? $this->favoritedBy()->count()),
             'is_favorite' => (bool) ($this->is_favorite ?? false),
-            'avg_rating' => (float) round($this->reviews()->avg('rating') ?? 0, 1),
-            'reviews_count' => (int) $this->reviews()->count(),
+            'avg_rating' => (float) round($this->reviews_avg_rating ?? ($this->reviews()->avg('rating') ?? 0), 1),
+            'reviews_count' => (int) ($this->reviews_count ?? $this->reviews()->count()),
         ];
     }
 }

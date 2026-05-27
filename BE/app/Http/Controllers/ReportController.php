@@ -182,6 +182,7 @@ class ReportController extends Controller
 
         // 3.2 10 giao dịch nộp phạt gần đây nhất
         $recentTransactions = \App\Models\FinePayment::where('status', 'completed')
+            ->with(['fine.member', 'collector'])
             ->orderByDesc('created_at')
             ->limit(10)
             ->get()
@@ -203,41 +204,49 @@ class ReportController extends Controller
             });
 
         // 4. Top 5 cuốn sách mượn nhiều nhất
-        $topBooks = $this->applyBorrowDateFilter(
+        $topBooksItems = $this->applyBorrowDateFilter(
             Borrowing::query()->select('book_id', DB::raw('count(*) as borrow_count')),
             $range
         )
             ->groupBy('book_id')
             ->orderByDesc('borrow_count')
             ->limit(5)
-            ->get()
-            ->map(function ($item) {
-                $book = Book::find($item->book_id);
-                return [
-                    'title'       => $book->title ?? 'Sách đã xóa',
-                    'author'      => $book->author ?? '',
-                    'genre'       => $book->genre ?? '',
-                    'borrow_count' => $item->borrow_count,
-                ];
-            });
+            ->get();
+
+        $bookIds = $topBooksItems->pluck('book_id')->filter();
+        $books = Book::whereIn('book_id', $bookIds)->withTrashed()->get()->keyBy('book_id');
+
+        $topBooks = $topBooksItems->map(function ($item) use ($books) {
+            $book = $books->get((int) $item->book_id);
+            return [
+                'title'       => $book->title ?? 'Sách đã xóa',
+                'author'      => $book->author ?? '',
+                'genre'       => $book->genre ?? '',
+                'borrow_count' => $item->borrow_count,
+            ];
+        });
 
         // 5. Top 5 sinh viên tích cực nhất
-        $topMembers = $this->applyBorrowDateFilter(
+        $topMembersItems = $this->applyBorrowDateFilter(
             Borrowing::query()->select('member_id', DB::raw('count(*) as borrow_count')),
             $range
         )
             ->groupBy('member_id')
             ->orderByDesc('borrow_count')
             ->limit(5)
-            ->get()
-            ->map(function ($item) {
-                $member = Member::find($item->member_id);
-                return [
-                    'name'         => $member->name ?? 'Sinh viên ẩn danh',
-                    'email'        => $member->email ?? '',
-                    'borrow_count' => $item->borrow_count,
-                ];
-            });
+            ->get();
+
+        $memberIds = $topMembersItems->pluck('member_id')->filter();
+        $members = Member::whereIn('member_id', $memberIds)->get()->keyBy('member_id');
+
+        $topMembers = $topMembersItems->map(function ($item) use ($members) {
+            $member = $members->get((int) $item->member_id);
+            return [
+                'name'         => $member->name ?? 'Sinh viên ẩn danh',
+                'email'        => $member->email ?? '',
+                'borrow_count' => $item->borrow_count,
+            ];
+        });
 
         // 5.1 Top 5 Học giả tích lũy XP nhiều nhất
         $topXpMembers = Member::query()
@@ -391,8 +400,10 @@ class ReportController extends Controller
                 Borrowing::query()->select('book_id', DB::raw('count(*) as borrow_count')),
                 $range
             )->groupBy('book_id')->orderByDesc('borrow_count')->limit(5)->get();
+            $bookIds = $topBooks->pluck('book_id')->filter();
+            $books = Book::whereIn('book_id', $bookIds)->withTrashed()->get()->keyBy('book_id');
             foreach ($topBooks as $item) {
-                $book = Book::find($item->book_id);
+                $book = $books->get((int) $item->book_id);
                 $this->writeCsvRow($file, [
                     $book->title  ?? 'Sách đã xóa',
                     $book->author ?? '',
@@ -408,8 +419,10 @@ class ReportController extends Controller
                 Borrowing::query()->select('member_id', DB::raw('count(*) as borrow_count')),
                 $range
             )->groupBy('member_id')->orderByDesc('borrow_count')->limit(5)->get();
+            $memberIds = $topMembers->pluck('member_id')->filter();
+            $members = Member::whereIn('member_id', $memberIds)->get()->keyBy('member_id');
             foreach ($topMembers as $item) {
-                $member = Member::find($item->member_id);
+                $member = $members->get((int) $item->member_id);
                 $this->writeCsvRow($file, [
                     $member->name  ?? 'Sinh viên ẩn danh',
                     $member->email ?? '',
@@ -473,6 +486,7 @@ class ReportController extends Controller
             $this->writeCsvRow($file, ['DANH SÁCH GIAO DỊCH NỘP PHẠT GẦN ĐÂY']);
             $this->writeCsvRow($file, ['Mã giao dịch', 'Sinh viên', 'Số tiền (VND)', 'Phương thức', 'Mã tham chiếu', 'Thời gian', 'Người thu / duyệt']);
             $recentPayments = \App\Models\FinePayment::where('status', 'completed')
+                ->with(['fine.member', 'collector'])
                 ->orderByDesc('created_at')
                 ->limit(20)
                 ->get();
@@ -928,7 +942,11 @@ class ReportController extends Controller
     public function exportCirculation(Request $request)
     {
         $range = $this->getDateRange($request);
-        $books = Book::withCount(['borrowings' => function ($q) use ($range) {
+        $books = Book::with(['borrowings' => function ($q) use ($range) {
+            if ($range) {
+                $q->whereBetween('borrow_date', $range);
+            }
+        }])->withCount(['borrowings' => function ($q) use ($range) {
             if ($range) {
                 $q->whereBetween('borrow_date', $range);
             }
@@ -975,11 +993,9 @@ class ReportController extends Controller
             // Write Rows
             foreach ($books as $book) {
                 // Calculate average borrow days in PHP (fully DB timezone/function independent)
-                $loansQuery = $book->borrowings()->whereNotNull('borrow_date')->whereNotNull('return_date');
-                if ($range) {
-                    $loansQuery->whereBetween('borrow_date', $range);
-                }
-                $loans = $loansQuery->get();
+                $loans = $book->borrowings->filter(function ($loan) {
+                    return $loan->borrow_date !== null && $loan->return_date !== null;
+                });
 
                 $totalDays = 0;
                 $count = $loans->count();
@@ -1004,7 +1020,9 @@ class ReportController extends Controller
                     $circStatus = 'Thấp';
                 }
 
-                $lastBorrow = $book->borrowings()->whereNotNull('borrow_date')->orderByDesc('borrow_date')->first();
+                $lastBorrow = $book->borrowings->filter(function ($loan) {
+                    return $loan->borrow_date !== null;
+                })->sortByDesc('borrow_date')->first();
 
                 $row = [];
                 foreach ($columns as $col) {
@@ -1032,6 +1050,16 @@ class ReportController extends Controller
     public function exportAssets(Request $request)
     {
         $books = Book::where('is_digital', false)->get();
+        $bookIds = $books->pluck('book_id');
+        $allFines = Fine::whereIn('reason', [Fine::REASON_LOST, Fine::REASON_DAMAGED])
+            ->whereHas('borrowing', function ($q) use ($bookIds) {
+                $q->whereIn('book_id', $bookIds);
+            })
+            ->with('borrowing')
+            ->get()
+            ->groupBy(function ($fine) {
+                return $fine->borrowing ? (int) $fine->borrowing->book_id : null;
+            });
 
         $headerMap = [
             'book_id' => 'Mã tài sản',
@@ -1063,7 +1091,7 @@ class ReportController extends Controller
             'Expires' => '0',
         ];
 
-        $callback = function () use ($books, $columns, $headerMap) {
+        $callback = function () use ($books, $columns, $headerMap, $allFines) {
             $file = fopen('php://output', 'w');
             fwrite($file, chr(0xFF) . chr(0xFE));
 
@@ -1077,10 +1105,7 @@ class ReportController extends Controller
                 $price = 120000;
 
                 // Count lost and damaged fines linked to this book's borrowings
-                $fines = Fine::whereIn('reason', [Fine::REASON_LOST, Fine::REASON_DAMAGED])
-                    ->whereHas('borrowing', function ($q) use ($book) {
-                        $q->where('book_id', $book->book_id);
-                    })->get();
+                $fines = $allFines->get((int) $book->book_id) ?? collect();
 
                 $lostCount = $fines->where('reason', Fine::REASON_LOST)->count();
                 $damagedCount = $fines->where('reason', Fine::REASON_DAMAGED)->count();
@@ -1121,7 +1146,12 @@ class ReportController extends Controller
 
     public function exportDigital(Request $request)
     {
-        $books = Book::where('is_digital', true)->with(['reviews'])->get();
+        $books = Book::where('is_digital', true)
+            ->with(['reviews'])
+            ->withCount(['digitalDocumentAccesses as view_count' => function ($q) {
+                $q->where('access_type', 'view');
+            }])
+            ->get();
 
         $headerMap = [
             'book_id' => 'Mã tài nguyên số',
@@ -1175,7 +1205,7 @@ class ReportController extends Controller
                 $ratingStr = $avgRate ? round($avgRate, 1) . ' / 5' : 'Chưa đánh giá';
 
                 // Online views: use accesses view count or mock it
-                $viewCount = $book->digitalDocumentAccesses()->where('access_type', 'view')->count();
+                $viewCount = $book->view_count;
                 if ($viewCount == 0) {
                     $viewCount = $book->download_count * 3; // Realistic simulation fallback
                 }

@@ -195,6 +195,10 @@ class SecurityHardeningTest extends TestCase
             ->assertOk()
             ->streamedContent();
 
+        if (function_exists('mb_convert_encoding')) {
+            $content = mb_convert_encoding($content, 'UTF-8', 'UTF-16LE');
+        }
+
         $this->assertStringContainsString('\'=HYPERLINK', $content);
         $this->assertStringContainsString('\'+Injected Author', $content);
         $this->assertStringContainsString('\'@Injected Genre', $content);

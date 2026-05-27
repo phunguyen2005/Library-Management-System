@@ -40,8 +40,8 @@ class DigitalDocumentResource extends JsonResource
             'ai_summary_generated_at' => $this->ai_summary_generated_at?->toISOString(),
             'cover' => $this->cover,
             'is_digital' => (bool) $this->is_digital,
-            'avg_rating' => (float) round($this->reviews()->avg('rating') ?? 0, 1),
-            'reviews_count' => (int) $this->reviews()->count(),
+            'avg_rating' => (float) round($this->reviews_avg_rating ?? ($this->reviews()->avg('rating') ?? 0), 1),
+            'reviews_count' => (int) ($this->reviews_count ?? $this->reviews()->count()),
         ];
     }
 

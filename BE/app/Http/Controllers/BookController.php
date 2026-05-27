@@ -33,7 +33,9 @@ class BookController extends Controller
                 ->withCount([
                     'favoritedBy as favorite_count',
                     'digitalDownloads as digital_downloads_count',
+                    'reviews as reviews_count',
                 ])
+                ->withAvg('reviews', 'rating')
                 ->orderByDesc('book_id');
             $search = trim((string) ($validated['query'] ?? ''));
 
@@ -82,7 +84,8 @@ class BookController extends Controller
         $book->loadCount([
             'favoritedBy as favorite_count',
             'digitalDownloads as digital_downloads_count',
-        ]);
+            'reviews as reviews_count',
+        ])->loadAvg('reviews', 'rating');
         return new BookResource($book);
     }
 
@@ -191,7 +194,13 @@ class BookController extends Controller
 
         \App\Services\AuditLoggerService::log('book_update', 'Đã cập nhật thông tin tài liệu: ' . $book->title . ' (ID: ' . $book->book_id . ')');
 
-        return response()->json(new BookResource($book->fresh()));
+        $book->loadCount([
+            'favoritedBy as favorite_count',
+            'digitalDownloads as digital_downloads_count',
+            'reviews as reviews_count',
+        ])->loadAvg('reviews', 'rating');
+
+        return response()->json(new BookResource($book));
     }
 
     public function destroy(Book $book)
@@ -242,7 +251,13 @@ class BookController extends Controller
 
         \App\Services\AuditLoggerService::log('digital_file_upload', 'Đã tải lên tệp tài liệu số cho sách: ' . $book->title . ' (ID: ' . $book->book_id . ')');
 
-        return response()->json(new BookResource($book->fresh()));
+        $book->loadCount([
+            'favoritedBy as favorite_count',
+            'digitalDownloads as digital_downloads_count',
+            'reviews as reviews_count',
+        ])->loadAvg('reviews', 'rating');
+
+        return response()->json(new BookResource($book));
     }
 
     public function getDigitalDocuments()
@@ -253,7 +268,9 @@ class BookController extends Controller
                 ->withCount([
                     'favoritedBy as favorite_count',
                     'digitalDownloads as digital_downloads_count',
+                    'reviews as reviews_count',
                 ])
+                ->withAvg('reviews', 'rating')
                 ->orderByDesc('digital_downloads_count')
                 ->get();
         }, 120);

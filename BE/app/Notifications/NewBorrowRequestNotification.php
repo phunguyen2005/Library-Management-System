@@ -6,7 +6,9 @@ use App\Models\Borrowing;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Notification;
 
-class NewBorrowRequestNotification extends Notification
+use Illuminate\Contracts\Queue\ShouldQueue;
+
+class NewBorrowRequestNotification extends Notification implements ShouldQueue
 {
     use Queueable;
 

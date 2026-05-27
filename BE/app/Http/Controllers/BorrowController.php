@@ -492,6 +492,7 @@ class BorrowController extends Controller
     {
         $query = Borrowing::query()
             ->with(['member', 'book', 'librarian', 'fine'])
+            ->withExists('review')
             ->orderByDesc('loan_id');
 
         if ($memberId !== null) {

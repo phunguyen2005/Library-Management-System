@@ -6,7 +6,9 @@ use App\Models\RoomBooking;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Notification;
 
-class NewRoomBookingRequestNotification extends Notification
+use Illuminate\Contracts\Queue\ShouldQueue;
+
+class NewRoomBookingRequestNotification extends Notification implements ShouldQueue
 {
     use Queueable;
 

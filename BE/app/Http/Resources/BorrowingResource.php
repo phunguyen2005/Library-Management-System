@@ -22,7 +22,7 @@ class BorrowingResource extends JsonResource
             'borrow_date' => $this->borrow_date?->toDateString(),
             'due_date' => $this->due_date?->toDateString(),
             'return_date' => $this->return_date?->toDateString(),
-            'is_reviewed' => (bool) $this->review()->exists(),
+            'is_reviewed' => (bool) ($this->review_exists ?? $this->review()->exists()),
             'is_overdue' => $overdue['is_overdue'],
             'days_overdue' => $overdue['days_overdue'],
             'due_status' => $overdue['due_status'],

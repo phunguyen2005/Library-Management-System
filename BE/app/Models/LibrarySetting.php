@@ -26,6 +26,15 @@ class LibrarySetting extends Model
 
     protected $table = 'library_settings';
 
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::saved(function () {
+            self::clearCache();
+        });
+    }
+
     protected $fillable = [
         'loan_period_days',
         'max_active_loans',
@@ -69,9 +78,20 @@ class LibrarySetting extends Model
         ];
     }
 
+    public static function clearCache(): void
+    {
+        if (app()->bound('library_settings.singleton')) {
+            app()->forgetInstance('library_settings.singleton');
+        }
+    }
+
     public static function singleton(): self
     {
-        return self::query()->firstOrCreate(
+        if (app()->bound('library_settings.singleton')) {
+            return app('library_settings.singleton');
+        }
+
+        $instance = self::query()->firstOrCreate(
             ['id' => 1],
             [
                 'loan_period_days' => self::DEFAULT_LOAN_PERIOD_DAYS,
@@ -93,5 +113,9 @@ class LibrarySetting extends Model
                 'room_cancel_deadline_hours' => self::DEFAULT_ROOM_CANCEL_DEADLINE_HOURS,
             ]
         );
+
+        app()->instance('library_settings.singleton', $instance);
+
+        return $instance;
     }
 }

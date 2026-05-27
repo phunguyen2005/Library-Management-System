@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { SHELF_LABELS } from '../lib/bookClassification';
 
 export { SHELF_LABELS };
@@ -57,6 +57,18 @@ interface MapZoneInfo {
   description: string;
   icon: string;
   details?: string;
+}
+
+type LibraryMapTab = 'map' | 'details';
+
+const MAP_BASE_WIDTH = 740;
+const MAP_BASE_HEIGHT = 680;
+const MIN_ZOOM = 0.35;
+const MAX_ZOOM = 1.25;
+const ZOOM_STEP = 0.1;
+
+function clampZoom(value: number) {
+  return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, value));
 }
 
 const ZONES: Record<string, MapZoneInfo> = {
@@ -127,6 +139,12 @@ const ZONES: Record<string, MapZoneInfo> = {
 
 export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bookTitle }: LibraryMapModalProps) {
   const [activeZone, setActiveZone] = useState<MapZoneInfo | null>(null);
+  const [selectedZone, setSelectedZone] = useState<MapZoneInfo | null>(null);
+  const [activeTab, setActiveTab] = useState<LibraryMapTab>('map');
+  const [zoom, setZoom] = useState(1);
+  const [isAutoFit, setIsAutoFit] = useState(true);
+  const [viewportWidth, setViewportWidth] = useState(MAP_BASE_WIDTH);
+  const viewportRef = useRef<HTMLDivElement | null>(null);
 
   const parsed = useMemo(() => parseLocation(highlightLocation), [highlightLocation]);
 
@@ -140,7 +158,7 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
 
   const [selectedFloor, setSelectedFloor] = useState<number>(initialFloor);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (parsed.shelf) {
       const char = parsed.shelf.charAt(0).toUpperCase();
       if (['F', 'G', 'H', 'I', 'J'].includes(char)) {
@@ -151,15 +169,111 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
     }
   }, [parsed.shelf]);
 
+  const fitScale = useMemo(() => clampZoom(Math.min(1, viewportWidth / MAP_BASE_WIDTH)), [viewportWidth]);
+
+  const resetInteractionState = useCallback(() => {
+    setActiveZone(null);
+    setSelectedZone(null);
+    setActiveTab('map');
+    setIsAutoFit(true);
+    setZoom(1);
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) {
+      resetInteractionState();
+    }
+  }, [isOpen, resetInteractionState]);
+
+  useEffect(() => {
+    if (!isOpen || !viewportRef.current) return;
+
+    const viewport = viewportRef.current;
+    const updateWidth = (nextWidth?: number) => {
+      const measuredWidth = nextWidth || viewport.getBoundingClientRect().width || viewport.clientWidth;
+      setViewportWidth(measuredWidth > 0 ? measuredWidth : MAP_BASE_WIDTH);
+    };
+
+    updateWidth();
+
+    const observer = new ResizeObserver((entries) => {
+      const width = entries[0]?.contentRect?.width;
+      updateWidth(width);
+    });
+
+    observer.observe(viewport);
+    return () => observer.disconnect();
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (isAutoFit) {
+      setZoom(fitScale);
+    }
+  }, [fitScale, isAutoFit]);
+
+  const handleClose = useCallback(() => {
+    resetInteractionState();
+    onClose();
+  }, [onClose, resetInteractionState]);
+
   if (!isOpen) return null;
 
   const isShelfHighlighted = (shelfCode: string) => parsed.shelf === shelfCode;
   const isZoneHighlighted = (zoneId: string) => parsed.zone === zoneId;
 
+  const getShelfInfo = (shelfCode: string, label = SHELF_LABELS[shelfCode] || 'Kệ sách'): MapZoneInfo => ({
+    id: shelfCode,
+    name: `Kệ Sách ${shelfCode}`,
+    description: `Khu vực: ${label}`,
+    icon: 'shelves',
+    details: `Kệ chuyên đề chứa các tài liệu thuộc phân mục: ${label}. Mã phân loại Dewey tương ứng.`,
+  });
+
+  const selectZone = (zone: MapZoneInfo) => {
+    setSelectedZone(zone);
+    setActiveZone(zone);
+  };
+
+  const getInteractiveZoneProps = (zone: MapZoneInfo) => ({
+    role: 'button' as const,
+    tabIndex: 0,
+    'aria-label': zone.icon === 'shelves' && /^[A-J]\d+$/i.test(zone.id) ? `Chọn kệ ${zone.id}` : `Chọn ${zone.name}`,
+    onClick: () => selectZone(zone),
+    onKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        selectZone(zone);
+      }
+    },
+    onMouseEnter: () => setActiveZone(zone),
+    onMouseLeave: () => setActiveZone(null),
+  });
+
+  const highlightedZone = parsed.zone ? ZONES[parsed.zone] : null;
+  const highlightedShelf = parsed.shelf ? getShelfInfo(parsed.shelf) : null;
+  const currentInfo = selectedZone || activeZone || highlightedZone || highlightedShelf;
+  const zoomPercent = Math.round(zoom * 100);
+
+  const setManualZoom = (nextZoom: number) => {
+    setIsAutoFit(false);
+    setZoom(clampZoom(nextZoom));
+  };
+
+  const fitToScreen = () => {
+    setIsAutoFit(true);
+    setZoom(fitScale);
+  };
+
+  const resetToActualSize = () => {
+    setIsAutoFit(false);
+    setZoom(1);
+  };
+
   // Render a bookshelf unit
   const renderShelf = (shelfCode: string, themeColor: string) => {
     const isHighlighted = isShelfHighlighted(shelfCode);
     const label = SHELF_LABELS[shelfCode] || 'Kệ sách';
+    const shelfInfo = getShelfInfo(shelfCode, label);
 
     // Tailwind classes are hardcoded or mapped to keep dynamic template strings working nicely
     const borderClass = isHighlighted ? 'border-amber-500 bg-amber-500/25 text-amber-900 dark:text-amber-300 scale-105 z-10' : '';
@@ -186,16 +300,7 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
         className={`relative flex h-14 items-center justify-center rounded-lg border-2 font-mono text-xs font-bold transition-all duration-300 select-none cursor-pointer ${
           isHighlighted ? borderClass : normalClasses
         }`}
-        onMouseEnter={() =>
-          setActiveZone({
-            id: shelfCode,
-            name: `Kệ Sách ${shelfCode}`,
-            description: `Khu vực: ${label}`,
-            icon: 'shelves',
-            details: `Kệ chuyên đề chứa các tài liệu thuộc phân mục: ${label}. Mã phân loại Dewey tương ứng.`,
-          })
-        }
-        onMouseLeave={() => setActiveZone(null)}
+        {...getInteractiveZoneProps(shelfInfo)}
       >
         <div className="text-center">
           <p className="text-[10px] tracking-widest opacity-85">{shelfCode}</p>
@@ -226,7 +331,12 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
   const isAuxiliaryShelf = parsed.shelf && ['F', 'G', 'H', 'I', 'J'].includes(parsed.shelf.charAt(0));
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm transition-all duration-300">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-2 backdrop-blur-sm transition-all duration-300 sm:p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="library-map-title"
+    >
       {/* Dynamic Keyframe Animations */}
       <style dangerouslySetInnerHTML={{ __html: `
         @keyframes pulse-glow {
@@ -250,13 +360,13 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
 
       <div className="flex h-full max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-surface-bright shadow-2xl border border-surface-container-high animate-fade-in">
         {/* Header */}
-        <header className="flex items-center justify-between border-b border-surface-container-high bg-surface-container-low px-6 py-4">
+        <header className="flex items-center justify-between border-b border-surface-container-high bg-surface-container-low px-4 py-3 sm:px-6 sm:py-4">
           <div className="flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
               <span className="material-symbols-outlined">map</span>
             </div>
             <div>
-              <h2 className="text-base font-bold text-on-surface">Sơ đồ bố trí Thư viện</h2>
+              <h2 id="library-map-title" className="text-base font-bold text-on-surface">Sơ đồ bố trí Thư viện</h2>
               <p className="text-xs text-on-surface-variant">
                 Bố cục không gian học tập và định vị tài liệu tại chỗ
               </p>
@@ -264,18 +374,90 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleClose}
+            aria-label="Đóng cửa sổ sơ đồ"
             className="flex h-9 w-9 items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer"
           >
             <span className="material-symbols-outlined">close</span>
           </button>
         </header>
 
+        <div className="grid grid-cols-2 border-b border-surface-container-high bg-surface-container-low p-1 md:hidden" role="tablist" aria-label="Chế độ xem sơ đồ thư viện">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'map'}
+            onClick={() => setActiveTab('map')}
+            className={`rounded-lg px-3 py-2 text-xs font-bold transition-colors ${
+              activeTab === 'map'
+                ? 'bg-primary text-white shadow-sm'
+                : 'text-on-surface-variant hover:bg-surface-container-high'
+            }`}
+          >
+            Bản đồ
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'details'}
+            onClick={() => setActiveTab('details')}
+            className={`rounded-lg px-3 py-2 text-xs font-bold transition-colors ${
+              activeTab === 'details'
+                ? 'bg-primary text-white shadow-sm'
+                : 'text-on-surface-variant hover:bg-surface-container-high'
+            }`}
+          >
+            Chú thích & Chi tiết
+          </button>
+        </div>
+
         {/* Content Area */}
         <div className="flex-1 flex flex-col md:flex-row overflow-hidden bg-surface-container-lowest">
           
           {/* Main Map Viewport */}
-          <div className="flex-1 overflow-auto custom-scrollbar p-6 blueprint-grid relative">
+          <div
+            ref={viewportRef}
+            data-testid="library-map-viewport"
+            className={`${activeTab === 'map' ? 'block' : 'hidden'} md:block flex-1 overflow-auto custom-scrollbar p-3 sm:p-6 blueprint-grid relative`}
+          >
+            <div className="absolute right-3 top-3 z-30 flex items-center gap-1 rounded-full border border-surface-container-high bg-surface-bright/95 p-1 shadow-lg backdrop-blur">
+              <button
+                type="button"
+                aria-label="Thu nhỏ"
+                onClick={() => setManualZoom(zoom - ZOOM_STEP)}
+                className="flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high"
+              >
+                <span className="material-symbols-outlined text-base">remove</span>
+              </button>
+              <span className="min-w-12 text-center text-[11px] font-bold text-on-surface">{zoomPercent}%</span>
+              <button
+                type="button"
+                aria-label="Phóng to"
+                onClick={() => setManualZoom(zoom + ZOOM_STEP)}
+                className="flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high"
+              >
+                <span className="material-symbols-outlined text-base">add</span>
+              </button>
+              <span className="mx-0.5 h-5 w-px bg-surface-container-high" />
+              <button
+                type="button"
+                aria-label="Vừa màn hình"
+                onClick={fitToScreen}
+                className={`flex h-8 w-8 items-center justify-center rounded-full ${
+                  isAutoFit ? 'bg-primary/10 text-primary' : 'text-on-surface-variant hover:bg-surface-container-high'
+                }`}
+              >
+                <span className="material-symbols-outlined text-base">fit_screen</span>
+              </button>
+              <button
+                type="button"
+                aria-label="Kích thước gốc 100%"
+                onClick={resetToActualSize}
+                className="flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high"
+              >
+                <span className="material-symbols-outlined text-base">center_focus_strong</span>
+              </button>
+            </div>
             
             {/* Quick alert if a specific book location is highlighted */}
             {highlightLocation && (
@@ -296,7 +478,21 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
             )}
 
             {/* Layout Blueprint */}
-            <div className="mx-auto min-w-[700px] max-w-[850px] border-4 border-slate-700 bg-surface-bright rounded-2xl p-4 shadow-inner relative">
+            <div
+              data-testid="library-map-shell"
+              className="mx-auto relative shrink-0"
+              style={{ width: MAP_BASE_WIDTH * zoom, height: MAP_BASE_HEIGHT * zoom }}
+            >
+              <div
+                data-testid="library-map-blueprint"
+                className="absolute left-0 top-0 border-4 border-slate-700 bg-surface-bright rounded-2xl p-4 shadow-inner"
+                style={{
+                  width: MAP_BASE_WIDTH,
+                  minHeight: MAP_BASE_HEIGHT,
+                  transform: `scale(${zoom})`,
+                  transformOrigin: 'top left',
+                }}
+              >
               
               {/* Outer boundary wall label */}
               <div className="absolute top-2 left-1/2 -translate-x-1/2 px-4 py-0.5 rounded-full bg-slate-700 text-white text-[10px] uppercase font-bold tracking-wider">
@@ -316,8 +512,7 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
                         ? 'animate-pulse-glow border-amber-500 bg-amber-500/10'
                         : 'border-slate-350 bg-slate-50/20 dark:border-slate-700 hover:border-primary hover:bg-primary/5'
                     }`}
-                    onMouseEnter={() => setActiveZone(ZONES.conference_room)}
-                    onMouseLeave={() => setActiveZone(null)}
+                    {...getInteractiveZoneProps(ZONES.conference_room)}
                   >
                     <div className="flex items-center gap-1.5 text-indigo-500">
                       <span className="material-symbols-outlined text-sm">groups</span>
@@ -341,8 +536,7 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
                         ? 'animate-pulse-glow border-amber-500 bg-amber-500/10'
                         : 'border-slate-350 bg-slate-50/20 dark:border-slate-700 hover:border-primary hover:bg-primary/5'
                     }`}
-                    onMouseEnter={() => setActiveZone(ZONES.computer_room)}
-                    onMouseLeave={() => setActiveZone(null)}
+                    {...getInteractiveZoneProps(ZONES.computer_room)}
                   >
                     <div className="flex items-center gap-1.5 text-primary">
                       <span className="material-symbols-outlined text-sm">computer</span>
@@ -363,8 +557,7 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
                         ? 'animate-pulse-glow border-amber-500 bg-amber-500/10'
                         : 'border-slate-350 bg-slate-50/20 dark:border-slate-700 hover:border-primary hover:bg-primary/5'
                     }`}
-                    onMouseEnter={() => setActiveZone(ZONES.newspaper_room)}
-                    onMouseLeave={() => setActiveZone(null)}
+                    {...getInteractiveZoneProps(ZONES.newspaper_room)}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
@@ -386,8 +579,7 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
                         ? 'animate-pulse-glow border-amber-500 bg-amber-500/10'
                         : 'border-slate-350 bg-slate-50/20 dark:border-slate-700 hover:border-primary hover:bg-primary/5'
                     }`}
-                    onMouseEnter={() => setActiveZone(ZONES.reception_student)}
-                    onMouseLeave={() => setActiveZone(null)}
+                    {...getInteractiveZoneProps(ZONES.reception_student)}
                   >
                     <div className="flex items-center gap-1.5 text-teal-600 dark:text-teal-400">
                       <span className="material-symbols-outlined text-sm">support_agent</span>
@@ -637,8 +829,7 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
                           ? 'animate-pulse-glow border-amber-500 bg-amber-500/10'
                           : 'border-slate-350 bg-slate-50/20 dark:border-slate-700 hover:border-primary hover:bg-primary/5'
                       }`}
-                      onMouseEnter={() => setActiveZone(ZONES.lockers)}
-                      onMouseLeave={() => setActiveZone(null)}
+                      {...getInteractiveZoneProps(ZONES.lockers)}
                     >
                       <div className="flex items-center gap-1 text-slate-600 dark:text-slate-400">
                         <span className="material-symbols-outlined text-xs">lock</span>
@@ -694,15 +885,12 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
                               ? 'animate-pulse-glow border-amber-500 bg-amber-500/25'
                               : 'border-sky-300/40 bg-sky-500/5 hover:bg-sky-500/10'
                           }`}
-                          onMouseEnter={() =>
-                            setActiveZone({
-                              id: 'R1',
-                              name: 'Phòng Nhóm R-01',
-                              description: 'Phòng thảo luận nhóm cách âm, sức chứa 6-8 người.',
-                              icon: 'meeting_room',
-                            })
-                          }
-                          onMouseLeave={() => setActiveZone(null)}
+                          {...getInteractiveZoneProps({
+                            id: 'R1',
+                            name: 'Phòng Nhóm R-01',
+                            description: 'Phòng thảo luận nhóm cách âm, sức chứa 6-8 người.',
+                            icon: 'meeting_room',
+                          })}
                         >
                           <span className="block text-[10px] font-bold text-sky-700 dark:text-sky-300">R-01</span>
                           <span className="text-[8px] text-slate-500">Group Room</span>
@@ -713,15 +901,12 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
                               ? 'animate-pulse-glow border-amber-500 bg-amber-500/25'
                               : 'border-sky-300/40 bg-sky-500/5 hover:bg-sky-500/10'
                           }`}
-                          onMouseEnter={() =>
-                            setActiveZone({
-                              id: 'R2',
-                              name: 'Phòng Nhóm R-02',
-                              description: 'Phòng thảo luận nhóm cách âm, sức chứa 6-8 người.',
-                              icon: 'meeting_room',
-                            })
-                          }
-                          onMouseLeave={() => setActiveZone(null)}
+                          {...getInteractiveZoneProps({
+                            id: 'R2',
+                            name: 'Phòng Nhóm R-02',
+                            description: 'Phòng thảo luận nhóm cách âm, sức chứa 6-8 người.',
+                            icon: 'meeting_room',
+                          })}
                         >
                           <span className="block text-[10px] font-bold text-sky-700 dark:text-sky-300">R-02</span>
                           <span className="text-[8px] text-slate-500">Group Room</span>
@@ -744,15 +929,12 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
                                   ? 'animate-pulse-glow border-amber-500 bg-amber-500/25 text-amber-900 dark:text-amber-300'
                                   : 'border-slate-200 bg-slate-50/10 hover:bg-slate-100 dark:border-slate-800'
                               }`}
-                              onMouseEnter={() =>
-                                setActiveZone({
-                                  id: code,
-                                  name: `Bàn học S-${String(i + 1).padStart(2, '0')}`,
-                                  description: 'Bàn tự học đơn cá nhân.',
-                                  icon: 'desk',
-                                })
-                              }
-                              onMouseLeave={() => setActiveZone(null)}
+                              {...getInteractiveZoneProps({
+                                id: code,
+                                name: `Bàn học S-${String(i + 1).padStart(2, '0')}`,
+                                description: 'Bàn tự học đơn cá nhân.',
+                                icon: 'desk',
+                              })}
                             >
                               S{i + 1}
                             </div>
@@ -774,16 +956,13 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
                                 ? 'animate-pulse-glow border-amber-500 bg-amber-500/25 text-amber-900 dark:text-amber-300'
                                 : 'border-dashed border-sky-300/40 bg-sky-500/5 hover:bg-sky-500/10 text-sky-700 dark:text-sky-300'
                             }`}
-                            onMouseEnter={() =>
-                              setActiveZone({
-                                id: code,
-                                name: `Bàn Nhóm G-0${idx + 1}`,
-                                description: 'Bàn họp nhóm lớn, có cổng cắm điện và cáp mạng.',
-                                icon: 'table_restaurant',
-                                details: 'Sức chứa tối đa 6 người, thích hợp thảo luận nhóm vừa và làm việc nhóm.',
-                              })
-                            }
-                            onMouseLeave={() => setActiveZone(null)}
+                            {...getInteractiveZoneProps({
+                              id: code,
+                              name: `Bàn Nhóm G-0${idx + 1}`,
+                              description: 'Bàn họp nhóm lớn, có cổng cắm điện và cáp mạng.',
+                              icon: 'table_restaurant',
+                              details: 'Sức chứa tối đa 6 người, thích hợp thảo luận nhóm vừa và làm việc nhóm.',
+                            })}
                           >
                             <span className="font-bold">G-0{idx + 1}</span>
                             <span className="text-[9px] font-sans opacity-80">6 chỗ 🪑🪑🪑</span>
@@ -806,15 +985,12 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
                                   ? 'animate-pulse-glow border-amber-500 bg-amber-500/25 text-amber-900 dark:text-amber-300'
                                   : 'border-slate-200 bg-slate-50/10 hover:bg-slate-100 dark:border-slate-800'
                               }`}
-                              onMouseEnter={() =>
-                                setActiveZone({
-                                  id: code,
-                                  name: `Bàn học S-${i + 13}`,
-                                  description: 'Bàn tự học đơn cá nhân.',
-                                  icon: 'desk',
-                                })
-                              }
-                              onMouseLeave={() => setActiveZone(null)}
+                              {...getInteractiveZoneProps({
+                                id: code,
+                                name: `Bàn học S-${i + 13}`,
+                                description: 'Bàn tự học đơn cá nhân.',
+                                icon: 'desk',
+                              })}
                             >
                               S{i + 13}
                             </div>
@@ -831,8 +1007,7 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
                         ? 'animate-pulse-glow border-amber-500 bg-amber-500/10'
                         : 'border-slate-350 bg-slate-50/20 dark:border-slate-700 hover:border-primary hover:bg-primary/5'
                     }`}
-                    onMouseEnter={() => setActiveZone(ZONES.internal_staff)}
-                    onMouseLeave={() => setActiveZone(null)}
+                    {...getInteractiveZoneProps(ZONES.internal_staff)}
                   >
                     <div className="flex items-center gap-1.5 text-rose-500">
                       <span className="material-symbols-outlined text-sm">badge</span>
@@ -850,8 +1025,7 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
                         ? 'animate-pulse-glow border-amber-500 bg-amber-500/10'
                         : 'border-slate-350 bg-slate-50/20 dark:border-slate-700 hover:border-primary hover:bg-primary/5'
                     }`}
-                    onMouseEnter={() => setActiveZone(ZONES.reception_desk)}
-                    onMouseLeave={() => setActiveZone(null)}
+                    {...getInteractiveZoneProps(ZONES.reception_desk)}
                   >
                     <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
                       <span className="material-symbols-outlined text-sm">desk</span>
@@ -882,42 +1056,69 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
             </div>
           </div>
 
+            {selectedZone && (
+              <div
+                data-testid="mobile-zone-sheet"
+                className="absolute inset-x-3 bottom-3 z-40 rounded-2xl border border-surface-container-high bg-surface-bright p-4 shadow-2xl md:hidden"
+                aria-label="Chi tiết khu vực đã chọn"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                    <span className="material-symbols-outlined">{selectedZone.icon}</span>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h4 className="text-sm font-bold text-on-surface">{selectedZone.name}</h4>
+                    <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">{selectedZone.description}</p>
+                  </div>
+                  <button
+                    type="button"
+                    aria-label="Đóng chi tiết khu vực"
+                    onClick={() => setSelectedZone(null)}
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high"
+                  >
+                    <span className="material-symbols-outlined text-base">close</span>
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('details')}
+                  className="mt-3 w-full rounded-xl bg-primary px-4 py-2.5 text-xs font-bold text-white shadow-sm"
+                >
+                  Xem chi tiết & Chú giải
+                </button>
+              </div>
+            )}
+          </div>
+
           {/* Interactive Info Sidebar panel */}
-          <aside className="w-full md:w-80 border-t md:border-t-0 md:border-l border-surface-container-high bg-surface-container-low p-6 flex flex-col justify-between overflow-y-auto">
+          <aside
+            className={`${activeTab === 'details' ? 'flex' : 'hidden'} md:flex w-full md:w-80 border-t md:border-t-0 md:border-l border-surface-container-high bg-surface-container-low p-6 flex-col justify-between overflow-y-auto`}
+            aria-label="Chi tiết khu vực"
+          >
             <div>
               <h3 className="text-sm font-bold uppercase text-outline tracking-wider mb-4 flex items-center gap-1.5">
                 <span className="material-symbols-outlined text-base">info</span>
                 Chi tiết khu vực
               </h3>
 
-              {activeZone || parsed.shelf || parsed.zone ? (
+              {currentInfo ? (
                 <div className="space-y-4 animate-fade-in">
                   {/* Current Active or Highlighted Zone Info */}
                   {(() => {
-                    const info = activeZone || (parsed.zone ? ZONES[parsed.zone] : null) || (parsed.shelf ? {
-                      id: parsed.shelf,
-                      name: `Kệ Sách ${parsed.shelf}`,
-                      description: `Khu vực: ${SHELF_LABELS[parsed.shelf] || 'Chuyên đề sách'}`,
-                      icon: 'shelves',
-                      details: `Kệ lưu trữ tài liệu phân loại theo nhóm chuyên đề ${SHELF_LABELS[parsed.shelf] || 'bổ sung'}. Vui lòng đối chiếu mã trên gáy sách.`,
-                    } : null);
-
-                    if (!info) return null;
-
                     return (
                       <>
                         <div className="flex items-center gap-3">
                           <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                            <span className="material-symbols-outlined text-2xl">{info.icon}</span>
+                            <span className="material-symbols-outlined text-2xl">{currentInfo.icon}</span>
                           </div>
                           <div>
-                            <h4 className="font-bold text-on-surface text-sm">{info.name}</h4>
-                            <p className="text-[11px] text-on-surface-variant leading-tight">{info.description}</p>
+                            <h4 className="font-bold text-on-surface text-sm">{currentInfo.name}</h4>
+                            <p className="text-[11px] text-on-surface-variant leading-tight">{currentInfo.description}</p>
                           </div>
                         </div>
 
                         <div className="rounded-xl border border-surface-container-high bg-surface-bright p-4 text-xs text-on-surface-variant leading-relaxed shadow-sm">
-                          {info.details || 'Không gian tự học yên tĩnh phục vụ sinh viên. Vui lòng giữ trật tự và vệ sinh chung khi sử dụng.'}
+                          {currentInfo.details || 'Không gian tự học yên tĩnh phục vụ sinh viên. Vui lòng giữ trật tự và vệ sinh chung khi sử dụng.'}
                         </div>
                       </>
                     );
@@ -1046,7 +1247,7 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
         <footer className="flex justify-end border-t border-surface-container-high bg-surface-container-low px-6 py-4">
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleClose}
             className="rounded-xl bg-primary px-6 py-2.5 text-xs font-bold text-white shadow-md hover:opacity-90 active:scale-95 transition-all cursor-pointer"
           >
             Đóng sơ đồ
