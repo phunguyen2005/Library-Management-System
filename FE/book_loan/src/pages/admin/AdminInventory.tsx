@@ -440,9 +440,23 @@ export default function AdminInventory() {
       emitToast({
         tone: 'error',
         title: 'Cần tệp số',
-        message: 'Hãy chọn tệp PDF, EPUB hoặc slide trước khi lưu tài nguyên số này.',
+        message: 'Hãy chọn tệp PDF, EPUB, MP3, WAV, M4A hoặc slide trước khi lưu tài nguyên số này.',
       });
       return;
+    }
+
+    // Client-side file type validation before any API call
+    if (isDigitalTab && selectedDigitalFile) {
+      const allowedExtensions = ['pdf', 'epub', 'mp3', 'wav', 'm4a', 'ppt', 'pptx'];
+      const ext = selectedDigitalFile.name.split('.').pop()?.toLowerCase() ?? '';
+      if (!allowedExtensions.includes(ext)) {
+        emitToast({
+          tone: 'error',
+          title: 'Định dạng không hợp lệ',
+          message: `Tệp "${selectedDigitalFile.name}" không được hỗ trợ. Chỉ chấp nhận: PDF, EPUB, MP3, WAV, M4A, PPT, PPTX.`,
+        });
+        return;
+      }
     }
 
     try {
@@ -460,14 +474,26 @@ export default function AdminInventory() {
         await uploadDigitalFile(savedBook.id, selectedDigitalFile);
       }
 
+      const uploadedFormat = selectedDigitalFile
+        ? determineCategory(selectedDigitalFile.name)
+        : null;
+      const isAudioUpload = uploadedFormat === 'AUDIO';
+
       closeModal();
       await loadBooks(false);
       emitToast({
         tone: 'success',
-        title: activeTab === 'digital' ? 'Đã lưu tài nguyên số' : 'Đã lưu sách mượn',
+        title:
+          activeTab === 'digital'
+            ? isAudioUpload
+              ? 'Đã lưu audio book'
+              : 'Đã lưu tài nguyên số'
+            : 'Đã lưu sách mượn',
         message:
           activeTab === 'digital'
-            ? 'Thông tin và tệp tài nguyên số đã được cập nhật.'
+            ? isAudioUpload
+              ? 'Audio book và tệp âm thanh đã được cập nhật thành công.'
+              : 'Thông tin và tệp tài nguyên số đã được cập nhật.'
             : 'Kho sách mượn đã được cập nhật.',
       });
     } catch (error: unknown) {

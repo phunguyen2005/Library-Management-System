@@ -26,6 +26,7 @@ return [
         'device_revoked' => 'Đã đăng xuất thiết bị thành công.',
         'sign_in_required' => 'Vui lòng đăng nhập để tiếp tục.',
         'forbidden' => 'Bạn không có quyền thực hiện thao tác này.',
+        'account_disabled' => 'Tài khoản này đã bị vô hiệu hóa. Vui lòng liên hệ thư viện để được hỗ trợ.',
     ],
     'borrow' => [
         'unpaid_fines_block' => 'Bạn cần thanh toán các khoản phí phạt còn nợ trước khi mượn sách mới.',

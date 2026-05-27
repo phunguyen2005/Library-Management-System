@@ -6,6 +6,7 @@ import {
   getAllMembers,
   updateMember,
   importMembers,
+  toggleMemberDisabled,
 } from '../../api/userApi';
 import CSVImportWizard from '../../components/CSVImportWizard';
 import CSVExportSelector from '../../components/CSVExportSelector';
@@ -73,6 +74,7 @@ const EMPTY_FORM: MemberFormData = {
 };
 
 function mapMember(member: MemberApiRecord): MemberListItem {
+  const disabled = member.is_disabled ?? false;
   return {
     id: member.member_id,
     name: member.name,
@@ -81,12 +83,15 @@ function mapMember(member: MemberApiRecord): MemberListItem {
     email: member.email || `${member.member_id}@student.hcmue.edu.vn`,
     phoneNumber: member.phone_number || 'Chưa cập nhật',
     joinDate: member.join_date || '',
-    status: 'Hoạt động',
-    statusColor: 'bg-green-100 text-green-700 border-green-200',
+    status: disabled ? 'Vô hiệu hóa' : 'Hoạt động',
+    statusColor: disabled
+      ? 'bg-red-100 text-red-700 border-red-200'
+      : 'bg-green-100 text-green-700 border-green-200',
     xp: member.xp ?? 0,
     points: member.points ?? 0,
     level: member.level ?? 1,
     badgesCount: member.badges_count ?? 0,
+    isDisabled: disabled,
   };
 }
 
@@ -97,6 +102,16 @@ function buildPayload(formData: MemberFormData, includePassword: boolean): Membe
     phone_number: formData.phone_number.trim() || null,
     join_date: formData.join_date || null,
   };
+
+  if (formData.level !== undefined) {
+    payload.level = formData.level;
+  }
+  if (formData.xp !== undefined) {
+    payload.xp = formData.xp;
+  }
+  if (formData.points !== undefined) {
+    payload.points = formData.points;
+  }
 
   if (includePassword || formData.password.trim()) {
     payload.password = formData.password;
@@ -143,6 +158,7 @@ export default function AdminMembers() {
   const [formData, setFormData] = useState<MemberFormData>(EMPTY_FORM);
   const [memberToDelete, setMemberToDelete] = useState<MemberListItem | null>(null);
   const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
+  const [isTogglingId, setIsTogglingId] = useState<number | null>(null);
 
   // --- CSV Import/Export state ---
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -304,6 +320,25 @@ export default function AdminMembers() {
 
       const message = getErrorMessage(error, 'Không thể xóa thành viên.');
       emitToast({ tone: 'error', title: 'Không thể xóa thành viên', message });
+    }
+  };
+
+  const handleToggleDisable = async (member: MemberListItem) => {
+    setIsTogglingId(member.id);
+    try {
+      const res = await toggleMemberDisabled(member.id);
+      await loadMembers(false);
+      emitToast({
+        tone: member.isDisabled ? 'success' : 'info',
+        title: member.isDisabled ? 'Đã kích hoạt tài khoản' : 'Đã vô hiệu hóa tài khoản',
+        message: res.message,
+      });
+    } catch (error: unknown) {
+      if (isUnauthorizedError(error)) return;
+      const message = getErrorMessage(error, 'Không thể thay đổi trạng thái tài khoản.');
+      emitToast({ tone: 'error', title: 'Thao tác thất bại', message });
+    } finally {
+      setIsTogglingId(null);
     }
   };
 
@@ -487,6 +522,26 @@ export default function AdminMembers() {
                         </button>
                         <button
                           type="button"
+                          disabled={isTogglingId === member.id}
+                          onClick={() => handleToggleDisable(member)}
+                          className={`rounded-lg p-2 transition-all disabled:opacity-50 ${
+                            member.isDisabled
+                              ? 'text-emerald-600 hover:bg-emerald-50'
+                              : 'text-amber-600 hover:bg-amber-50'
+                          }`}
+                          title={member.isDisabled ? 'Kích hoạt lại tài khoản' : 'Vô hiệu hóa tài khoản'}
+                          aria-label={member.isDisabled ? `Kích hoạt lại ${member.name}` : `Vô hiệu hóa ${member.name}`}
+                        >
+                          <span aria-hidden="true" className="material-symbols-outlined text-[18px]">
+                            {isTogglingId === member.id
+                              ? 'hourglass_empty'
+                              : member.isDisabled
+                              ? 'lock_open'
+                              : 'block'}
+                          </span>
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => promptDelete(member)}
                           className="rounded-lg p-2 text-red-500 transition-all hover:bg-red-50"
                           title="Xóa"
@@ -541,30 +596,63 @@ export default function AdminMembers() {
             <form onSubmit={handleSubmit} className="space-y-4 p-6">
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 {modalMode === 'edit' && (
-                  <div className="md:col-span-2 bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-100 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div className="md:col-span-2 bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-100 rounded-xl p-4 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
                     <div>
                       <h4 className="font-bold text-sm text-indigo-900 flex items-center gap-1.5">
                         <span className="material-symbols-outlined text-[18px]">workspace_premium</span>
                         Thành tích Học giả (Gamification)
                       </h4>
-                      <p className="text-[11px] text-indigo-700 mt-0.5">Thống kê hoạt động học tập và đọc sách của sinh viên.</p>
+                      <p className="text-[11px] text-indigo-700 mt-0.5">Điều chỉnh cấp độ, điểm tích lũy XP và xu thưởng của sinh viên.</p>
                     </div>
-                    <div className="flex flex-wrap gap-3 text-center w-full sm:w-auto">
-                      <div className="flex-1 min-w-[70px] bg-white/80 border border-indigo-200/50 rounded-lg px-2.5 py-1.5 shadow-sm">
-                        <span className="text-[9px] uppercase font-bold text-slate-400 block tracking-wider">Cấp độ</span>
-                        <span className="font-extrabold text-indigo-600 text-sm">Lvl {formData.level ?? 1}</span>
+                    <div className="flex flex-wrap gap-2.5 text-center w-full lg:w-auto">
+                      <div className="flex-1 min-w-[85px] bg-white border border-indigo-200/60 rounded-xl px-2 py-1.5 shadow-sm transition-all focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-500/10">
+                        <label htmlFor="member-level" className="text-[9px] uppercase font-bold text-slate-400 block tracking-wider cursor-pointer select-none">Cấp độ</label>
+                        <div className="flex items-center justify-center gap-0.5 mt-0.5">
+                          <span className="font-bold text-indigo-500 text-xs select-none">Lvl</span>
+                          <input
+                            id="member-level"
+                            type="number"
+                            min="1"
+                            value={formData.level ?? 1}
+                            onChange={(e) => setFormData({ ...formData, level: Math.max(1, parseInt(e.target.value) || 1) })}
+                            className="font-extrabold text-indigo-600 text-sm w-10 bg-transparent border-none p-0 outline-none text-center focus:ring-0 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          />
+                        </div>
                       </div>
-                      <div className="flex-1 min-w-[70px] bg-white/80 border border-indigo-200/50 rounded-lg px-2.5 py-1.5 shadow-sm">
-                        <span className="text-[9px] uppercase font-bold text-slate-400 block tracking-wider">Tích lũy</span>
-                        <span className="font-extrabold text-blue-600 text-sm">{formData.xp ?? 0} XP</span>
+                      <div className="flex-1 min-w-[95px] bg-white border border-indigo-200/60 rounded-xl px-2 py-1.5 shadow-sm transition-all focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-500/10">
+                        <label htmlFor="member-xp" className="text-[9px] uppercase font-bold text-slate-400 block tracking-wider cursor-pointer select-none">Tích lũy</label>
+                        <div className="flex items-center justify-center gap-0.5 mt-0.5">
+                          <input
+                            id="member-xp"
+                            type="number"
+                            min="0"
+                            value={formData.xp ?? 0}
+                            onChange={(e) => setFormData({ ...formData, xp: Math.max(0, parseInt(e.target.value) || 0) })}
+                            className="font-extrabold text-blue-600 text-sm w-14 bg-transparent border-none p-0 outline-none text-center focus:ring-0 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          />
+                          <span className="font-bold text-blue-500 text-[10px] select-none">XP</span>
+                        </div>
                       </div>
-                      <div className="flex-1 min-w-[70px] bg-white/80 border border-indigo-200/50 rounded-lg px-2.5 py-1.5 shadow-sm">
-                        <span className="text-[9px] uppercase font-bold text-slate-400 block tracking-wider">Điểm xu</span>
-                        <span className="font-extrabold text-amber-600 text-sm">{formData.points ?? 0} 🪙</span>
+                      <div className="flex-1 min-w-[85px] bg-white border border-indigo-200/60 rounded-xl px-2 py-1.5 shadow-sm transition-all focus-within:border-amber-400 focus-within:ring-2 focus-within:ring-amber-500/10">
+                        <label htmlFor="member-points" className="text-[9px] uppercase font-bold text-slate-400 block tracking-wider cursor-pointer select-none">Điểm xu</label>
+                        <div className="flex items-center justify-center gap-0.5 mt-0.5">
+                          <input
+                            id="member-points"
+                            type="number"
+                            min="0"
+                            value={formData.points ?? 0}
+                            onChange={(e) => setFormData({ ...formData, points: Math.max(0, parseInt(e.target.value) || 0) })}
+                            className="font-extrabold text-amber-600 text-sm w-10 bg-transparent border-none p-0 outline-none text-center focus:ring-0 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          />
+                          <span className="select-none text-xs" aria-hidden="true">🪙</span>
+                        </div>
                       </div>
-                      <div className="flex-1 min-w-[70px] bg-white/80 border border-indigo-200/50 rounded-lg px-2.5 py-1.5 shadow-sm">
+                      <div className="flex-1 min-w-[85px] bg-white/60 border border-indigo-100 rounded-xl px-2 py-1.5 shadow-sm select-none">
                         <span className="text-[9px] uppercase font-bold text-slate-400 block tracking-wider">Huy hiệu</span>
-                        <span className="font-extrabold text-emerald-600 text-sm">{formData.badgesCount ?? 0} 🏅</span>
+                        <div className="flex items-center justify-center gap-0.5 mt-0.5">
+                          <span className="font-extrabold text-emerald-600 text-sm">{formData.badgesCount ?? 0}</span>
+                          <span aria-hidden="true" className="text-xs">🏅</span>
+                        </div>
                       </div>
                     </div>
                   </div>

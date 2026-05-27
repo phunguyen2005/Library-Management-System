@@ -34,11 +34,22 @@ class AppNewBookNotification extends Notification
      */
     public function toArray(object $notifiable): array
     {
+        $isAudio = strtoupper((string) ($this->book->file_format ?? '')) === 'AUDIO';
+        $isDigital = $this->book->is_digital;
+
+        if ($isAudio) {
+            $message = 'Audio book mới "' . $this->book->title . '" vừa được thêm vào kho tài liệu số.';
+        } elseif ($isDigital) {
+            $message = 'Tài liệu số mới "' . $this->book->title . '" vừa được thêm vào thư viện.';
+        } else {
+            $message = 'Sách mới "' . $this->book->title . '" vừa được thêm vào thư viện.';
+        }
+
         return [
             'type' => 'new_book',
             'book_id' => $this->book->book_id,
             'book_title' => $this->book->title,
-            'message' => 'Sách mới "' . $this->book->title . '" vừa được thêm vào thư viện.',
+            'message' => $message,
         ];
     }
 }

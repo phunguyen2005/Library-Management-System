@@ -8,6 +8,7 @@ export interface MemberApiRecord {
   points?: number;
   level?: number;
   badges_count?: number;
+  is_disabled?: boolean;
 }
 
 export interface MemberListItem {
@@ -24,6 +25,7 @@ export interface MemberListItem {
   points: number;
   level: number;
   badgesCount: number;
+  isDisabled: boolean;
 }
 
 export type MemberPayload = {
@@ -33,4 +35,8 @@ export type MemberPayload = {
   join_date?: string | null;
   password?: string;
   password_confirmation?: string;
+  level?: number;
+  xp?: number;
+  points?: number;
 };
+

@@ -56,6 +56,12 @@ export async function deleteMember(memberId: number) {
   });
 }
 
+export async function toggleMemberDisabled(memberId: number) {
+  return apiRequest<{ message: string; data: MemberApiRecord }>(`/members/${memberId}/toggle-disable`, {
+    method: 'PATCH',
+  });
+}
+
 export async function getMyProfile() {
   return apiRequest<MeResponse>('/me');
 }

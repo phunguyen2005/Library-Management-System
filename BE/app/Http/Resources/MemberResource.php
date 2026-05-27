@@ -20,6 +20,7 @@ class MemberResource extends JsonResource
             'level' => $this->level ?? 1,
             'badges_count' => $this->badges_count ?? $this->badges()->count(),
             'borrow_suspended_until' => $this->borrow_suspended_until?->toIso8601String(),
+            'is_disabled' => (bool) ($this->is_disabled ?? false),
         ];
     }
 }

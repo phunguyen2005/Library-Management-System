@@ -63,6 +63,18 @@ class AdminMemberController extends Controller
             $member->borrow_suspended_until = $validated['borrow_suspended_until'];
         }
 
+        if (array_key_exists('level', $validated)) {
+            $member->level = $validated['level'];
+        }
+
+        if (array_key_exists('xp', $validated)) {
+            $member->xp = $validated['xp'];
+        }
+
+        if (array_key_exists('points', $validated)) {
+            $member->points = $validated['points'];
+        }
+
         if (! empty($validated['password'])) {
             $member->password = $validated['password'];
         }
@@ -84,6 +96,35 @@ class AdminMemberController extends Controller
 
         return response()->json([
             'message' => 'Xóa thành viên thành công.',
+        ]);
+    }
+
+    public function toggleDisable(Member $member)
+    {
+        $newState = ! $member->is_disabled;
+        $member->is_disabled = $newState;
+        $member->save();
+
+        if ($newState) {
+            // Revoke all active access tokens so the user is immediately logged out
+            $member->tokens()->delete();
+
+            \App\Services\AuditLoggerService::log(
+                'member_disabled',
+                "Vô hiệu hóa tài khoản thành viên: {$member->name} (ID: {$member->member_id})."
+            );
+        } else {
+            \App\Services\AuditLoggerService::log(
+                'member_enabled',
+                "Kích hoạt lại tài khoản thành viên: {$member->name} (ID: {$member->member_id})."
+            );
+        }
+
+        return response()->json([
+            'message' => $newState
+                ? "Tài khoản của {$member->name} đã bị vô hiệu hóa."
+                : "Tài khoản của {$member->name} đã được kích hoạt lại.",
+            'data' => new MemberResource($member->fresh()),
         ]);
     }
 

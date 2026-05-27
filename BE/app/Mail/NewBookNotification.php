@@ -33,9 +33,18 @@ class NewBookNotification extends Mailable implements ShouldQueue
      */
     public function envelope(): Envelope
     {
-        return new Envelope(
-            subject: 'Sách mới tại Thư viện HCMUE: ' . $this->book->title,
-        );
+        $isAudio = strtoupper((string) ($this->book->file_format ?? '')) === 'AUDIO';
+        $isDigital = $this->book->is_digital;
+
+        if ($isAudio) {
+            $subject = 'Audio book mới tại Thư viện HCMUE: ' . $this->book->title;
+        } elseif ($isDigital) {
+            $subject = 'Tài liệu số mới tại Thư viện HCMUE: ' . $this->book->title;
+        } else {
+            $subject = 'Sách mới tại Thư viện HCMUE: ' . $this->book->title;
+        }
+
+        return new Envelope(subject: $subject);
     }
 
     /**

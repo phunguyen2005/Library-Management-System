@@ -31,6 +31,9 @@ const updateMemberMock = vi.fn(async (memberId: number, payload: MemberPayload) 
     email: payload.email,
     phone_number: payload.phone_number,
     join_date: payload.join_date,
+    level: payload.level,
+    xp: payload.xp,
+    points: payload.points,
   };
 
   membersState = membersState.map((member) =>
@@ -134,6 +137,9 @@ describe('AdminMembers', () => {
         email: 'old.member@student.hcmue.edu.vn',
         phone_number: '0901888888',
         join_date: '2026-03-17',
+        level: 1,
+        xp: 0,
+        points: 0,
       });
       expect(screen.getByText('Updated Member')).toBeInTheDocument();
     });

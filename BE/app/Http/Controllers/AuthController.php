@@ -52,6 +52,14 @@ class AuthController extends Controller
 
         $role = $user->getRoleName();
 
+        if ($role === 'student' && $user->is_disabled) {
+            $this->logFailedLogin($identifier, $request, $user);
+
+            return response()->json([
+                'message' => __('messages.auth.account_disabled'),
+            ], 403);
+        }
+
         if ($role === 'student' && is_null($user->email_verified_at)) {
             return response()->json([
                 'message' => __('messages.auth.email_not_verified'),

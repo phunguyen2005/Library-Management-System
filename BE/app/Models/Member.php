@@ -42,6 +42,7 @@ class Member extends Authenticatable
         'daily_streak',
         'last_check_in_at',
         'borrow_suspended_until',
+        'is_disabled',
     ];
 
     protected $hidden = [
@@ -68,6 +69,7 @@ class Member extends Authenticatable
             'daily_streak' => 'integer',
             'last_check_in_at' => 'datetime',
             'borrow_suspended_until' => 'datetime',
+            'is_disabled' => 'boolean',
         ];
     }
 

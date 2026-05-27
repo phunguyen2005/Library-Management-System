@@ -256,7 +256,7 @@ export default function Digital() {
                   </span>
                   {resource.readingProgress && (
                     <span className="rounded-md bg-green-500/10 px-1.5 py-0.5 text-[9px] font-bold text-green-600 animate-pulse">
-                      Đang đọc
+                      {resource.format.toUpperCase() === 'AUDIO' ? 'Đang nghe' : 'Đang đọc'}
                     </span>
                   )}
                 </div>
@@ -277,9 +277,19 @@ export default function Digital() {
                     type="button"
                     disabled={!resource.openUrl}
                     onClick={() => setReadingDoc(resource)}
-                    className="rounded-lg bg-primary px-2 py-2 text-[11px] font-bold text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-surface-container-high disabled:text-outline cursor-pointer"
+                    className="flex items-center justify-center gap-1 rounded-lg bg-primary px-2 py-2 text-[11px] font-bold text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-surface-container-high disabled:text-outline cursor-pointer"
                   >
-                    Mở đọc
+                    {resource.format.toUpperCase() === 'AUDIO' ? (
+                      <>
+                        <span className="material-symbols-outlined text-[13px]">headphones</span>
+                        <span>Nghe</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="material-symbols-outlined text-[13px]">menu_book</span>
+                        <span>Mở đọc</span>
+                      </>
+                    )}
                   </button>
                   <button
                     type="button"

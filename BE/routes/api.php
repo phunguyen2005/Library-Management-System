@@ -121,6 +121,7 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/members/import', [AdminMemberController::class, 'import']);
             Route::put('/members/{member}', [AdminMemberController::class, 'update']);
             Route::delete('/members/{member}', [AdminMemberController::class, 'destroy']);
+            Route::patch('/members/{member}/toggle-disable', [AdminMemberController::class, 'toggleDisable']);
         });
 
         // Books Catalog Management

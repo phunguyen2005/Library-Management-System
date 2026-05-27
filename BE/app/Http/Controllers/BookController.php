@@ -131,8 +131,14 @@ class BookController extends Controller
             'is_available' => $quantity > 0,
         ]);
 
-        \App\Jobs\NotifyNewBookJob::dispatch($book);
-        GenerateBookAiMetadataJob::dispatch($book->book_id);
+        // For physical books: notify and generate AI metadata immediately.
+        // For digital books: notification and AI metadata are deferred to uploadDigitalFile()
+        // so that emails only go out after the file is successfully attached.
+        if (! $isDigital) {
+            \App\Jobs\NotifyNewBookJob::dispatch($book);
+            GenerateBookAiMetadataJob::dispatch($book->book_id);
+        }
+
         $this->bookCache->bump();
 
         \App\Services\AuditLoggerService::log('book_create', 'Đã thêm tài liệu mới: ' . $book->title . ' (ID: ' . $book->book_id . ')');
@@ -236,17 +242,27 @@ class BookController extends Controller
 
         $path = $file->storeAs($directory, $filename, 'local');
 
+        $format = $this->digitalFormatFromExtension($extension);
+        $isAudio = $format === 'AUDIO';
+
         $book->fill([
             'is_digital' => true,
-            'resource_type' => $book->resource_type ?: 'Tài liệu số',
-            'file_format' => $this->digitalFormatFromExtension($extension),
+            'resource_type' => $book->resource_type ?: ($isAudio ? 'Audio Book' : 'Tài liệu số'),
+            'file_format' => $format,
             'file_size' => $this->formatFileSize((int) $file->getSize()),
             'file_path' => $path,
             'file_url' => null,
         ]);
         $book->save();
 
-        GenerateBookAiMetadataJob::dispatch($book->book_id);
+        // Skip AI metadata generation for audio files — AI summaries are irrelevant for audio.
+        if (! $isAudio) {
+            GenerateBookAiMetadataJob::dispatch($book->book_id);
+        }
+
+        // Send new-book notification now that the file is confirmed uploaded.
+        \App\Jobs\NotifyNewBookJob::dispatch($book);
+
         $this->bookCache->bump();
 
         \App\Services\AuditLoggerService::log('digital_file_upload', 'Đã tải lên tệp tài liệu số cho sách: ' . $book->title . ' (ID: ' . $book->book_id . ')');

@@ -26,6 +26,7 @@ return [
         'device_revoked' => 'Device signed out successfully.',
         'sign_in_required' => 'Please sign in to continue.',
         'forbidden' => 'You do not have permission to perform this action.',
+        'account_disabled' => 'This account has been disabled. Please contact the library for assistance.',
     ],
     'borrow' => [
         'unpaid_fines_block' => 'Please pay outstanding fines before borrowing another book.',
