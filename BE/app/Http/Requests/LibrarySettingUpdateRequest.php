@@ -29,6 +29,9 @@ class LibrarySettingUpdateRequest extends FormRequest
             'room_open_time' => ['required', 'string', 'regex:/^[0-2][0-9]:[0-5][0-9]$/'],
             'room_close_time' => ['required', 'string', 'regex:/^[0-2][0-9]:[0-5][0-9]$/'],
             'room_cancel_deadline_hours' => ['required', 'integer', 'min:0', 'max:24'],
+            'pickup_deadline_hours' => ['required', 'integer', 'min:1', 'max:168'],
+            'max_missed_pickups' => ['required', 'integer', 'min:1', 'max:20'],
+            'suspension_duration_days' => ['required', 'integer', 'min:1', 'max:365'],
         ];
     }
 }

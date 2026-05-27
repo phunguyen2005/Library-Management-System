@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useAuth } from '../../auth/AuthContext';
 import { requestBorrow, getMyRequests, type MemberRequest } from '../../api/borrowApi';
 import { fetchBorrowableBooks } from '../../api/bookApi';
 import {
@@ -43,6 +44,7 @@ function readSort(value: string | null): SortKey {
 }
 
 export default function Catalog() {
+  const { user, role } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const query = searchParams.get('q') || '';
   const category = searchParams.get('category') || 'all';
@@ -803,6 +805,25 @@ export default function Catalog() {
                   </span>
                 </div>
                 {(() => {
+                  const isOutlookStudent = user?.email && (
+                    user.email.toLowerCase().endsWith('@student.hcmue.edu.vn') || 
+                    user.email.toLowerCase().endsWith('@hcmue.edu.vn')
+                  );
+
+                  if (role === 'student' && !isOutlookStudent) {
+                    return (
+                      <div className="rounded-xl bg-amber-500/10 border border-amber-500/25 p-3.5 text-xs text-amber-700 flex items-start gap-2 max-w-md text-left">
+                        <span className="material-symbols-outlined text-amber-600 shrink-0 select-none">info</span>
+                        <div>
+                          <p className="font-bold">Quyền mượn bị giới hạn</p>
+                          <p className="mt-0.5 text-[11px] leading-relaxed text-amber-600">
+                            Quyền mượn sách vật lý và đặt chỗ chỉ áp dụng cho sinh viên sử dụng email trường (@student.hcmue.edu.vn hoặc @hcmue.edu.vn). Giao dịch của bạn được ghi nhận dưới danh nghĩa khách vãng lai (chỉ được xem tài liệu).
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  }
+
                   const activeRes = reservations.find(
                     (r) => r.book_id === selectedBook.id && r.status === 'waiting'
                   );

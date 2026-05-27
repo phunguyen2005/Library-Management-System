@@ -35,6 +35,9 @@ class LibrarySettingController extends Controller
             'room_open_time' => $validated['room_open_time'],
             'room_close_time' => $validated['room_close_time'],
             'room_cancel_deadline_hours' => $validated['room_cancel_deadline_hours'],
+            'pickup_deadline_hours' => $validated['pickup_deadline_hours'],
+            'max_missed_pickups' => $validated['max_missed_pickups'],
+            'suspension_duration_days' => $validated['suspension_duration_days'],
         ]);
         $settings->save();
 
@@ -64,6 +67,9 @@ class LibrarySettingController extends Controller
             'room_open_time' => (string) ($settings->room_open_time ?? LibrarySetting::DEFAULT_ROOM_OPEN_TIME),
             'room_close_time' => (string) ($settings->room_close_time ?? LibrarySetting::DEFAULT_ROOM_CLOSE_TIME),
             'room_cancel_deadline_hours' => (int) ($settings->room_cancel_deadline_hours ?? LibrarySetting::DEFAULT_ROOM_CANCEL_DEADLINE_HOURS),
+            'pickup_deadline_hours' => (int) ($settings->pickup_deadline_hours ?? LibrarySetting::DEFAULT_PICKUP_DEADLINE_HOURS),
+            'max_missed_pickups' => (int) ($settings->max_missed_pickups ?? LibrarySetting::DEFAULT_MAX_MISSED_PICKUPS),
+            'suspension_duration_days' => (int) ($settings->suspension_duration_days ?? LibrarySetting::DEFAULT_SUSPENSION_DURATION_DAYS),
             'updated_at' => $settings->updated_at?->toIso8601String(),
         ];
     }

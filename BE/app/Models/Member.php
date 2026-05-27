@@ -41,6 +41,7 @@ class Member extends Authenticatable
         'level',
         'daily_streak',
         'last_check_in_at',
+        'borrow_suspended_until',
     ];
 
     protected $hidden = [
@@ -66,6 +67,7 @@ class Member extends Authenticatable
             'level' => 'integer',
             'daily_streak' => 'integer',
             'last_check_in_at' => 'datetime',
+            'borrow_suspended_until' => 'datetime',
         ];
     }
 

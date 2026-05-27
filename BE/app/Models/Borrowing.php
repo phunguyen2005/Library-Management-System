@@ -39,6 +39,7 @@ class Borrowing extends Model
         'book_id',
         'member_id',
         'librarian_id',
+        'approved_at',
         'status',
         'rejection_reason',
         'rejected_at',
@@ -54,6 +55,7 @@ class Borrowing extends Model
             'due_date' => 'date',
             'return_date' => 'date',
             'rejected_at' => 'datetime',
+            'approved_at' => 'datetime',
         ];
     }
 

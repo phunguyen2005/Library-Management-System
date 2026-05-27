@@ -59,6 +59,10 @@ class AdminMemberController extends Controller
             'join_date' => $validated['join_date'] ?? $member->join_date,
         ]);
 
+        if (array_key_exists('borrow_suspended_until', $validated)) {
+            $member->borrow_suspended_until = $validated['borrow_suspended_until'];
+        }
+
         if (! empty($validated['password'])) {
             $member->password = $validated['password'];
         }

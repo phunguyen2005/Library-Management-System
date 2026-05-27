@@ -31,6 +31,23 @@ class ReservationController extends Controller
         $member = $request->user();
 
         $reservation = DB::transaction(function () use ($member, $bookId) {
+            $emailLower = strtolower(trim($member->email));
+            $isOutlookStudent = str_ends_with($emailLower, '@student.hcmue.edu.vn') || str_ends_with($emailLower, '@hcmue.edu.vn');
+            if (!$isOutlookStudent) {
+                throw new HttpResponseException(response()->json([
+                    'message' => 'Quyền đặt chỗ sách chỉ dành cho sinh viên sử dụng tài khoản Outlook trường (@student.hcmue.edu.vn hoặc @hcmue.edu.vn). Khách vãng lai chỉ được xem tài liệu.',
+                ], 403));
+            }
+
+            $settings = LibrarySetting::singleton();
+            if ($member->borrow_suspended_until && now()->lt($member->borrow_suspended_until)) {
+                throw new HttpResponseException(response()->json([
+                    'message' => 'Quyền đặt chỗ sách của bạn đang bị tạm khóa đến ' . 
+                        \Carbon\Carbon::parse($member->borrow_suspended_until)->format('d/m/Y H:i') . 
+                        ' do vi phạm quá hạn nhận sách quá ' . ($settings->max_missed_pickups ?? 3) . ' lần trong 2 tuần.',
+                ], 422));
+            }
+
             $book = Book::query()->lockForUpdate()->findOrFail($bookId);
 
             if ($book->is_digital) {

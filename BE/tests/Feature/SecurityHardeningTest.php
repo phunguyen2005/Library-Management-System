@@ -252,6 +252,64 @@ class SecurityHardeningTest extends TestCase
             ->assertJsonPath('status', RoomBooking::STATUS_APPROVED);
     }
 
+    public function test_borrowing_and_reservation_restricted_to_outlook_students(): void
+    {
+        $casualGuest = Member::query()->create([
+            'name' => 'Casual Guest Student',
+            'email' => 'casual.guest@gmail.com',
+            'password' => Hash::make('Library@2026'),
+            'phone_number' => '0900111223',
+            'email_verified_at' => now(),
+            'join_date' => today()->toDateString(),
+        ]);
+        $casualGuest->assignRole('student');
+        $casualToken = $casualGuest->createToken('casual-token', ['role:student'])->plainTextToken;
+
+        $outlookStudent = Member::query()->create([
+            'name' => 'Outlook Student',
+            'email' => 'outlook.student@student.hcmue.edu.vn',
+            'password' => Hash::make('Library@2026'),
+            'phone_number' => '0900111224',
+            'email_verified_at' => now(),
+            'join_date' => today()->toDateString(),
+        ]);
+        $outlookStudent->assignRole('student');
+        $outlookToken = $outlookStudent->createToken('outlook-token', ['role:student'])->plainTextToken;
+
+        $book = $this->createPhysicalBook('Casual Restriction Test Book');
+
+        $this->withToken($outlookToken)
+            ->postJson('/api/requests', ['book_id' => $book->book_id])
+            ->dump();
+
+        $this->withToken($casualToken)
+            ->postJson('/api/requests', ['book_id' => $book->book_id])
+            ->assertStatus(403)
+            ->assertJsonFragment(['message' => 'Quyền mượn sách chỉ dành cho sinh viên sử dụng tài khoản Outlook trường (@student.hcmue.edu.vn hoặc @hcmue.edu.vn). Khách vãng lai chỉ được xem tài liệu.']);
+
+        $book->update(['available_quantity' => 0]);
+
+        $this->withToken($casualToken)
+            ->postJson("/api/reservations/{$book->book_id}")
+            ->assertStatus(403)
+            ->assertJsonFragment(['message' => 'Quyền đặt chỗ sách chỉ dành cho sinh viên sử dụng tài khoản Outlook trường (@student.hcmue.edu.vn hoặc @hcmue.edu.vn). Khách vãng lai chỉ được xem tài liệu.']);
+
+        $anotherOutlook = Member::query()->create([
+            'name' => 'Another Outlook Student',
+            'email' => 'another.outlook@student.hcmue.edu.vn',
+            'password' => Hash::make('Library@2026'),
+            'phone_number' => '0900111225',
+            'email_verified_at' => now(),
+            'join_date' => today()->toDateString(),
+        ]);
+        $anotherOutlook->assignRole('student');
+        $anotherOutlookToken = $anotherOutlook->createToken('another-outlook-token', ['role:student'])->plainTextToken;
+
+        $this->withToken($anotherOutlookToken)
+            ->postJson("/api/reservations/{$book->book_id}")
+            ->assertStatus(201);
+    }
+
     private function createPhysicalBook(string $title): Book
     {
         return Book::query()->create([

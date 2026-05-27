@@ -31,6 +31,7 @@ class MemberUpdateRequest extends FormRequest
             'phone_number' => ['nullable', 'string', 'max:15'],
             'join_date' => ['nullable', 'date'],
             'password' => ['nullable', 'confirmed', Password::min(8)->letters()->numbers()],
+            'borrow_suspended_until' => ['nullable', 'date'],
         ];
     }
 }

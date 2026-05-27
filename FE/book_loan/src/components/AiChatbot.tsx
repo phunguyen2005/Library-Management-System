@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useAuth } from '../auth/AuthContext';
 import { streamChatMessage, type ChatMessage } from '../api/aiApi';
 import { fetchBookDetail } from '../api/bookApi';
 import { requestBorrow } from '../api/borrowApi';
@@ -12,9 +13,15 @@ import type { FormattedBook } from '../types/book';
 
 // Custom inline card sub-component for rich previews and actions
 function InlineBookCard({ bookId }: { bookId: number }) {
+  const { user, role } = useAuth();
   const [book, setBook] = useState<FormattedBook | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+
+  const isOutlookStudent = user?.email && (
+    user.email.toLowerCase().endsWith('@student.hcmue.edu.vn') || 
+    user.email.toLowerCase().endsWith('@hcmue.edu.vn')
+  );
 
   useEffect(() => {
     let active = true;
@@ -37,6 +44,14 @@ function InlineBookCard({ bookId }: { bookId: number }) {
   const handleBorrow = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!book) return;
+    if (role === 'student' && !isOutlookStudent) {
+      emitToast({
+        tone: 'warning',
+        title: 'Quyền mượn bị giới hạn',
+        message: 'Khách vãng lai không thể mượn sách vật lý. Vui lòng sử dụng tài khoản Outlook trường.',
+      });
+      return;
+    }
     setActionLoading(true);
     try {
       const response = await requestBorrow(book.id);
@@ -58,6 +73,14 @@ function InlineBookCard({ bookId }: { bookId: number }) {
   const handleReserve = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!book) return;
+    if (role === 'student' && !isOutlookStudent) {
+      emitToast({
+        tone: 'warning',
+        title: 'Quyền đặt chỗ bị giới hạn',
+        message: 'Khách vãng lai không thể đặt chỗ trước. Vui lòng sử dụng tài khoản Outlook trường.',
+      });
+      return;
+    }
     setActionLoading(true);
     try {
       const response = await reserveBook(book.id);
@@ -141,18 +164,20 @@ function InlineBookCard({ bookId }: { bookId: number }) {
           ) : book.is_available ? (
             <button
               type="button"
-              disabled={actionLoading}
+              disabled={actionLoading || (role === 'student' && !isOutlookStudent)}
               onClick={handleBorrow}
               className="text-[10px] bg-primary hover:bg-primary/95 text-white px-2.5 py-1 rounded-lg font-bold transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              title={role === 'student' && !isOutlookStudent ? 'Chỉ áp dụng cho email trường học' : undefined}
             >
               {actionLoading ? 'Đang gửi...' : 'Mượn ngay'}
             </button>
           ) : (
             <button
               type="button"
-              disabled={actionLoading}
+              disabled={actionLoading || (role === 'student' && !isOutlookStudent)}
               onClick={handleReserve}
               className="text-[10px] bg-amber-600 hover:bg-amber-700 text-white px-2.5 py-1 rounded-lg font-bold transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              title={role === 'student' && !isOutlookStudent ? 'Chỉ áp dụng cho email trường học' : undefined}
             >
               {actionLoading ? 'Đang gửi...' : 'Đặt chỗ trước'}
             </button>

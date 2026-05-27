@@ -27,10 +27,27 @@ class BorrowController extends Controller
         $loan = DB::transaction(function () use ($member, $validated) {
             $memberLocked = Member::query()->lockForUpdate()->findOrFail($member->member_id);
 
+            $emailLower = strtolower(trim($memberLocked->email));
+            $isOutlookStudent = str_ends_with($emailLower, '@student.hcmue.edu.vn') || str_ends_with($emailLower, '@hcmue.edu.vn');
+            if (!$isOutlookStudent) {
+                throw new HttpResponseException(response()->json([
+                    'message' => 'Quyền mượn sách chỉ dành cho sinh viên sử dụng tài khoản Outlook trường (@student.hcmue.edu.vn hoặc @hcmue.edu.vn). Khách vãng lai chỉ được xem tài liệu.',
+                ], 403));
+            }
+
             $unpaidFineTotal = Fine::query()
                 ->where('member_id', $memberLocked->member_id)
                 ->where('status', Fine::STATUS_UNPAID)
                 ->sum('amount');
+
+            $settings = LibrarySetting::singleton();
+            if ($memberLocked->borrow_suspended_until && now()->lt($memberLocked->borrow_suspended_until)) {
+                throw new HttpResponseException(response()->json([
+                    'message' => 'Quyền mượn sách của bạn đang bị tạm khóa đến ' . 
+                        \Carbon\Carbon::parse($memberLocked->borrow_suspended_until)->format('d/m/Y H:i') . 
+                        ' do vi phạm quá hạn nhận sách quá ' . ($settings->max_missed_pickups ?? 3) . ' lần trong 2 tuần.',
+                ], 422));
+            }
 
             if ((float) $unpaidFineTotal > 0) {
                 throw new HttpResponseException(response()->json([
@@ -135,6 +152,7 @@ class BorrowController extends Controller
 
             $loan->status = Borrowing::STATUS_APPROVED;
             $loan->librarian_id = $librarian->librarian_id;
+            $loan->approved_at = now();
             $loan->save();
 
             $book->available_quantity = $book->available_quantity - 1;
@@ -574,6 +592,7 @@ class BorrowController extends Controller
                     'member_id' => $nextReservation->member_id,
                     'status' => Borrowing::STATUS_APPROVED,
                     'borrow_date' => now()->toDateString(),
+                    'approved_at' => now(),
                 ]);
 
                 // Send in-app notification

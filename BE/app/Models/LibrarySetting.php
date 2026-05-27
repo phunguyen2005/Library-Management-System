@@ -13,7 +13,9 @@ class LibrarySetting extends Model
     public const DEFAULT_GRACE_PERIOD_DAYS = 0;
     public const DEFAULT_DAMAGED_BOOK_FEE = 50000;
     public const DEFAULT_LOST_BOOK_FEE = 200000;
-    public const DEFAULT_PICKUP_DEADLINE_HOURS = 48;
+    public const DEFAULT_PICKUP_DEADLINE_HOURS = 24;
+    public const DEFAULT_MAX_MISSED_PICKUPS = 3;
+    public const DEFAULT_SUSPENSION_DURATION_DAYS = 14;
     public const DEFAULT_ROOM_MAX_HOURS_PER_BOOKING = 3;
     public const DEFAULT_ROOM_MAX_HOURS_PER_WEEK = 4;
     public const DEFAULT_ROOM_MAX_BOOKINGS_PER_DAY = 2;
@@ -45,6 +47,8 @@ class LibrarySetting extends Model
         'damaged_book_fee',
         'lost_book_fee',
         'pickup_deadline_hours',
+        'max_missed_pickups',
+        'suspension_duration_days',
         'room_max_hours_per_booking',
         'room_max_hours_per_week',
         'room_max_bookings_per_day',
@@ -68,6 +72,8 @@ class LibrarySetting extends Model
             'damaged_book_fee' => 'decimal:2',
             'lost_book_fee' => 'decimal:2',
             'pickup_deadline_hours' => 'integer',
+            'max_missed_pickups' => 'integer',
+            'suspension_duration_days' => 'integer',
             'room_max_hours_per_booking' => 'integer',
             'room_max_hours_per_week' => 'integer',
             'room_max_bookings_per_day' => 'integer',
@@ -105,6 +111,8 @@ class LibrarySetting extends Model
                 'damaged_book_fee' => self::DEFAULT_DAMAGED_BOOK_FEE,
                 'lost_book_fee' => self::DEFAULT_LOST_BOOK_FEE,
                 'pickup_deadline_hours' => self::DEFAULT_PICKUP_DEADLINE_HOURS,
+                'max_missed_pickups' => self::DEFAULT_MAX_MISSED_PICKUPS,
+                'suspension_duration_days' => self::DEFAULT_SUSPENSION_DURATION_DAYS,
                 'room_max_hours_per_booking' => self::DEFAULT_ROOM_MAX_HOURS_PER_BOOKING,
                 'room_max_hours_per_week' => self::DEFAULT_ROOM_MAX_HOURS_PER_WEEK,
                 'room_max_bookings_per_day' => self::DEFAULT_ROOM_MAX_BOOKINGS_PER_DAY,

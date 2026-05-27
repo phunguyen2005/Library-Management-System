@@ -19,6 +19,7 @@ class MemberResource extends JsonResource
             'points' => $this->points ?? 0,
             'level' => $this->level ?? 1,
             'badges_count' => $this->badges_count ?? $this->badges()->count(),
+            'borrow_suspended_until' => $this->borrow_suspended_until?->toIso8601String(),
         ];
     }
 }

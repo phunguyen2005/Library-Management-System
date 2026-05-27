@@ -45,6 +45,7 @@ class AuthenticatedUserResource extends JsonResource
                 'level' => $user->level,
                 'daily_streak' => $user->daily_streak,
                 'last_check_in_at' => $user->last_check_in_at?->toIso8601String(),
+                'borrow_suspended_until' => $user->borrow_suspended_until?->toIso8601String(),
             ];
         }
 

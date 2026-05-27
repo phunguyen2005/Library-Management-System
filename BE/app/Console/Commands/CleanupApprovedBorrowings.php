@@ -25,7 +25,8 @@ class CleanupApprovedBorrowings extends Command
 
         $expiredLoans = Borrowing::query()
             ->where('status', Borrowing::STATUS_APPROVED)
-            ->where('updated_at', '<=', $cutoff)
+            ->whereNotNull('approved_at')
+            ->where('approved_at', '<=', $cutoff)
             ->with(['book', 'member'])
             ->get();
 
@@ -49,14 +50,9 @@ class CleanupApprovedBorrowings extends Command
                 $fresh->rejected_at = now();
                 $fresh->save();
 
-                // Restore inventory (approved had decremented available_quantity)
+                // Process next person in the reservation queue for this book, or restore inventory
                 $book = Book::query()->lockForUpdate()->find($fresh->book_id);
                 if ($book) {
-                    $book->available_quantity = min($book->total_quantity, $book->available_quantity + 1);
-                    $book->is_available = $book->available_quantity > 0;
-                    $book->save();
-
-                    // Process next person in the reservation queue for this book
                     \App\Http\Controllers\BorrowController::processNextInQueue($book->book_id);
                 }
 
@@ -73,6 +69,37 @@ class CleanupApprovedBorrowings extends Command
                     $fresh->member?->notify(new BorrowingStatusMailNotification($fresh, 'expired'));
                 } catch (\Exception $e) {
                     // Ignore notification failures in local/test
+                }
+
+                // Check if member should be suspended due to repeated violations
+                $member = $fresh->member;
+                if ($member) {
+                    $settings = LibrarySetting::singleton();
+                    $maxMissed = (int) ($settings->max_missed_pickups ?? LibrarySetting::DEFAULT_MAX_MISSED_PICKUPS);
+                    $suspensionDays = (int) ($settings->suspension_duration_days ?? LibrarySetting::DEFAULT_SUSPENSION_DURATION_DAYS);
+
+                    $missedCount = Borrowing::where('member_id', $member->member_id)
+                        ->where('status', Borrowing::STATUS_CANCELLED)
+                        ->where('rejection_reason', 'like', '%Hết thời hạn%nhận sách%')
+                        ->where('rejected_at', '>=', now()->subDays(14))
+                        ->count();
+
+                    if ($missedCount > $maxMissed) {
+                        $member->borrow_suspended_until = now()->addDays($suspensionDays);
+                        $member->save();
+
+                        AuditLoggerService::log(
+                            'member_suspend',
+                            "Tài khoản sinh viên {$member->name} bị tạm khóa quyền mượn {$suspensionDays} ngày (đến " . now()->addDays($suspensionDays)->format('d/m/Y H:i') . ") do quá {$maxMissed} lần không đến nhận sách.",
+                            null
+                        );
+
+                        try {
+                            $member->notify(new \App\Notifications\MemberSuspendedNotification($suspensionDays, $member->borrow_suspended_until));
+                        } catch (\Exception $e) {
+                            // ignore notification failures
+                        }
+                    }
                 }
 
                 $count++;
