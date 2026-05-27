@@ -183,4 +183,33 @@ describe('AdminInventory digital upload', () => {
       expect(uploadDigitalFileMock).toHaveBeenCalledWith(99, file);
     });
   });
+
+  it('uploads a selected audio file after creating an audio digital resource', async () => {
+    const user = userEvent.setup();
+    const file = new File(['dummy audio data'], 'lecture.mp3', { type: 'audio/mpeg' });
+
+    renderAdminInventory();
+
+    await waitFor(() => expect(fetchBorrowableBooksMock).toHaveBeenCalled());
+    await user.click(screen.getByRole('tab', { name: 'Tài nguyên số' }));
+    await user.click(screen.getByRole('button', { name: 'Thêm tài nguyên số' }));
+    await user.type(screen.getByLabelText('Tiêu đề sách'), 'Audio Systems Lecture');
+    await user.type(screen.getByLabelText('Tác giả sách'), 'Library Admin');
+    await user.upload(screen.getByLabelText('Tệp số'), file);
+
+    const categoryInput = screen.getByLabelText(/Loại tài nguyên/i) as HTMLInputElement;
+    expect(categoryInput.value).toBe('AUDIO');
+
+    await user.click(screen.getByRole('button', { name: 'Lưu tài nguyên số' }));
+
+    await waitFor(() => {
+      expect(addDigitalResourceMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'Audio Systems Lecture',
+          resource_type: 'AUDIO',
+        }),
+      );
+      expect(uploadDigitalFileMock).toHaveBeenCalledWith(99, file);
+    });
+  });
 });

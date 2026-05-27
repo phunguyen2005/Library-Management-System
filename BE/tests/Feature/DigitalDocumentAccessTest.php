@@ -190,6 +190,28 @@ class DigitalDocumentAccessTest extends TestCase
         Storage::disk('local')->assertExists($book->file_path);
     }
 
+    public function test_admin_can_upload_audio_file_for_book(): void
+    {
+        Storage::fake('local');
+        $librarian = Librarian::query()->findOrFail(1);
+        $token = $librarian->createToken('audio-upload-access', ['role:admin']);
+        $file = UploadedFile::fake()->create('lecture.mp3', 256, 'audio/mpeg');
+
+        $this->withToken($token->plainTextToken)
+            ->withHeader('Accept', 'application/json')
+            ->post('/api/books/7/digital-file', ['file' => $file])
+            ->assertOk()
+            ->assertJsonPath('is_digital', true)
+            ->assertJsonPath('file_format', 'AUDIO')
+            ->assertJsonPath('has_digital_file', true)
+            ->assertJsonPath('digital_file_name', 'lecture.mp3');
+
+        $book = Book::query()->findOrFail(7);
+
+        $this->assertNotNull($book->file_path);
+        Storage::disk('local')->assertExists($book->file_path);
+    }
+
     public function test_students_cannot_upload_digital_file_for_book(): void
     {
         Storage::fake('local');

@@ -46,6 +46,7 @@ return [
         'client_id' => env('MICROSOFT_CLIENT_ID'),
         'client_secret' => env('MICROSOFT_CLIENT_SECRET'),
         'redirect' => env('MICROSOFT_REDIRECT_URI', 'http://localhost:8000/api/auth/microsoft/callback'),
+        'tenant' => env('MICROSOFT_TENANT', 'common'),
     ],
 
 

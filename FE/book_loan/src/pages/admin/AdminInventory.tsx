@@ -100,6 +100,7 @@ function determineCategory(fileName: string): string {
   if (ext === 'pdf') return 'PDF';
   if (ext === 'epub') return 'EPUB';
   if (ext === 'ppt' || ext === 'pptx') return 'SLIDES';
+  if (ext === 'mp3' || ext === 'wav' || ext === 'm4a') return 'AUDIO';
   return 'PDF';
 }
 
@@ -1073,17 +1074,17 @@ export default function AdminInventory() {
                       id="book-digital-file"
                       aria-label="Tệp số"
                       type="file"
-                      accept=".pdf,.epub,.ppt,.pptx"
+                      accept=".pdf,.epub,.ppt,.pptx,.mp3,.wav,.m4a"
                       onChange={(event) => {
                         const file = event.target.files?.[0] || null;
                         if (file) {
                           const ext = file.name.split('.').pop()?.toLowerCase();
-                          const allowedExtensions = ['pdf', 'epub', 'ppt', 'pptx'];
+                          const allowedExtensions = ['pdf', 'epub', 'ppt', 'pptx', 'mp3', 'wav', 'm4a'];
                           if (!ext || !allowedExtensions.includes(ext)) {
                             emitToast({
                               tone: 'error',
                               title: 'Định dạng tệp không hỗ trợ',
-                              message: 'Hệ thống chỉ chấp nhận tệp tài liệu dạng PDF, EPUB hoặc Slides (PPT/PPTX). Không hỗ trợ tệp âm thanh (Audio).',
+                              message: 'Hệ thống chỉ chấp nhận tệp PDF, EPUB, Slides (PPT/PPTX) hoặc Âm thanh (MP3/WAV/M4A).',
                             });
                             event.target.value = ''; // Reset file input
                             setSelectedDigitalFile(null);

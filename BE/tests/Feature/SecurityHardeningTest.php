@@ -279,8 +279,10 @@ class SecurityHardeningTest extends TestCase
         $book = $this->createPhysicalBook('Casual Restriction Test Book');
 
         $this->withToken($outlookToken)
-            ->postJson('/api/requests', ['book_id' => $book->book_id])
-            ->dump();
+            ->postJson('/api/requests', ['book_id' => $book->book_id]);
+
+        $this->flushHeaders();
+        \Illuminate\Support\Facades\Auth::forgetUser();
 
         $this->withToken($casualToken)
             ->postJson('/api/requests', ['book_id' => $book->book_id])
@@ -288,6 +290,9 @@ class SecurityHardeningTest extends TestCase
             ->assertJsonFragment(['message' => 'Quyền mượn sách chỉ dành cho sinh viên sử dụng tài khoản Outlook trường (@student.hcmue.edu.vn hoặc @hcmue.edu.vn). Khách vãng lai chỉ được xem tài liệu.']);
 
         $book->update(['available_quantity' => 0]);
+
+        $this->flushHeaders();
+        \Illuminate\Support\Facades\Auth::forgetUser();
 
         $this->withToken($casualToken)
             ->postJson("/api/reservations/{$book->book_id}")
@@ -304,6 +309,9 @@ class SecurityHardeningTest extends TestCase
         ]);
         $anotherOutlook->assignRole('student');
         $anotherOutlookToken = $anotherOutlook->createToken('another-outlook-token', ['role:student'])->plainTextToken;
+
+        $this->flushHeaders();
+        \Illuminate\Support\Facades\Auth::forgetUser();
 
         $this->withToken($anotherOutlookToken)
             ->postJson("/api/reservations/{$book->book_id}")
