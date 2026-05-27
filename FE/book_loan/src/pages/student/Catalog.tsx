@@ -564,6 +564,35 @@ export default function Catalog() {
           </button>
         </div>
 
+        {/* Quick Category Chips for Students */}
+        <div className="mb-6 flex gap-2 overflow-x-auto pb-2.5 -mx-4 px-4 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-slate-200/50 md:mx-0 md:px-0">
+          <button
+            type="button"
+            onClick={() => updateFilter('category', 'all')}
+            className={`shrink-0 rounded-full px-4.5 py-2 text-xs font-bold transition-all hover:scale-[1.02] cursor-pointer ${
+              category === 'all'
+                ? 'bg-primary text-white shadow-md shadow-primary/25 border border-primary'
+                : 'bg-surface-container-low text-slate-600 hover:bg-slate-100 hover:text-slate-800 border border-slate-200/60 dark:border-stone-800 dark:text-stone-300'
+            }`}
+          >
+            Tất cả
+          </button>
+          {BOOK_CLASSIFICATIONS.map((item) => (
+            <button
+              key={item.code}
+              type="button"
+              onClick={() => updateFilter('category', item.genre)}
+              className={`shrink-0 rounded-full px-4.5 py-2 text-xs font-bold transition-all hover:scale-[1.02] cursor-pointer ${
+                category === item.genre
+                  ? 'bg-primary text-white shadow-md shadow-primary/25 border border-primary'
+                  : 'bg-surface-container-low text-slate-600 hover:bg-slate-100 hover:text-slate-800 border border-slate-200/60 dark:border-stone-800 dark:text-stone-300'
+              }`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+
         <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {isLoading ? (
             <div className="col-span-full py-10 text-center">Đang tải biểu mẫu sách...</div>

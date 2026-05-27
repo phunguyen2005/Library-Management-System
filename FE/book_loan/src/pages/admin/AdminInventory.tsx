@@ -151,6 +151,7 @@ export default function AdminInventory() {
   const initialTab = searchParams.get('tab') === 'digital' ? 'digital' : 'borrow';
   const [activeTab, setActiveTab] = useState<InventoryTab>(initialTab);
   const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [borrowBooks, setBorrowBooks] = useState<FormattedBook[]>([]);
   const [digitalBooks, setDigitalBooks] = useState<FormattedBook[]>([]);
   const [loading, setLoading] = useState(true);
@@ -231,14 +232,14 @@ export default function AdminInventory() {
     try {
       setLoadError(null);
       if (activeTab === 'digital') {
-        const digital = await fetchDigitalResourceBooks(page, debouncedSearchTerm);
+        const digital = await fetchDigitalResourceBooks(page, debouncedSearchTerm, 10, selectedCategory);
         setDigitalBooks(digital.data);
         if (digital.meta) {
           setTotalPages(digital.meta.last_page);
           setTotalRecords(digital.meta.total);
         }
       } else {
-        const borrowable = await fetchBorrowableBooks(page, debouncedSearchTerm);
+        const borrowable = await fetchBorrowableBooks(page, debouncedSearchTerm, 10, selectedCategory);
         setBorrowBooks(borrowable.data);
         if (borrowable.meta) {
           setTotalPages(borrowable.meta.last_page);
@@ -262,7 +263,12 @@ export default function AdminInventory() {
 
   useEffect(() => {
     void loadBooks();
-  }, [activeTab, page, debouncedSearchTerm]);
+  }, [activeTab, page, debouncedSearchTerm, selectedCategory]);
+
+  const handleCategoryChange = (category: string) => {
+    setSelectedCategory(category);
+    setPage(1);
+  };
 
   useEffect(() => {
     setSearchTerm(searchParams.get('search') || '');
@@ -707,21 +713,45 @@ export default function AdminInventory() {
 
       <section className="overflow-hidden rounded-2xl border border-surface-container-low bg-surface-bright scholar-shadow">
         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-surface-container bg-slate-50/50 p-6">
-          <div className="relative w-full flex-1 md:max-w-md">
-            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-              search
-            </span>
-            <input
-              type="text"
-              placeholder={
-                isDigitalTab
-                  ? 'Tìm theo tiêu đề, tác giả, định dạng...'
-                  : 'Tìm theo tiêu đề, tác giả, kệ...'
-              }
-              value={searchTerm}
-              onChange={(event) => handleSearchChange(event.target.value)}
-              className="w-full rounded-xl border border-surface-container-high bg-white py-2.5 pl-10 pr-4 text-sm outline-none transition-all focus:ring-2 focus:ring-primary/20"
-            />
+          <div className="flex flex-wrap items-center gap-3 w-full flex-1 md:max-w-2xl">
+            <div className="relative flex-1 min-w-[240px]">
+              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+                search
+              </span>
+              <input
+                type="text"
+                placeholder={
+                  isDigitalTab
+                    ? 'Tìm theo tiêu đề, tác giả, định dạng...'
+                    : 'Tìm theo tiêu đề, tác giả, kệ...'
+                }
+                value={searchTerm}
+                onChange={(event) => handleSearchChange(event.target.value)}
+                className="w-full rounded-xl border border-surface-container-high bg-white py-2.5 pl-10 pr-4 text-sm outline-none transition-all focus:ring-2 focus:ring-primary/20"
+              />
+            </div>
+
+            <div className="relative shrink-0 min-w-[200px]">
+              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">
+                filter_alt
+              </span>
+              <select
+                aria-label="Lọc theo thể loại"
+                value={selectedCategory}
+                onChange={(e) => handleCategoryChange(e.target.value)}
+                className="w-full rounded-xl border border-surface-container-high bg-white py-2.5 pl-9 pr-8 text-sm outline-none transition-all focus:ring-2 focus:ring-primary/20 appearance-none cursor-pointer font-semibold text-slate-600"
+              >
+                <option value="all">Tất cả thể loại</option>
+                {BOOK_CLASSIFICATIONS.map((item) => (
+                  <option key={item.code} value={item.genre}>
+                    {item.label}
+                  </option>
+                ))}
+              </select>
+              <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-[18px]">
+                arrow_drop_down
+              </span>
+            </div>
           </div>
           <div className="flex items-center gap-3 text-xs font-semibold text-outline">
             {isFiltering ? 'Đang tải...' : `${totalRecords} bản ghi`}

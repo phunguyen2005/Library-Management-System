@@ -103,20 +103,24 @@ export async function fetchBooks(page = 1, query = '', limit = 10) {
   };
 }
 
-export async function fetchBorrowableBooks(page = 1, query = '', limit = 10) {
-  const data = await apiRequest<PaginatedResponse<BookApiRecord>>(
-    `/books?is_digital=false&limit=${limit}&page=${page}&query=${encodeURIComponent(query)}`
-  );
+export async function fetchBorrowableBooks(page = 1, query = '', limit = 10, genre?: string) {
+  let url = `/books?is_digital=false&limit=${limit}&page=${page}&query=${encodeURIComponent(query)}`;
+  if (genre && genre !== 'all') {
+    url += `&genre=${encodeURIComponent(genre)}`;
+  }
+  const data = await apiRequest<PaginatedResponse<BookApiRecord>>(url);
   return {
     ...data,
     data: data.data.map(normalizeBook),
   };
 }
 
-export async function fetchDigitalResourceBooks(page = 1, query = '', limit = 10) {
-  const data = await apiRequest<PaginatedResponse<BookApiRecord>>(
-    `/books?is_digital=true&limit=${limit}&page=${page}&query=${encodeURIComponent(query)}`
-  );
+export async function fetchDigitalResourceBooks(page = 1, query = '', limit = 10, genre?: string) {
+  let url = `/books?is_digital=true&limit=${limit}&page=${page}&query=${encodeURIComponent(query)}`;
+  if (genre && genre !== 'all') {
+    url += `&genre=${encodeURIComponent(genre)}`;
+  }
+  const data = await apiRequest<PaginatedResponse<BookApiRecord>>(url);
   return {
     ...data,
     data: data.data.map(normalizeBook),
