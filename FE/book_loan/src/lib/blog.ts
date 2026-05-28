@@ -46,7 +46,9 @@ export function sanitizeBlogHtml(html?: string | null) {
       .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
       .replace(/\son\w+="[^"]*"/gi, '')
       .replace(/\son\w+='[^']*'/gi, '')
-      .replace(/javascript:/gi, '');
+      .replace(/javascript:/gi, '')
+      .replace(/style="[^"]*?(?:color|background)[^"]*?"/gi, '')
+      .replace(/style='[^']*?(?:color|background)[^']*?'/gi, '');
   }
 
   const parser = new DOMParser();
@@ -54,6 +56,26 @@ export function sanitizeBlogHtml(html?: string | null) {
   documentRef.querySelectorAll('script, style, iframe, object, embed, link, meta').forEach((node) => node.remove());
 
   documentRef.body.querySelectorAll('*').forEach((node) => {
+    // Strip background and color properties from style attribute to ensure dark mode compatibility
+    const styleAttr = node.getAttribute('style');
+    if (styleAttr) {
+      const cleanedStyles = styleAttr
+        .split(';')
+        .map((s) => s.trim())
+        .filter((s) => {
+          if (!s) return false;
+          const [prop] = s.split(':').map((p) => p.trim().toLowerCase());
+          return prop !== 'color' && prop !== 'background' && prop !== 'background-color';
+        })
+        .join('; ');
+      
+      if (cleanedStyles) {
+        node.setAttribute('style', cleanedStyles);
+      } else {
+        node.removeAttribute('style');
+      }
+    }
+
     Array.from(node.attributes).forEach((attribute) => {
       const name = attribute.name.toLowerCase();
       const value = attribute.value.trim().toLowerCase();
@@ -65,6 +87,78 @@ export function sanitizeBlogHtml(html?: string | null) {
   });
 
   return documentRef.body.innerHTML;
+}
+
+function slugifyHeading(text: string, index: number) {
+  const slug = text
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .trim()
+    .replace(/\s+/g, '-')
+    .slice(0, 64);
+
+  return slug || `section-${index + 1}`;
+}
+
+export type BlogContentHeading = {
+  id: string;
+  text: string;
+  level: 2 | 3;
+};
+
+export function prepareBlogContent(html?: string | null) {
+  const sanitizedHtml = sanitizeBlogHtml(html);
+
+  if (!sanitizedHtml || typeof DOMParser === 'undefined') {
+    return {
+      html: sanitizedHtml,
+      headings: [] as BlogContentHeading[],
+    };
+  }
+
+  const parser = new DOMParser();
+  const documentRef = parser.parseFromString(sanitizedHtml, 'text/html');
+  const usedIds = new Set<string>();
+  const headings: BlogContentHeading[] = [];
+
+  documentRef.body.querySelectorAll('h2, h3').forEach((node, index) => {
+    const text = (node.textContent || '').replace(/\s+/g, ' ').trim();
+
+    if (!text) {
+      return;
+    }
+
+    const baseId = slugifyHeading(text, index);
+    let id = baseId;
+    let suffix = 2;
+
+    while (usedIds.has(id)) {
+      id = `${baseId}-${suffix}`;
+      suffix += 1;
+    }
+
+    usedIds.add(id);
+    node.id = id;
+    headings.push({
+      id,
+      text,
+      level: node.tagName.toLowerCase() === 'h3' ? 3 : 2,
+    });
+  });
+
+  return {
+    html: documentRef.body.innerHTML,
+    headings,
+  };
+}
+
+export function estimateBlogReadingMinutes(content?: string | null, fallback?: string | null) {
+  const source = stripBlogHtml(content) || fallback?.trim() || '';
+  const wordCount = source.match(/\S+/g)?.length || 0;
+
+  return Math.max(1, Math.ceil(wordCount / 220));
 }
 
 export function blogExcerpt(content?: string | null, fallback?: string | null) {

@@ -39,8 +39,7 @@ class BookController extends Controller
                     'digitalDownloads as digital_downloads_count',
                     'reviews as reviews_count',
                 ])
-                ->withAvg('reviews', 'rating')
-                ->orderByDesc('book_id');
+                ->withAvg('reviews', 'rating');
             $search = trim((string) ($validated['query'] ?? ''));
 
             if ($search !== '') {
@@ -75,6 +74,12 @@ class BookController extends Controller
             if (array_key_exists('resource_type', $validated) && $validated['resource_type'] !== null) {
                 $query->where('resource_type', $validated['resource_type']);
             }
+
+            match ($validated['sort'] ?? 'title') {
+                'newest' => $query->orderByDesc('published_year')->orderBy('title')->orderBy('book_id'),
+                'available' => $query->orderByDesc('available_quantity')->orderBy('title')->orderBy('book_id'),
+                default => $query->orderBy('title')->orderBy('book_id'),
+            };
 
             return $query->paginate($validated['limit'] ?? 15, ['*'], 'page', $validated['page'] ?? 1)
                 ->withQueryString();
@@ -192,6 +197,15 @@ class BookController extends Controller
                 'file_path' => array_key_exists('file_path', $validated) ? $validated['file_path'] : $book->file_path,
                 'file_url' => array_key_exists('file_url', $validated) ? $validated['file_url'] : $book->file_url,
             ]);
+
+            if (strtoupper((string) $book->file_format) === 'AUDIO') {
+                $book->forceFill([
+                    'ai_summary' => null,
+                    'ai_tags' => [],
+                    'ai_summary_generated_at' => null,
+                ]);
+            }
+
             $book->save();
 
             if (! $isDigital) {
@@ -277,6 +291,15 @@ class BookController extends Controller
             'file_url' => $uploadResult['secure_url'],
             'cloudinary_public_id' => $uploadResult['public_id'],
         ]);
+
+        if ($isAudio) {
+            $book->forceFill([
+                'ai_summary' => null,
+                'ai_tags' => [],
+                'ai_summary_generated_at' => null,
+            ]);
+        }
+
         $book->save();
 
         // Skip AI metadata generation for audio files — AI summaries are irrelevant for audio.
@@ -327,6 +350,14 @@ class BookController extends Controller
         }
 
         $disposition = $request->query('disposition') === 'attachment' ? 'attachment' : 'inline';
+
+        $actor = $this->signedAccessActor($request);
+        if ($disposition === 'attachment' && $actor instanceof Member && $actor->level < 5) {
+            return response()->json([
+                'message' => 'Bạn phải đạt cấp độ 5 (Level 5) trong hệ thống để tải tài liệu này.',
+            ], 403);
+        }
+
         $accessType = $disposition === 'attachment'
             ? DigitalDocumentAccess::TYPE_DOWNLOAD
             : DigitalDocumentAccess::TYPE_PREVIEW;

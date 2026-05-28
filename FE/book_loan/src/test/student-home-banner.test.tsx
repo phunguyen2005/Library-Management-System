@@ -104,6 +104,6 @@ describe('Student home featured banner', () => {
     await user.click(screen.getByRole('button', { name: 'Sach tiep theo' }));
     expect(scrollByMock).toHaveBeenCalledWith({ left: expect.any(Number), behavior: 'smooth' });
 
-    await waitFor(() => expect(fetchBorrowableBooksMock).toHaveBeenCalledWith(1, '', 1000));
+    await waitFor(() => expect(fetchBorrowableBooksMock).toHaveBeenCalledWith(1, '', 5));
   });
 });

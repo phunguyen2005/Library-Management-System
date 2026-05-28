@@ -100,6 +100,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/reservations/{reservationId}', [\App\Http\Controllers\ReservationController::class, 'cancel']);
         Route::get('/fines/me/summary', [\App\Http\Controllers\FineController::class, 'summary']);
         Route::get('/fines/me', [\App\Http\Controllers\FineController::class, 'me']);
+        Route::post('/fines/{fineId}/apply-waiver', [\App\Http\Controllers\FineController::class, 'applyWaiver']);
         Route::post('/fines/{fineId}/momo/pay', [\App\Http\Controllers\MomoPaymentController::class, 'initiatePayment']);
         Route::post('/fines/{fineId}/vnpay/pay', [\App\Http\Controllers\VnpayPaymentController::class, 'initiatePayment']);
         Route::get('/fines/payments/{paymentId}/status', [\App\Http\Controllers\MomoPaymentController::class, 'checkStatus']);

@@ -76,6 +76,20 @@ describe('LibraryMapModal mobile experience', () => {
     });
   });
 
+  it('keeps the scaled blueprint aligned to fixed map dimensions', async () => {
+    render(<LibraryMapModal isOpen onClose={vi.fn()} />);
+
+    const blueprint = await screen.findByTestId('library-map-blueprint');
+
+    await waitFor(() => {
+      expect(blueprint).toHaveStyle({
+        width: '740px',
+        height: '680px',
+        transform: 'scale(0.5)',
+      });
+    });
+  });
+
   it('selects zones by tap, shows the mobile detail sheet, and resets after close', async () => {
     const user = userEvent.setup();
     render(<ControlledMapModal />);

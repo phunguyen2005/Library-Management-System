@@ -21,6 +21,7 @@ export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const navigate = useNavigate();
   const { setSession } = useAuth();
@@ -244,15 +245,25 @@ export default function Login() {
                     lock
                   </span>
                   <input
-                    type="password"
+                    type={showPassword ? 'text' : 'password'}
                     name="password"
                     autoComplete={isLogin ? 'current-password' : 'new-password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full rounded-lg border-none bg-surface-container-low py-3 pl-11 pr-4 text-slate-900 outline-none placeholder:text-slate-400 focus:ring-2 focus:ring-primary"
+                    className="w-full rounded-lg border-none bg-surface-container-low py-3 pl-11 pr-12 text-slate-900 outline-none placeholder:text-slate-400 focus:ring-2 focus:ring-primary"
                     required
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    <span className="material-symbols-outlined select-none text-xl">
+                      {showPassword ? 'visibility_off' : 'visibility'}
+                    </span>
+                  </button>
                 </div>
                 {!isLogin && (
                   <p className="mt-2 text-xs text-slate-500">

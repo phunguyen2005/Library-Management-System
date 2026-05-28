@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
 import { requestBorrow, getMyRequests, type MemberRequest } from '../../api/borrowApi';
@@ -12,6 +12,7 @@ import {
 import { fetchBookReviews, submitBookReview, type ReviewRecord } from '../../api/reviewApi';
 import { reserveBook, cancelReservation, fetchMyReservations, type ReservationRecord } from '../../api/reservationApi';
 import EmptyState from '../../components/EmptyState';
+import Pagination from '../../components/Pagination';
 import StarRating from '../../components/StarRating';
 import LibraryMapModal from '../../components/LibraryMapModal';
 import { applyImageFallback } from '../../lib/display';
@@ -19,9 +20,12 @@ import { getErrorMessage, isUnauthorizedError } from '../../lib/errors';
 import { BOOK_CLASSIFICATIONS } from '../../lib/bookClassification';
 import { emitToast } from '../../notifications/events';
 import type { FormattedBook } from '../../types/book';
+import type { PaginationMeta } from '../../types/pagination';
 
 type AvailabilityFilter = 'all' | 'available' | 'unavailable';
 type SortKey = 'title' | 'newest' | 'available';
+
+const PAGE_SIZE = 12;
 
 const AVAILABILITY_OPTIONS: Array<{ label: string; value: AvailabilityFilter }> = [
   { label: 'Tất cả trạng thái', value: 'all' },
@@ -43,6 +47,16 @@ function readSort(value: string | null): SortKey {
   return value === 'newest' || value === 'available' ? value : 'title';
 }
 
+function readPage(value: string | null): number {
+  const page = Number(value);
+
+  return Number.isInteger(page) && page > 0 ? page : 1;
+}
+
+function normalizeSearchQuery(value: string): string {
+  return value.normalize('NFC');
+}
+
 export default function Catalog() {
   const { user, role } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -50,8 +64,12 @@ export default function Catalog() {
   const category = searchParams.get('category') || 'all';
   const availability = readAvailability(searchParams.get('availability'));
   const sort = readSort(searchParams.get('sort'));
+  const page = readPage(searchParams.get('page'));
+  const [searchInput, setSearchInput] = useState(() => normalizeSearchQuery(query));
+  const [isComposingSearch, setIsComposingSearch] = useState(false);
   const [selectedBook, setSelectedBook] = useState<FormattedBook | null>(null);
   const [books, setBooks] = useState<FormattedBook[]>([]);
+  const [paginationMeta, setPaginationMeta] = useState<PaginationMeta | null>(null);
   const [reviews, setReviews] = useState<ReviewRecord[]>([]);
   const [reservations, setReservations] = useState<ReservationRecord[]>([]);
   const [myRequests, setMyRequests] = useState<MemberRequest[]>([]);
@@ -67,6 +85,8 @@ export default function Catalog() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isSearchingSuggestions, setIsSearchingSuggestions] = useState(false);
   const autocompleteRef = useRef<HTMLDivElement>(null);
+  const favoriteBooksRef = useRef<FormattedBook[]>([]);
+  const previousQueryRef = useRef(query);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -81,9 +101,64 @@ export default function Catalog() {
   }, []);
 
   useEffect(() => {
-    if (query.trim().length < 2) {
+    if (query === previousQueryRef.current) {
+      return;
+    }
+
+    previousQueryRef.current = query;
+
+    const normalizedQuery = normalizeSearchQuery(query);
+    if (!isComposingSearch && normalizedQuery !== normalizeSearchQuery(searchInput).trim()) {
+      setSearchInput(normalizedQuery);
+    }
+  }, [isComposingSearch, query, searchInput]);
+
+  useEffect(() => {
+    if (isComposingSearch) {
+      return;
+    }
+
+    const nextQuery = normalizeSearchQuery(searchInput).trim();
+    const currentQuery = normalizeSearchQuery(query);
+
+    if (nextQuery === currentQuery) {
+      return;
+    }
+
+    const handler = window.setTimeout(() => {
+      const nextParams = new URLSearchParams(searchParams);
+
+      if (nextQuery) {
+        nextParams.set('q', nextQuery);
+      } else {
+        nextParams.delete('q');
+      }
+
+      nextParams.delete('book');
+      nextParams.delete('page');
+      setSelectedBook(null);
+      setSearchParams(nextParams, { replace: true });
+    }, 300);
+
+    return () => {
+      window.clearTimeout(handler);
+    };
+  }, [isComposingSearch, query, searchInput, searchParams, setSearchParams]);
+
+  useEffect(() => {
+    if (isComposingSearch) {
       setSuggestions([]);
       setShowSuggestions(false);
+      setIsSearchingSuggestions(false);
+      return;
+    }
+
+    const autocompleteQuery = normalizeSearchQuery(searchInput).trim();
+
+    if (autocompleteQuery.length < 2) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      setIsSearchingSuggestions(false);
       return;
     }
 
@@ -91,7 +166,7 @@ export default function Catalog() {
     const handler = setTimeout(async () => {
       try {
         const { autocompleteBooks } = await import('../../api/bookApi');
-        const results = await autocompleteBooks(query.trim());
+        const results = await autocompleteBooks(autocompleteQuery);
         setSuggestions(results);
         setShowSuggestions(results.length > 0);
       } catch (e) {
@@ -104,7 +179,7 @@ export default function Catalog() {
     return () => {
       clearTimeout(handler);
     };
-  }, [query]);
+  }, [isComposingSearch, searchInput]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isBorrowing, setIsBorrowing] = useState(false);
   const [isReserving, setIsReserving] = useState(false);
@@ -114,28 +189,79 @@ export default function Catalog() {
   const [newComment, setNewComment] = useState('');
 
   useEffect(() => {
-    setIsLoading(true);
-    setLoadError(null);
+    let isActive = true;
 
     Promise.all([
-      fetchBorrowableBooks(1, '', 1000),
       fetchFavoriteBooks(),
       fetchMyReservations(),
       getMyRequests(),
     ])
-      .then(([booksResponse, favoriteBooks, userReservations, requests]) => {
-        const catalogBooks = Array.isArray(booksResponse) ? booksResponse : booksResponse.data;
-        setBooks(mergeFavoriteState(catalogBooks, favoriteBooks));
+      .then(([favoriteBooks, userReservations, requests]) => {
+        if (!isActive) {
+          return;
+        }
+
+        favoriteBooksRef.current = favoriteBooks;
+        setBooks((current) => mergeFavoriteState(current, favoriteBooks));
         setReservations(userReservations);
         setMyRequests(requests);
       })
       .catch((error: unknown) => {
+        if (isUnauthorizedError(error) || !isActive) {
+          return;
+        }
+
+        const message = getErrorMessage(error, 'Không thể tải danh mục sách.');
+        emitToast({ tone: 'error', title: 'Không thể tải danh mục', message });
+      });
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let isActive = true;
+    const isAvailable =
+      availability === 'all' ? undefined : availability === 'available';
+
+    setIsLoading(true);
+    setLoadError(null);
+
+    fetchBorrowableBooks(page, query, PAGE_SIZE, category, sort, isAvailable)
+      .then((booksResponse) => {
+        if (!isActive) {
+          return;
+        }
+
+        setBooks(mergeFavoriteState(booksResponse.data, favoriteBooksRef.current));
+        setPaginationMeta(
+          booksResponse.meta ?? {
+            current_page: page,
+            last_page: 1,
+            per_page: PAGE_SIZE,
+            total: booksResponse.data.length,
+          },
+        );
+      })
+      .catch((error: unknown) => {
+        if (isUnauthorizedError(error) || !isActive) {
+          return;
+        }
+
         const message = getErrorMessage(error, 'Không thể tải danh mục sách.');
         setLoadError(message);
         emitToast({ tone: 'error', title: 'Không thể tải danh mục', message });
       })
-      .finally(() => setIsLoading(false));
-  }, []);
+      .finally(() => {
+        if (isActive) {
+          setIsLoading(false);
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [availability, category, page, query, sort]);
 
   useEffect(() => {
     const selectedId = Number(searchParams.get('book'));
@@ -166,38 +292,9 @@ export default function Catalog() {
     }
   }, [selectedBook]);
 
-  const filteredBooks = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
-
-    const nextBooks = books.filter((book) => {
-      const matchesQuery =
-        !normalizedQuery ||
-        [book.title, book.author, book.category, book.genre, book.location, book.isbn]
-          .join(' ')
-          .toLowerCase()
-          .includes(normalizedQuery);
-
-      const matchesCategory = category === 'all' || book.category === category;
-      const matchesAvailability =
-        availability === 'all' ||
-        (availability === 'available' && book.is_available) ||
-        (availability === 'unavailable' && !book.is_available);
-
-      return matchesQuery && matchesCategory && matchesAvailability;
-    });
-
-    return [...nextBooks].sort((first, second) => {
-      if (sort === 'newest') {
-        return (second.published_year ?? 0) - (first.published_year ?? 0);
-      }
-
-      if (sort === 'available') {
-        return second.available_quantity - first.available_quantity;
-      }
-
-      return first.title.localeCompare(second.title, 'vi');
-    });
-  }, [availability, books, category, query, sort]);
+  const currentPage = paginationMeta?.current_page ?? page;
+  const totalPages = paginationMeta?.last_page ?? 1;
+  const totalRecords = paginationMeta?.total ?? books.length;
 
   const updateFilter = (key: string, value: string) => {
     const nextParams = new URLSearchParams(searchParams);
@@ -210,6 +307,7 @@ export default function Catalog() {
 
     if (key !== 'book') {
       nextParams.delete('book');
+      nextParams.delete('page');
       setSelectedBook(null);
     }
 
@@ -217,6 +315,7 @@ export default function Catalog() {
   };
 
   const resetFilters = () => {
+    setSearchInput('');
     setSelectedBook(null);
     setSearchParams({}, { replace: true });
   };
@@ -230,6 +329,21 @@ export default function Catalog() {
 
   const closeBook = () => {
     const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('book');
+    setSelectedBook(null);
+    setSearchParams(nextParams, { replace: true });
+  };
+
+  const handlePageChange = (nextPage: number) => {
+    const boundedPage = Math.max(1, Math.min(nextPage, totalPages));
+    const nextParams = new URLSearchParams(searchParams);
+
+    if (boundedPage <= 1) {
+      nextParams.delete('page');
+    } else {
+      nextParams.set('page', String(boundedPage));
+    }
+
     nextParams.delete('book');
     setSelectedBook(null);
     setSearchParams(nextParams, { replace: true });
@@ -430,8 +544,13 @@ export default function Catalog() {
             <div className="relative">
               <input
                 type="search"
-                value={query}
-                onChange={(event) => updateFilter('q', event.target.value)}
+                value={searchInput}
+                onChange={(event) => setSearchInput(event.target.value)}
+                onCompositionStart={() => setIsComposingSearch(true)}
+                onCompositionEnd={(event) => {
+                  setIsComposingSearch(false);
+                  setSearchInput(normalizeSearchQuery(event.currentTarget.value));
+                }}
                 onFocus={() => {
                   if (suggestions.length > 0) setShowSuggestions(true);
                 }}
@@ -551,7 +670,7 @@ export default function Catalog() {
           <div>
             <h2 className="text-xl md:text-2xl font-bold text-on-surface">Danh mục sách</h2>
             <p className="mt-1 text-xs md:text-sm text-on-surface-variant">
-              Hiển thị {filteredBooks.length} trong tổng số {books.length} kết quả
+              Hiển thị {books.length} trong tổng số {totalRecords} kết quả
             </p>
           </div>
           <button
@@ -600,7 +719,7 @@ export default function Catalog() {
             <div className="col-span-full">
               <EmptyState icon="error" title="Không thể tải danh mục" message={loadError} />
             </div>
-          ) : filteredBooks.length === 0 ? (
+          ) : books.length === 0 ? (
             <div className="col-span-full">
               <EmptyState
                 icon="search_off"
@@ -609,7 +728,7 @@ export default function Catalog() {
               />
             </div>
           ) : (
-            filteredBooks.map((book) => (
+            books.map((book) => (
               <article
                 key={book.id}
                 className="group text-left cursor-pointer"
@@ -680,6 +799,12 @@ export default function Catalog() {
             ))
           )}
         </div>
+
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={handlePageChange}
+        />
       </section>
 
       {selectedBook && (

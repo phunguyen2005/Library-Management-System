@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { fetchBlogPost, fetchBlogPosts, type BlogPostRecord } from '../../api/blogApi';
@@ -8,9 +8,10 @@ import LanguageToggle from '../../components/LanguageToggle';
 import PageLoader from '../../components/PageLoader';
 import ThemeToggle from '../../components/ThemeToggle';
 import logo from '../../assets/logo.png';
-import { FALLBACK_BLOG_COVER, blogExcerpt, getBlogCategoryMeta, sanitizeBlogHtml } from '../../lib/blog';
+import { FALLBACK_BLOG_COVER, blogExcerpt, estimateBlogReadingMinutes, getBlogCategoryMeta, prepareBlogContent } from '../../lib/blog';
 import { applyImageFallback, formatDisplayDate } from '../../lib/display';
 import { getErrorMessage } from '../../lib/errors';
+import { getIntlLocale } from '../../i18n';
 
 function setMeta(name: string, content: string) {
   let meta = document.querySelector<HTMLMetaElement>(`meta[name="${name}"]`);
@@ -32,6 +33,8 @@ export default function BlogPost() {
   const [relatedPosts, setRelatedPosts] = useState<BlogPostRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [hasCopiedLink, setHasCopiedLink] = useState(false);
+  const preparedContent = useMemo(() => prepareBlogContent(post?.content), [post?.content]);
 
   useEffect(() => {
     let isActive = true;
@@ -50,6 +53,7 @@ export default function BlogPost() {
 
         setPost(currentPost);
         setRelatedPosts(related.data.filter((item) => item.slug !== currentPost.slug).slice(0, 3));
+        setHasCopiedLink(false);
 
         const description = blogExcerpt(currentPost.content, currentPost.excerpt);
         document.title = `${currentPost.title} | ${t('common.digitalLibrary')}`;
@@ -86,6 +90,24 @@ export default function BlogPost() {
 
   const category = getBlogCategoryMeta(post.category);
   const cover = post.cover_image || FALLBACK_BLOG_COVER;
+  const readingMinutes = estimateBlogReadingMinutes(post.content, post.excerpt);
+  const displayDate = formatDisplayDate(post.published_at || post.created_at, '');
+  const viewCount = post.views.toLocaleString(getIntlLocale());
+  const shareUrl = typeof window !== 'undefined'
+    ? new URL(`/blog/${post.slug}`, window.location.origin).toString()
+    : `/blog/${post.slug}`;
+  const copyArticleLink = async () => {
+    if (typeof navigator === 'undefined' || !navigator.clipboard?.writeText) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setHasCopiedLink(true);
+    } catch {
+      setHasCopiedLink(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-surface text-on-surface">
@@ -116,46 +138,101 @@ export default function BlogPost() {
 
       <main>
         <section className="relative overflow-hidden bg-slate-950 text-white">
-          <div className="absolute inset-0 opacity-45">
+          <div className="absolute inset-0 opacity-40">
             <img src={cover} alt="" className="h-full w-full object-cover" onError={(event) => applyImageFallback(event.currentTarget)} />
           </div>
-          <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/78 to-slate-950/30" />
-          <div className="relative mx-auto max-w-screen-xl px-4 py-20 md:px-6 md:py-28">
-            <span className={`inline-flex items-center gap-1 rounded border px-3 py-1 text-xs font-bold uppercase tracking-wider ${category.color}`}>
-              <span className="material-symbols-outlined text-[15px]">{category.icon}</span>
-              {category.label}
-            </span>
-            <h1 className="mt-5 max-w-4xl font-headline text-4xl font-black leading-tight tracking-tight md:text-6xl">
-              {post.title}
-            </h1>
-            <div className="mt-6 flex flex-wrap items-center gap-4 text-sm text-slate-200">
-              <span className="inline-flex items-center gap-2">
-                <span className="material-symbols-outlined text-[17px]">person</span>
-                {post.author?.name || 'HCMUE Library'}
+          <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/86 to-slate-950/35" />
+          <div className="relative mx-auto max-w-screen-xl px-4 py-12 md:px-6 md:py-20">
+            <nav aria-label="Breadcrumb" className="mb-8 flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-300">
+              <Link to="/" className="transition hover:text-white">{t('nav.home')}</Link>
+              <span aria-hidden="true" className="text-slate-500">/</span>
+              <Link to="/blog" className="transition hover:text-white">{t('blog.eyebrow')}</Link>
+            </nav>
+
+            <div className="max-w-4xl">
+              <span className={`inline-flex items-center gap-1 rounded border px-3 py-1 text-xs font-bold uppercase tracking-wider ${category.color}`}>
+                <span className="material-symbols-outlined text-[15px]">{category.icon}</span>
+                {category.label}
               </span>
-              <span className="inline-flex items-center gap-2">
-                <span className="material-symbols-outlined text-[17px]">calendar_month</span>
-                {formatDisplayDate(post.published_at || post.created_at, '')}
-              </span>
-              <span className="inline-flex items-center gap-2">
-                <span className="material-symbols-outlined text-[17px]">visibility</span>
-                {post.views.toLocaleString()} {t('blog.views')}
-              </span>
+              <h1 id="blog-post-title" className="mt-5 font-headline text-4xl font-black leading-tight tracking-tight md:text-6xl">
+                {post.title}
+              </h1>
+              {post.excerpt ? (
+                <p className="mt-5 max-w-3xl text-lg font-medium leading-8 text-slate-200 md:text-xl">
+                  {post.excerpt}
+                </p>
+              ) : null}
+              <div className="mt-7 flex flex-wrap items-center gap-4 text-sm text-slate-200">
+                <span className="inline-flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[17px]">person</span>
+                  {post.author?.name || 'HCMUE Library'}
+                </span>
+                <span className="inline-flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[17px]">calendar_month</span>
+                  {displayDate}
+                </span>
+                <span className="inline-flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[17px]">schedule</span>
+                  {t('blog.readingTime', { count: readingMinutes })}
+                </span>
+                <span className="inline-flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[17px]">visibility</span>
+                  {viewCount} {t('blog.views')}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => void copyArticleLink()}
+                className="mt-7 inline-flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-4 py-2 text-sm font-bold text-white shadow-sm backdrop-blur transition hover:border-white/35 hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-white/35"
+              >
+                <span aria-hidden="true" className="material-symbols-outlined text-[17px]">{hasCopiedLink ? 'check' : 'link'}</span>
+                {hasCopiedLink ? t('blog.linkCopied') : t('blog.copyLink')}
+              </button>
             </div>
           </div>
         </section>
 
-        <article className="mx-auto max-w-3xl px-4 py-10 md:px-6 md:py-14">
-          {post.excerpt ? (
-            <p className="mb-8 rounded-2xl border border-primary/15 bg-primary/5 p-5 text-lg font-medium leading-relaxed text-on-surface">
-              {post.excerpt}
-            </p>
-          ) : null}
-          <div
-            className="blog-rich-content"
-            dangerouslySetInnerHTML={{ __html: sanitizeBlogHtml(post.content) }}
-          />
-        </article>
+        <section className="border-b border-surface-container-high bg-surface">
+          <div className="mx-auto grid max-w-screen-xl gap-10 px-4 py-10 md:px-6 md:py-14 lg:grid-cols-[minmax(0,760px)_280px] lg:items-start lg:justify-center">
+            <article aria-labelledby="blog-post-title" className="min-w-0">
+              <div
+                className="blog-rich-content"
+                dangerouslySetInnerHTML={{ __html: preparedContent.html }}
+              />
+            </article>
+
+            <aside className="space-y-7 lg:sticky lg:top-24">
+              <div className="border-l border-surface-container-high pl-5">
+                <p className="text-xs font-black uppercase tracking-wider text-on-surface-variant">{t('blog.articleMeta')}</p>
+                <dl className="mt-4 space-y-3 text-sm">
+                  <div className="flex items-center justify-between gap-4">
+                    <dt className="text-on-surface-variant">{category.label}</dt>
+                    <dd className="font-bold text-on-surface">{displayDate}</dd>
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <dt className="text-on-surface-variant">{t('blog.readingTime', { count: readingMinutes })}</dt>
+                    <dd className="font-bold text-on-surface">{viewCount} {t('blog.views')}</dd>
+                  </div>
+                </dl>
+              </div>
+
+              {preparedContent.headings.length > 0 ? (
+                <nav aria-label={t('blog.inThisArticle')} className="border-l border-primary/35 pl-5">
+                  <p className="text-xs font-black uppercase tracking-wider text-primary">{t('blog.inThisArticle')}</p>
+                  <ol className="mt-4 space-y-3 text-sm">
+                    {preparedContent.headings.map((heading) => (
+                      <li key={heading.id} className={heading.level === 3 ? 'pl-3' : undefined}>
+                        <a href={`#${heading.id}`} className="line-clamp-2 text-on-surface-variant transition hover:text-primary">
+                          {heading.text}
+                        </a>
+                      </li>
+                    ))}
+                  </ol>
+                </nav>
+              ) : null}
+            </aside>
+          </div>
+        </section>
 
         {relatedPosts.length > 0 ? (
           <section className="border-t border-surface-container-high bg-surface-container-low py-12">

@@ -5,6 +5,7 @@ import { getErrorMessage } from '../lib/errors';
 import { emitToast } from '../notifications/events';
 import { applyImageFallback } from '../lib/display';
 import type { DigitalDocument, ReadingProgressRecord } from '../types/book';
+import { useAuth } from '../auth/AuthContext';
 
 interface ReadingRoomProps {
   document: DigitalDocument;
@@ -13,6 +14,10 @@ interface ReadingRoomProps {
 }
 
 export default function ReadingRoom({ document, onClose, onProgressSaved }: ReadingRoomProps) {
+  const { user, role } = useAuth();
+  const userLevel = typeof user?.level === 'number' ? user.level : 1;
+  const canDownload = role === 'admin' || role === 'librarian' || userLevel >= 5;
+
   const isPdf = document.format.toUpperCase() === 'PDF';
   const isAudio = document.format.toUpperCase() === 'AUDIO';
   
@@ -258,27 +263,39 @@ export default function ReadingRoom({ document, onClose, onProgressSaved }: Read
           {document.downloadUrl && (
             <button
               type="button"
-              onClick={() => window.open(document.downloadUrl!, '_blank')}
+              onClick={() => {
+                if (!canDownload) {
+                  emitToast({
+                    tone: 'warning',
+                    title: 'Yêu cầu cấp độ 5',
+                    message: 'Bạn phải đạt cấp độ 5 trở lên trong hệ thống học giả để tải tài liệu số.',
+                  });
+                  return;
+                }
+                window.open(document.downloadUrl!, '_blank');
+              }}
               className="flex h-10 gap-2 items-center rounded-lg bg-stone-800 px-4 text-sm font-semibold transition-colors hover:bg-stone-700 cursor-pointer"
             >
               <span className="material-symbols-outlined text-lg">download</span>
               <span>Tải tệp</span>
             </button>
           )}
-
+ 
           {/* AI Helper Toggle Button */}
-          <button
-            type="button"
-            onClick={() => setIsAiOpen(!isAiOpen)}
-            className={`flex h-10 gap-2 items-center rounded-lg px-4 text-sm font-bold transition-all cursor-pointer ${
-              isAiOpen
-                ? 'bg-primary text-white shadow-md'
-                : 'bg-stone-800 text-stone-300 hover:bg-stone-700 hover:text-white'
-            }`}
-          >
-            <span className="material-symbols-outlined text-[18px]">smart_toy</span>
-            <span>Hỏi Trợ lý AI</span>
-          </button>
+          {!isAudio && (
+            <button
+              type="button"
+              onClick={() => setIsAiOpen(!isAiOpen)}
+              className={`flex h-10 gap-2 items-center rounded-lg px-4 text-sm font-bold transition-all cursor-pointer ${
+                isAiOpen
+                  ? 'bg-primary text-white shadow-md'
+                  : 'bg-stone-800 text-stone-300 hover:bg-stone-700 hover:text-white'
+              }`}
+            >
+              <span className="material-symbols-outlined text-[18px]">smart_toy</span>
+              <span>Hỏi Trợ lý AI</span>
+            </button>
+          )}
 
           <button
             type="button"
@@ -463,16 +480,27 @@ export default function ReadingRoom({ document, onClose, onProgressSaved }: Read
                         <span className="material-symbols-outlined text-base">forward_10</span>
                       </button>
 
-                      {/* Download Link */}
-                      <a
-                        href={document.downloadUrl || '#'}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex h-8 w-8 items-center justify-center rounded-lg bg-stone-950 hover:bg-stone-850 border border-stone-800 text-stone-300 transition-colors"
+                      {/* Download Button */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!canDownload) {
+                            emitToast({
+                              tone: 'warning',
+                              title: 'Yêu cầu cấp độ 5',
+                              message: 'Bạn phải đạt cấp độ 5 trở lên trong hệ thống học giả để tải bài giảng.',
+                            });
+                            return;
+                          }
+                          if (document.downloadUrl) {
+                            window.open(document.downloadUrl, '_blank', 'noopener,noreferrer');
+                          }
+                        }}
+                        className="flex h-8 w-8 items-center justify-center rounded-lg bg-stone-950 hover:bg-stone-850 border border-stone-800 text-stone-300 transition-colors cursor-pointer"
                         title="Tải bài giảng"
                       >
                         <span className="material-symbols-outlined text-[15px]">download</span>
-                      </a>
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -486,7 +514,17 @@ export default function ReadingRoom({ document, onClose, onProgressSaved }: Read
                   {document.downloadUrl && (
                     <button
                       type="button"
-                      onClick={() => window.open(document.downloadUrl!, '_blank')}
+                      onClick={() => {
+                        if (!canDownload) {
+                          emitToast({
+                            tone: 'warning',
+                            title: 'Yêu cầu cấp độ 5',
+                            message: 'Bạn phải đạt cấp độ 5 trở lên trong hệ thống học giả để tải tài liệu số.',
+                          });
+                          return;
+                        }
+                        window.open(document.downloadUrl!, '_blank');
+                      }}
                       className="rounded-lg bg-primary px-6 py-3 font-bold text-white shadow-lg transition-transform hover:scale-105 active:scale-95 cursor-pointer"
                     >
                       Tải tài liệu ngay
@@ -507,7 +545,7 @@ export default function ReadingRoom({ document, onClose, onProgressSaved }: Read
         </main>
 
         {/* Right sidebar - AI Chatbot Drawer */}
-        {isAiOpen && (
+        {isAiOpen && !isAudio && (
           <div className="w-full md:w-96 border-l border-stone-800 bg-stone-950 flex flex-col h-full animate-slide-left z-30">
             {/* Sidebar Chat Header */}
             <header className="flex h-14 items-center justify-between border-b border-stone-800 px-4 bg-stone-900/40">

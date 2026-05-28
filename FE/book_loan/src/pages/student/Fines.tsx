@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { getMyFines, initiateMomoPayment, initiateVnpayPayment, getMomoPaymentStatus, simulateMomoPayment, simulateVnpayPayment, type FineEntry, type FineStatus } from '../../api/fineApi';
+import { getMyFines, applyFineWaiver, initiateMomoPayment, initiateVnpayPayment, getMomoPaymentStatus, simulateMomoPayment, simulateVnpayPayment, type FineEntry, type FineStatus } from '../../api/fineApi';
+import { fetchGamifyProfile, type MemberRewardRecord } from '../../api/gamifyApi';
 import { apiRequest } from '../../api/client';
 import EmptyState from '../../components/EmptyState';
 import { formatDisplayDate } from '../../lib/display';
@@ -29,6 +30,7 @@ function statusConfig(status: FineStatus) {
 
 export default function StudentFines() {
   const [fines, setFines] = useState<FineEntry[]>([]);
+  const [activeTickets, setActiveTickets] = useState<MemberRewardRecord[]>([]);
   const [totalUnpaid, setTotalUnpaid] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -36,16 +38,18 @@ export default function StudentFines() {
 
   const [isMomoLoading, setIsMomoLoading] = useState(false);
   const [isVnpayLoading, setIsVnpayLoading] = useState(false);
+  const [isWaiverLoading, setIsWaiverLoading] = useState(false);
   const [currentPaymentId, setCurrentPaymentId] = useState<number | null>(null);
   const [isQrZoomed, setIsQrZoomed] = useState(false);
 
   const fetchFines = React.useCallback(() => {
     setIsLoading(true);
     setError(null);
-    getMyFines()
-      .then((response) => {
-        setFines(response.fines);
-        setTotalUnpaid(response.total_unpaid);
+    Promise.all([getMyFines(), fetchGamifyProfile()])
+      .then(([finesResponse, profileResponse]) => {
+        setFines(finesResponse.fines);
+        setTotalUnpaid(finesResponse.total_unpaid);
+        setActiveTickets(profileResponse.active_tickets);
       })
       .catch((loadError: unknown) => {
         const message = getErrorMessage(loadError, 'Không thể tải danh sách khoản phạt.');
@@ -260,6 +264,38 @@ export default function StudentFines() {
     setIsQrZoomed(false);
   };
 
+  const getEligibleWaiverTicket = (fineAmount: number | string) => {
+    return activeTickets.find(
+      (t) =>
+        t.status === 'active' &&
+        t.reward?.benefit_type === 'fine_waiver' &&
+        Number(fineAmount) <= Number(t.reward.benefit_value) &&
+        (t.expires_at === null || new Date(t.expires_at) > new Date())
+    );
+  };
+
+  const handleApplyWaiver = async (fineId: number, ticket: MemberRewardRecord) => {
+    if (!window.confirm(`Bạn có chắc chắn muốn dùng vé miễn phạt "${ticket.reward?.name}" để xóa khoản phạt này?`)) {
+      return;
+    }
+    setIsWaiverLoading(true);
+    try {
+      const response = await applyFineWaiver(fineId);
+      emitToast({
+        tone: 'success',
+        title: 'Thành công',
+        message: response.message,
+      });
+      setGuideFine(null);
+      fetchFines();
+    } catch (err: unknown) {
+      const msg = getErrorMessage(err, 'Không thể áp dụng vé miễn phạt.');
+      emitToast({ tone: 'error', title: 'Lỗi', message: msg });
+    } finally {
+      setIsWaiverLoading(false);
+    }
+  };
+
 
   const summary = useMemo(() => {
     const unpaidCount = fines.filter((fine) => fine.status === 'unpaid').length;
@@ -337,15 +373,38 @@ export default function StudentFines() {
                   </div>
                 </div>
 
-                <div className="flex justify-end pt-1">
+                <div className="flex justify-between items-center gap-2 pt-1 w-full">
                   {fine.status === 'unpaid' ? (
-                    <button
-                      type="button"
-                      onClick={() => setGuideFine(fine)}
-                      className="w-full rounded-lg bg-primary py-2 text-xs font-bold text-white shadow-sm hover:opacity-90 cursor-pointer"
-                    >
-                      Hướng dẫn thanh toán
-                    </button>
+                    <>
+                      {getEligibleWaiverTicket(fine.amount) ? (
+                        <div className="grid grid-cols-2 gap-2 w-full">
+                          <button
+                            type="button"
+                            disabled={isWaiverLoading}
+                            onClick={() => handleApplyWaiver(fine.fine_id, getEligibleWaiverTicket(fine.amount)!)}
+                            className="rounded-lg bg-emerald-600 py-2 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 cursor-pointer flex items-center justify-center gap-1"
+                          >
+                            <span className="material-symbols-outlined text-sm">local_activity</span>
+                            Dùng vé
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setGuideFine(fine)}
+                            className="rounded-lg bg-primary py-2 text-xs font-bold text-white shadow-sm hover:opacity-90 cursor-pointer"
+                          >
+                            Thanh toán
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setGuideFine(fine)}
+                          className="w-full rounded-lg bg-primary py-2 text-xs font-bold text-white shadow-sm hover:opacity-90 cursor-pointer"
+                        >
+                          Hướng dẫn thanh toán
+                        </button>
+                      )}
+                    </>
                   ) : (
                     <span className="text-xs font-semibold text-slate-400">Không cần xử lý</span>
                   )}
@@ -421,13 +480,26 @@ export default function StudentFines() {
                       </td>
                       <td className="px-6 py-4 text-right">
                         {fine.status === 'unpaid' ? (
-                          <button
-                            type="button"
-                            onClick={() => setGuideFine(fine)}
-                            className="rounded-lg bg-primary px-4 py-2 text-xs font-bold text-white shadow-sm shadow-primary/20 hover:opacity-90 cursor-pointer"
-                          >
-                            Xem hướng dẫn thanh toán
-                          </button>
+                          <div className="flex flex-col md:flex-row gap-2 justify-end items-center">
+                            {getEligibleWaiverTicket(fine.amount) && (
+                              <button
+                                type="button"
+                                disabled={isWaiverLoading}
+                                onClick={() => handleApplyWaiver(fine.fine_id, getEligibleWaiverTicket(fine.amount)!)}
+                                className="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-sm shadow-emerald-600/20 hover:bg-emerald-700 hover:scale-[1.02] active:scale-95 transition-all cursor-pointer flex items-center gap-1 shrink-0"
+                              >
+                                <span className="material-symbols-outlined text-sm">local_activity</span>
+                                Dùng vé miễn phạt
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => setGuideFine(fine)}
+                              className="rounded-lg bg-primary px-4 py-2 text-xs font-bold text-white shadow-sm shadow-primary/20 hover:opacity-90 cursor-pointer shrink-0"
+                            >
+                              Xem hướng dẫn thanh toán
+                            </button>
+                          </div>
                         ) : (
                           <span className="text-xs font-semibold text-slate-400">Không cần xử lý</span>
                         )}
@@ -492,6 +564,31 @@ export default function StudentFines() {
                 </button>
               </div>
               <div className="space-y-3 text-sm text-slate-700">
+                {getEligibleWaiverTicket(guideFine.amount) && (
+                  <div className="rounded-xl border border-amber-300 bg-amber-50/50 p-3 border-dashed">
+                    <p className="font-bold text-amber-800 flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-sm">local_activity</span>
+                      Sử dụng vé miễn phạt đổi thưởng
+                    </p>
+                    <p className="mt-1 text-xs text-amber-700 leading-relaxed">
+                      Bạn đang sở hữu vé miễn phạt <strong>{getEligibleWaiverTicket(guideFine.amount)?.reward?.name}</strong> có thể áp dụng cho khoản phạt này.
+                    </p>
+                    <button
+                      type="button"
+                      disabled={isWaiverLoading}
+                      onClick={() => handleApplyWaiver(guideFine.fine_id, getEligibleWaiverTicket(guideFine.amount)!)}
+                      className="mt-3 w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 disabled:opacity-50 text-white font-bold py-2.5 text-xs shadow-md shadow-amber-600/10 transition-all cursor-pointer"
+                    >
+                      {isWaiverLoading ? (
+                        <span className="animate-spin h-3.5 w-3.5 border-2 border-white border-t-transparent rounded-full"></span>
+                      ) : (
+                        <span className="material-symbols-outlined text-sm">confirmation_number</span>
+                      )}
+                      Dùng vé xóa nợ phạt ngay
+                    </button>
+                  </div>
+                )}
+
                 <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-3">
                   <p className="font-bold text-emerald-800 flex items-center gap-1">
                     <span className="material-symbols-outlined text-sm">payments</span>

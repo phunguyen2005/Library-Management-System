@@ -1,7 +1,8 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import type { BlogPostRecord } from '../api/blogApi';
-import { FALLBACK_BLOG_COVER, blogExcerpt, getBlogCategoryMeta } from '../lib/blog';
+import { FALLBACK_BLOG_COVER, blogExcerpt, estimateBlogReadingMinutes, getBlogCategoryMeta } from '../lib/blog';
 import { applyImageFallback, formatDisplayDate } from '../lib/display';
 
 type BlogCardProps = {
@@ -11,8 +12,10 @@ type BlogCardProps = {
 };
 
 export default function BlogCard({ post, featured = false, compact = false }: BlogCardProps) {
+  const { t } = useTranslation();
   const category = getBlogCategoryMeta(post.category);
   const image = post.cover_image || FALLBACK_BLOG_COVER;
+  const readingMinutes = estimateBlogReadingMinutes(post.content, post.excerpt);
 
   if (compact) {
     return (
@@ -61,19 +64,17 @@ export default function BlogCard({ post, featured = false, compact = false }: Bl
           loading="lazy"
         />
         {post.is_pinned ? (
-          <span className="absolute left-4 top-4 inline-flex items-center gap-1 rounded-full bg-white/90 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-primary shadow-sm backdrop-blur">
+          <span className="absolute left-4 top-4 inline-flex items-center gap-1 rounded-lg bg-white/90 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-primary shadow-sm backdrop-blur dark:bg-surface-bright/90">
             <span className="material-symbols-outlined text-[13px] filled">push_pin</span>
-            {category.label}
+            {t('blog.featured')}
           </span>
         ) : null}
       </div>
       <div className="flex flex-1 flex-col p-5">
-        {!post.is_pinned ? (
-          <span className={`mb-3 inline-flex w-fit items-center gap-1 rounded border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${category.color}`}>
-            <span className="material-symbols-outlined text-[14px]">{category.icon}</span>
-            {category.label}
-          </span>
-        ) : null}
+        <span className={`mb-3 inline-flex w-fit items-center gap-1 rounded border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${category.color}`}>
+          <span className="material-symbols-outlined text-[14px]">{category.icon}</span>
+          {category.label}
+        </span>
         <h3 className={`${featured ? 'text-2xl md:text-3xl' : 'text-lg'} line-clamp-2 font-bold leading-tight text-on-surface group-hover:text-primary`}>
           {post.title}
         </h3>
@@ -82,7 +83,9 @@ export default function BlogCard({ post, featured = false, compact = false }: Bl
         </p>
         <div className="mt-auto flex items-center justify-between gap-3 pt-5 text-xs text-on-surface-variant">
           <span className="line-clamp-1 font-medium">{post.author?.name || 'HCMUE Library'}</span>
-          <span>{formatDisplayDate(post.published_at || post.created_at, '')}</span>
+          <span className="shrink-0">
+            {formatDisplayDate(post.published_at || post.created_at, '')} · {t('blog.readingTime', { count: readingMinutes })}
+          </span>
         </div>
       </div>
     </Link>

@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class BookIndexRequest extends FormRequest
 {
@@ -27,6 +28,7 @@ class BookIndexRequest extends FormRequest
             'is_available' => ['nullable', 'boolean'],
             'is_digital' => ['nullable', 'boolean'],
             'resource_type' => ['nullable', 'string', 'max:50'],
+            'sort' => ['nullable', 'string', Rule::in(['title', 'newest', 'available'])],
             'page' => ['nullable', 'integer', 'min:1'],
             'limit' => ['nullable', 'integer', 'min:1', 'max:1000'],
         ];

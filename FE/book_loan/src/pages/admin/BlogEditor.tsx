@@ -39,7 +39,7 @@ function toolbarButtonClass(active = false) {
   return `flex h-9 min-w-9 items-center justify-center rounded-lg border px-2 text-xs font-bold transition ${
     active
       ? 'border-primary bg-primary text-white'
-      : 'border-surface-container-high bg-white text-slate-600 hover:border-primary/30 hover:text-primary'
+      : 'border-surface-container-high bg-surface-bright text-on-surface-variant hover:border-primary/30 hover:text-primary'
   }`;
 }
 
@@ -79,7 +79,7 @@ export default function BlogEditor({ post, onSaved, onCancel }: BlogEditorProps)
     editorProps: {
       attributes: {
         class:
-          'blog-editor-content min-h-[300px] rounded-b-xl border border-t-0 border-surface-container-high bg-white px-4 py-4 text-sm leading-relaxed outline-none',
+          'blog-editor-content min-h-[300px] rounded-b-xl border border-t-0 border-surface-container-high bg-surface-bright px-4 py-4 text-sm leading-relaxed outline-none',
       },
     },
   });
@@ -220,36 +220,36 @@ export default function BlogEditor({ post, onSaved, onCancel }: BlogEditorProps)
   const selectedCategory = getBlogCategoryMeta(form.category);
 
   return (
-    <form onSubmit={handleSubmit} className="grid max-h-[88vh] grid-cols-1 overflow-hidden rounded-2xl bg-white shadow-2xl lg:grid-cols-[1fr_340px]">
+    <form onSubmit={handleSubmit} className="grid max-h-[88vh] grid-cols-1 overflow-hidden rounded-2xl bg-surface-bright text-on-surface shadow-2xl lg:grid-cols-[1fr_340px]">
       <section className="custom-scrollbar max-h-[88vh] overflow-y-auto p-6">
         <div className="mb-5 flex items-center justify-between gap-4">
           <div>
-            <h3 className="text-xl font-black text-slate-900">
+            <h3 className="text-xl font-black text-on-surface">
               {post ? 'Chỉnh sửa bài viết' : 'Viết bài blog mới'}
             </h3>
-            <p className="mt-1 text-xs text-slate-500">Nội dung được lưu dưới dạng HTML rich text.</p>
+            <p className="mt-1 text-xs text-on-surface-variant">Nội dung được lưu dưới dạng HTML rich text.</p>
           </div>
-          <button type="button" onClick={onCancel} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+          <button type="button" onClick={onCancel} className="rounded-lg p-2 text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface">
             <span className="material-symbols-outlined">close</span>
           </button>
         </div>
 
         <div className="space-y-4">
           <div>
-            <label htmlFor="blog-title" className="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-600">
+            <label htmlFor="blog-title" className="mb-1 block text-xs font-bold uppercase tracking-wider text-on-surface-variant">
               Tiêu đề
             </label>
             <input
               id="blog-title"
               value={form.title}
               onChange={(event) => updateForm('title', event.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-base font-bold outline-none focus:border-primary/40 focus:ring-4 focus:ring-primary/10"
+              className="w-full rounded-xl border border-surface-container-high bg-surface-container-low px-4 py-3 text-base font-bold text-on-surface outline-none placeholder:text-on-surface-variant focus:border-primary/40 focus:ring-4 focus:ring-primary/10"
               placeholder="Nhập tiêu đề bài viết"
             />
           </div>
 
           <div>
-            <label htmlFor="blog-excerpt" className="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-600">
+            <label htmlFor="blog-excerpt" className="mb-1 block text-xs font-bold uppercase tracking-wider text-on-surface-variant">
               Tóm tắt
             </label>
             <div className="flex gap-2">
@@ -258,7 +258,7 @@ export default function BlogEditor({ post, onSaved, onCancel }: BlogEditorProps)
                 value={form.excerpt}
                 onChange={(event) => updateForm('excerpt', event.target.value)}
                 rows={3}
-                className="min-h-24 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-primary/40 focus:ring-4 focus:ring-primary/10"
+                className="min-h-24 flex-1 rounded-xl border border-surface-container-high bg-surface-container-low px-4 py-3 text-sm text-on-surface outline-none placeholder:text-on-surface-variant focus:border-primary/40 focus:ring-4 focus:ring-primary/10"
                 placeholder="Để trống để hệ thống tự tạo từ nội dung"
               />
               <button
@@ -275,13 +275,13 @@ export default function BlogEditor({ post, onSaved, onCancel }: BlogEditorProps)
 
           <div>
             <div className="mb-1 flex items-center justify-between">
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-600">Nội dung</label>
+              <label className="block text-xs font-bold uppercase tracking-wider text-on-surface-variant">Nội dung</label>
               <span className={`inline-flex items-center gap-1 rounded border px-2 py-0.5 text-[10px] font-bold ${selectedCategory.color}`}>
                 <span className="material-symbols-outlined text-[13px]">{selectedCategory.icon}</span>
                 {selectedCategory.label}
               </span>
             </div>
-            <div className="flex flex-wrap gap-1 rounded-t-xl border border-surface-container-high bg-slate-50 p-2">
+            <div className="flex flex-wrap gap-1 rounded-t-xl border border-surface-container-high bg-surface-container-low p-2">
               <button type="button" className={toolbarButtonClass(editor?.isActive('bold'))} onClick={() => editor?.chain().focus().toggleBold().run()}>
                 B
               </button>
@@ -315,38 +315,38 @@ export default function BlogEditor({ post, onSaved, onCancel }: BlogEditorProps)
         </div>
       </section>
 
-      <aside className="custom-scrollbar max-h-[88vh] overflow-y-auto border-t border-surface-container-high bg-slate-50 p-6 lg:border-l lg:border-t-0">
+      <aside className="custom-scrollbar max-h-[88vh] overflow-y-auto border-t border-surface-container-high bg-surface-container-low p-6 lg:border-l lg:border-t-0">
         <div className="space-y-5">
           <div>
-            <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-600">Ảnh bìa</label>
-            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+            <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-on-surface-variant">Ảnh bìa</label>
+            <div className="overflow-hidden rounded-xl border border-surface-container-high bg-surface-bright">
               <img src={coverPreview} alt="Blog cover preview" className="aspect-[16/10] w-full object-cover" />
             </div>
             <input
               type="file"
               accept="image/png,image/jpeg,image/webp"
               onChange={(event) => updateForm('cover_image_file', event.target.files?.[0] || null)}
-              className="mt-3 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs file:mr-3 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-xs file:font-bold file:text-white"
+              className="mt-3 w-full rounded-lg border border-surface-container-high bg-surface-bright px-3 py-2 text-xs text-on-surface file:mr-3 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-xs file:font-bold file:text-white"
             />
             <input
               type="url"
               value={form.cover_image}
               onChange={(event) => updateForm('cover_image', event.target.value)}
               placeholder="Hoặc dán URL ảnh bìa"
-              className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-primary/20"
+              className="mt-2 w-full rounded-lg border border-surface-container-high bg-surface-bright px-3 py-2 text-xs text-on-surface outline-none placeholder:text-on-surface-variant focus:ring-2 focus:ring-primary/20"
             />
           </div>
 
           <div className="grid grid-cols-1 gap-4">
             <div>
-              <label htmlFor="blog-category" className="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-600">
+              <label htmlFor="blog-category" className="mb-1 block text-xs font-bold uppercase tracking-wider text-on-surface-variant">
                 Phân loại
               </label>
               <select
                 id="blog-category"
                 value={form.category}
                 onChange={(event) => updateForm('category', event.target.value)}
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+                className="w-full rounded-lg border border-surface-container-high bg-surface-bright px-3 py-2 text-sm text-on-surface outline-none focus:ring-2 focus:ring-primary/20"
               >
                 {BLOG_CATEGORY_OPTIONS.map((option) => {
                   const meta = getBlogCategoryMeta(option.value);
@@ -360,14 +360,14 @@ export default function BlogEditor({ post, onSaved, onCancel }: BlogEditorProps)
             </div>
 
             <div>
-              <label htmlFor="blog-status" className="mb-1 block text-xs font-bold uppercase tracking-wider text-slate-600">
+              <label htmlFor="blog-status" className="mb-1 block text-xs font-bold uppercase tracking-wider text-on-surface-variant">
                 Trạng thái
               </label>
               <select
                 id="blog-status"
                 value={form.status}
                 onChange={(event) => updateForm('status', event.target.value as BlogEditorForm['status'])}
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+                className="w-full rounded-lg border border-surface-container-high bg-surface-bright px-3 py-2 text-sm text-on-surface outline-none focus:ring-2 focus:ring-primary/20"
               >
                 <option value="draft">Nháp</option>
                 <option value="published">Xuất bản</option>
@@ -375,7 +375,7 @@ export default function BlogEditor({ post, onSaved, onCancel }: BlogEditorProps)
               </select>
             </div>
 
-            <label className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 text-sm font-bold text-slate-700">
+            <label className="flex items-center gap-3 rounded-xl border border-surface-container-high bg-surface-bright p-3 text-sm font-bold text-on-surface">
               <input
                 type="checkbox"
                 checked={form.is_pinned}
@@ -391,7 +391,7 @@ export default function BlogEditor({ post, onSaved, onCancel }: BlogEditorProps)
               type="button"
               onClick={onCancel}
               disabled={isSaving}
-              className="flex-1 rounded-xl bg-slate-200 px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-300 disabled:opacity-60"
+              className="flex-1 rounded-xl bg-surface-container px-4 py-3 text-sm font-bold text-on-surface transition hover:bg-surface-container-high disabled:opacity-60"
             >
               Hủy
             </button>

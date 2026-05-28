@@ -391,4 +391,92 @@ class FinePaymentWorkflowTest extends TestCase
             ])
             ->assertStatus(403);
     }
+
+    public function test_student_can_apply_fine_waiver_ticket(): void
+    {
+        $member = Member::query()->findOrFail(1);
+        $token = $member->createToken('student-fines', ['role:student']);
+
+        // Create a fine of 40,000 VND (<= 50,000 VND limit)
+        $fine = Fine::query()->create([
+            'loan_id' => 1,
+            'member_id' => $member->member_id,
+            'amount' => 40000,
+            'reason' => 'overdue',
+            'status' => 'unpaid',
+        ]);
+
+        // Mock a returned borrowing so the fine isn't actively overdue/growing
+        Borrowing::find(1)->update(['status' => 'returned', 'return_date' => '2026-04-10']);
+
+        // 1. Try to apply without ticket (should fail)
+        $this->withToken($token->plainTextToken)
+            ->postJson("/api/fines/{$fine->fine_id}/apply-waiver")
+            ->assertStatus(400)
+            ->assertJsonPath('message', 'Bạn không có vé miễn phạt khả dụng.');
+
+        // 2. Buy a fine waiver ticket
+        $reward = \App\Models\Reward::query()->where('benefit_type', 'fine_waiver')->first();
+        $this->assertNotNull($reward);
+
+        \App\Models\MemberReward::create([
+            'member_id' => $member->member_id,
+            'reward_id' => $reward->id,
+            'status' => 'active',
+            'redeemed_at' => now(),
+            'expires_at' => now()->addDays(30),
+        ]);
+
+        // 3. Apply waiver (should succeed)
+        $this->withToken($token->plainTextToken)
+            ->postJson("/api/fines/{$fine->fine_id}/apply-waiver")
+            ->assertOk()
+            ->assertJsonPath('fine.status', 'waived')
+            ->assertJsonPath('fine.waived_reason', 'Sử dụng vé miễn phạt: ' . $reward->name);
+
+        $this->assertDatabaseHas('fines', [
+            'fine_id' => $fine->fine_id,
+            'status' => 'waived',
+        ]);
+
+        $this->assertDatabaseHas('member_rewards', [
+            'member_id' => $member->member_id,
+            'reward_id' => $reward->id,
+            'status' => 'used',
+        ]);
+    }
+
+    public function test_student_cannot_apply_fine_waiver_ticket_for_large_fine(): void
+    {
+        $member = Member::query()->findOrFail(1);
+        $token = $member->createToken('student-fines', ['role:student']);
+
+        // Create a fine of 60,000 VND (> 50,000 VND limit)
+        $fine = Fine::query()->create([
+            'loan_id' => 1,
+            'member_id' => $member->member_id,
+            'amount' => 60000,
+            'reason' => 'overdue',
+            'status' => 'unpaid',
+        ]);
+
+        Borrowing::find(1)->update(['status' => 'returned', 'return_date' => '2026-04-10']);
+
+        $reward = \App\Models\Reward::query()->where('benefit_type', 'fine_waiver')->first();
+        \App\Models\MemberReward::create([
+            'member_id' => $member->member_id,
+            'reward_id' => $reward->id,
+            'status' => 'active',
+            'redeemed_at' => now(),
+            'expires_at' => now()->addDays(30),
+        ]);
+
+        $this->withToken($token->plainTextToken)
+            ->postJson("/api/fines/{$fine->fine_id}/apply-waiver")
+            ->assertStatus(400)
+            ->assertJson([
+                'message' => 'Vé miễn phạt này chỉ có thể áp dụng cho các khoản phạt từ ' . number_format($reward->benefit_value) . ' VND trở xuống.',
+            ]);
+    }
 }
+

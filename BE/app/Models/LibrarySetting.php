@@ -3,9 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Cache;
 
 class LibrarySetting extends Model
 {
+    private const CACHE_KEY = 'library_settings.singleton_cache';
+
     public const DEFAULT_LOAN_PERIOD_DAYS = 14;
     public const DEFAULT_MAX_ACTIVE_LOANS = 5;
     public const DEFAULT_FINE_PER_DAY = 5000;
@@ -92,6 +95,8 @@ class LibrarySetting extends Model
         if (app()->bound('library_settings.singleton')) {
             app()->forgetInstance('library_settings.singleton');
         }
+
+        Cache::forget(self::CACHE_KEY);
     }
 
     public static function singleton(): self
@@ -100,31 +105,33 @@ class LibrarySetting extends Model
             return app('library_settings.singleton');
         }
 
-        $instance = self::query()->firstOrCreate(
-            ['id' => 1],
-            [
-                'loan_period_days' => self::DEFAULT_LOAN_PERIOD_DAYS,
-                'max_active_loans' => self::DEFAULT_MAX_ACTIVE_LOANS,
-                'fine_per_day' => self::DEFAULT_FINE_PER_DAY,
-                'max_fine_per_loan' => self::DEFAULT_MAX_FINE_PER_LOAN,
-                'grace_period_days' => self::DEFAULT_GRACE_PERIOD_DAYS,
-                'damaged_book_fee' => self::DEFAULT_DAMAGED_BOOK_FEE,
-                'lost_book_fee' => self::DEFAULT_LOST_BOOK_FEE,
-                'pickup_deadline_hours' => self::DEFAULT_PICKUP_DEADLINE_HOURS,
-                'max_missed_pickups' => self::DEFAULT_MAX_MISSED_PICKUPS,
-                'suspension_duration_days' => self::DEFAULT_SUSPENSION_DURATION_DAYS,
-                'room_max_hours_per_booking' => self::DEFAULT_ROOM_MAX_HOURS_PER_BOOKING,
-                'room_max_hours_per_week' => self::DEFAULT_ROOM_MAX_HOURS_PER_WEEK,
-                'room_max_bookings_per_day' => self::DEFAULT_ROOM_MAX_BOOKINGS_PER_DAY,
-                'room_advance_booking_days' => self::DEFAULT_ROOM_ADVANCE_BOOKING_DAYS,
-                'room_min_group_size' => self::DEFAULT_ROOM_MIN_GROUP_SIZE,
-                'room_checkin_window_minutes' => self::DEFAULT_ROOM_CHECKIN_WINDOW_MINUTES,
-                'room_booking_requires_approval' => self::DEFAULT_ROOM_BOOKING_REQUIRES_APPROVAL,
-                'room_open_time' => self::DEFAULT_ROOM_OPEN_TIME,
-                'room_close_time' => self::DEFAULT_ROOM_CLOSE_TIME,
-                'room_cancel_deadline_hours' => self::DEFAULT_ROOM_CANCEL_DEADLINE_HOURS,
-            ]
-        );
+        $instance = Cache::remember(self::CACHE_KEY, now()->addHour(), function () {
+            return self::query()->firstOrCreate(
+                ['id' => 1],
+                [
+                    'loan_period_days' => self::DEFAULT_LOAN_PERIOD_DAYS,
+                    'max_active_loans' => self::DEFAULT_MAX_ACTIVE_LOANS,
+                    'fine_per_day' => self::DEFAULT_FINE_PER_DAY,
+                    'max_fine_per_loan' => self::DEFAULT_MAX_FINE_PER_LOAN,
+                    'grace_period_days' => self::DEFAULT_GRACE_PERIOD_DAYS,
+                    'damaged_book_fee' => self::DEFAULT_DAMAGED_BOOK_FEE,
+                    'lost_book_fee' => self::DEFAULT_LOST_BOOK_FEE,
+                    'pickup_deadline_hours' => self::DEFAULT_PICKUP_DEADLINE_HOURS,
+                    'max_missed_pickups' => self::DEFAULT_MAX_MISSED_PICKUPS,
+                    'suspension_duration_days' => self::DEFAULT_SUSPENSION_DURATION_DAYS,
+                    'room_max_hours_per_booking' => self::DEFAULT_ROOM_MAX_HOURS_PER_BOOKING,
+                    'room_max_hours_per_week' => self::DEFAULT_ROOM_MAX_HOURS_PER_WEEK,
+                    'room_max_bookings_per_day' => self::DEFAULT_ROOM_MAX_BOOKINGS_PER_DAY,
+                    'room_advance_booking_days' => self::DEFAULT_ROOM_ADVANCE_BOOKING_DAYS,
+                    'room_min_group_size' => self::DEFAULT_ROOM_MIN_GROUP_SIZE,
+                    'room_checkin_window_minutes' => self::DEFAULT_ROOM_CHECKIN_WINDOW_MINUTES,
+                    'room_booking_requires_approval' => self::DEFAULT_ROOM_BOOKING_REQUIRES_APPROVAL,
+                    'room_open_time' => self::DEFAULT_ROOM_OPEN_TIME,
+                    'room_close_time' => self::DEFAULT_ROOM_CLOSE_TIME,
+                    'room_cancel_deadline_hours' => self::DEFAULT_ROOM_CANCEL_DEADLINE_HOURS,
+                ]
+            );
+        });
 
         app()->instance('library_settings.singleton', $instance);
 

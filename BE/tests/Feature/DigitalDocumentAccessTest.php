@@ -7,6 +7,7 @@ use App\Models\Librarian;
 use App\Models\Member;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
@@ -33,6 +34,40 @@ class DigitalDocumentAccessTest extends TestCase
         $this->assertNotEmpty($document['open_url']);
         $this->assertNotEmpty($document['download_url']);
         $this->assertArrayHasKey('has_attached_file', $document);
+    }
+
+    public function test_audio_digital_document_payload_suppresses_ai_metadata(): void
+    {
+        $audio = $this->createAudioDocumentWithAiMetadata();
+        $member = Member::query()->findOrFail(1);
+        $token = $member->createToken('student-audio-resource-scrub', ['role:student'])->plainTextToken;
+
+        $documentResponse = $this->withToken($token)
+            ->getJson('/api/digital-documents')
+            ->assertOk();
+
+        $document = collect($documentResponse->json('data') ?? $documentResponse->json())
+            ->firstWhere('book_id', $audio->book_id);
+
+        $this->assertIsArray($document);
+        $this->assertNull($document['ai_summary']);
+        $this->assertSame([], $document['ai_tags']);
+        $this->assertNull($document['ai_summary_generated_at']);
+    }
+
+    public function test_audio_book_payload_suppresses_ai_metadata(): void
+    {
+        $audio = $this->createAudioDocumentWithAiMetadata();
+
+        $book = collect($this->getJson('/api/books?is_digital=true&limit=1000')
+            ->assertOk()
+            ->json('data'))
+            ->firstWhere('book_id', $audio->book_id);
+
+        $this->assertIsArray($book);
+        $this->assertNull($book['ai_summary']);
+        $this->assertSame([], $book['ai_tags']);
+        $this->assertNull($book['ai_summary_generated_at']);
     }
 
     public function test_book_index_filters_borrowable_and_digital_books_by_purpose(): void
@@ -118,6 +153,7 @@ class DigitalDocumentAccessTest extends TestCase
         }
 
         $member = Member::query()->findOrFail(1);
+        $member->update(['level' => 5]);
         $token = $member->createToken('student-real-download-audit', ['role:student'])->plainTextToken;
 
         $documentResponse = $this->withToken($token)
@@ -144,6 +180,32 @@ class DigitalDocumentAccessTest extends TestCase
 
         $this->assertSame(1, $refreshedDocument['download_count']);
         $this->assertSame(1, $book->fresh()->download_count);
+    }
+
+    public function test_signed_digital_document_download_requires_member_level_five(): void
+    {
+        $member = Member::query()->findOrFail(1);
+        $member->update(['level' => 4]);
+        $token = $member->createToken('student-low-level-download-audit', ['role:student'])->plainTextToken;
+
+        $documentResponse = $this->withToken($token)
+            ->getJson('/api/digital-documents')
+            ->assertOk();
+        $document = collect($documentResponse->json('data') ?? $documentResponse->json())
+            ->first();
+        $book = Book::query()->findOrFail($document['book_id']);
+        $initialDownloads = $book->download_count;
+
+        $response = $this->get($document['download_url'])
+            ->assertForbidden();
+
+        $this->assertStringContainsString('5', (string) $response->json('message'));
+        $this->assertDatabaseMissing('digital_document_accesses', [
+            'book_id' => $book->book_id,
+            'member_id' => $member->member_id,
+            'access_type' => 'download',
+        ]);
+        $this->assertSame($initialDownloads, $book->fresh()->download_count);
     }
 
     public function test_signed_digital_document_route_serves_preview_and_records_preview_access(): void
@@ -209,6 +271,11 @@ class DigitalDocumentAccessTest extends TestCase
         $librarian = Librarian::query()->findOrFail(1);
         $token = $librarian->createToken('audio-upload-access', ['role:admin']);
         $file = UploadedFile::fake()->create('lecture.mp3', 256, 'audio/mpeg');
+        Book::query()->findOrFail(7)->forceFill([
+            'ai_summary' => 'Existing summary should be removed for audio.',
+            'ai_tags' => ['existing', 'summary'],
+            'ai_summary_generated_at' => now(),
+        ])->save();
 
         $this->withToken($token->plainTextToken)
             ->withHeader('Accept', 'application/json')
@@ -223,6 +290,9 @@ class DigitalDocumentAccessTest extends TestCase
 
         $this->assertNotNull($book->file_url);
         $this->assertSame('library_digital_files/lecture_audio', $book->cloudinary_public_id);
+        $this->assertNull($book->ai_summary);
+        $this->assertSame([], $book->ai_tags);
+        $this->assertNull($book->ai_summary_generated_at);
     }
 
     public function test_students_cannot_upload_digital_file_for_book(): void
@@ -287,5 +357,32 @@ class DigitalDocumentAccessTest extends TestCase
         // Mong đợi redirect (302) sang URL của Cloudinary thay vì đọc local 200
         $this->get($url)
             ->assertRedirect($book->file_url);
+    }
+
+    private function createAudioDocumentWithAiMetadata(): Book
+    {
+        $book = Book::query()->create([
+            'title' => 'Audio Lesson With Legacy AI',
+            'author' => 'Library Admin',
+            'genre' => 'Listening',
+            'published_year' => 2026,
+            'location' => null,
+            'is_digital' => true,
+            'resource_type' => 'Audio Book',
+            'file_format' => 'AUDIO',
+            'file_size' => '2 MB',
+            'file_url' => 'https://example.com/audio-lesson.mp3',
+            'download_count' => 0,
+            'total_quantity' => 1,
+            'available_quantity' => 1,
+            'is_available' => true,
+            'ai_summary' => 'Legacy AI summary should not be exposed.',
+            'ai_tags' => ['legacy-ai', 'audio'],
+            'ai_summary_generated_at' => now(),
+        ]);
+
+        Cache::flush();
+
+        return $book;
     }
 }

@@ -26,6 +26,10 @@ class GenerateBookAiMetadataJob implements ShouldQueue
             return;
         }
 
+        if (strtoupper($book->file_format ?: '') === 'AUDIO') {
+            return;
+        }
+
         $metadataService->apply($book);
     }
 }

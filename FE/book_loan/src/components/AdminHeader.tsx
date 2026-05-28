@@ -7,15 +7,26 @@ import LanguageToggle from './LanguageToggle';
 
 type AdminHeaderProps = {
   onOpenPolicy: () => void;
+  onToggleSidebar?: () => void;
 };
 
-export default function AdminHeader({ onOpenPolicy }: AdminHeaderProps) {
+export default function AdminHeader({ onOpenPolicy, onToggleSidebar }: AdminHeaderProps) {
   const { t } = useTranslation();
   const { user } = useAuth();
 
   return (
-    <header className="z-20 flex h-16 shrink-0 items-center justify-between border-b border-surface-container/40 bg-surface/80 px-8 backdrop-blur-md">
+    <header className="z-20 flex h-16 shrink-0 items-center justify-between border-b border-surface-container/40 bg-surface/80 px-4 md:px-8 backdrop-blur-md">
       <div className="flex flex-1 items-center gap-4">
+        {onToggleSidebar && (
+          <button
+            type="button"
+            onClick={onToggleSidebar}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-on-surface-variant hover:bg-surface-container lg:hidden cursor-pointer"
+            aria-label="Mở thanh điều hướng"
+          >
+            <span className="material-symbols-outlined text-2xl">menu</span>
+          </button>
+        )}
       </div>
 
       <div className="flex items-center gap-4">

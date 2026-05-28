@@ -16,20 +16,34 @@ class FineController extends Controller
     public function me(Request $request, FineCalculationService $calculator)
     {
         $member = $request->user();
+        $validated = $request->validate([
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
 
-        $fines = Fine::query()
-            ->with(['borrowing.book', 'payments'])
-            ->where('member_id', $member->member_id)
-            ->orderByDesc('fine_id')
-            ->get();
+        $baseQuery = Fine::query()
+            ->where('member_id', $member->member_id);
 
-        $totalUnpaid = (float) $fines
+        $totalUnpaid = (float) (clone $baseQuery)
             ->where('status', Fine::STATUS_UNPAID)
-            ->sum(fn (Fine $fine) => (float) $fine->amount);
+            ->sum('amount');
+
+        $paginator = (clone $baseQuery)
+            ->with(['borrowing.book', 'payments'])
+            ->orderByDesc('fine_id')
+            ->paginate($validated['per_page'] ?? 15);
 
         return response()->json([
             'total_unpaid' => $totalUnpaid,
-            'fines' => $fines->map(fn (Fine $fine) => $this->formatFine($fine, $calculator))->values(),
+            'fines' => $paginator->getCollection()
+                ->map(fn (Fine $fine) => $this->formatFine($fine, $calculator))
+                ->values(),
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+            ],
         ]);
     }
 
@@ -120,43 +134,75 @@ class FineController extends Controller
 
     public function statistics()
     {
-        $totalCollected = (float) Fine::query()->where('status', Fine::STATUS_PAID)->sum('amount');
-        $totalUnpaid = (float) Fine::query()->where('status', Fine::STATUS_UNPAID)->sum('amount');
-        $totalWaived = (float) Fine::query()->where('status', Fine::STATUS_WAIVED)->sum('amount');
-        $thisMonthCollected = (float) Fine::query()
-            ->where('status', Fine::STATUS_PAID)
-            ->whereYear('paid_at', now()->year)
-            ->whereMonth('paid_at', now()->month)
-            ->sum('amount');
+        $monthStart = now()->startOfMonth();
+        $monthEnd = now()->endOfMonth();
+        $rangeStart = now()->startOfMonth()->subMonths(5);
+        $rangeEnd = now()->endOfMonth();
 
-        $months = collect(range(5, 0))->map(function (int $offset) {
+        $totals = Fine::query()
+            ->selectRaw('SUM(CASE WHEN status = ? THEN amount ELSE 0 END) as total_collected', [Fine::STATUS_PAID])
+            ->selectRaw('SUM(CASE WHEN status = ? THEN amount ELSE 0 END) as total_unpaid', [Fine::STATUS_UNPAID])
+            ->selectRaw('SUM(CASE WHEN status = ? THEN amount ELSE 0 END) as total_waived', [Fine::STATUS_WAIVED])
+            ->selectRaw(
+                'SUM(CASE WHEN status = ? AND paid_at BETWEEN ? AND ? THEN amount ELSE 0 END) as this_month_collected',
+                [Fine::STATUS_PAID, $monthStart, $monthEnd],
+            )
+            ->first();
+
+        $paid = DB::table('fines')
+            ->selectRaw($this->monthBucket('paid_at').' as month')
+            ->selectRaw('SUM(amount) as collected')
+            ->selectRaw('0 as unpaid')
+            ->selectRaw('0 as waived')
+            ->where('status', Fine::STATUS_PAID)
+            ->whereBetween('paid_at', [$rangeStart, $rangeEnd])
+            ->groupBy('month');
+
+        $unpaid = DB::table('fines')
+            ->selectRaw($this->monthBucket('created_at').' as month')
+            ->selectRaw('0 as collected')
+            ->selectRaw('SUM(amount) as unpaid')
+            ->selectRaw('0 as waived')
+            ->where('status', Fine::STATUS_UNPAID)
+            ->whereBetween('created_at', [$rangeStart, $rangeEnd])
+            ->groupBy('month');
+
+        $waived = DB::table('fines')
+            ->selectRaw($this->monthBucket('updated_at').' as month')
+            ->selectRaw('0 as collected')
+            ->selectRaw('0 as unpaid')
+            ->selectRaw('SUM(amount) as waived')
+            ->where('status', Fine::STATUS_WAIVED)
+            ->whereBetween('updated_at', [$rangeStart, $rangeEnd])
+            ->groupBy('month');
+
+        $monthlyTotals = DB::query()
+            ->fromSub($paid->unionAll($unpaid)->unionAll($waived), 'monthly_fines')
+            ->selectRaw('month')
+            ->selectRaw('SUM(collected) as collected')
+            ->selectRaw('SUM(unpaid) as unpaid')
+            ->selectRaw('SUM(waived) as waived')
+            ->groupBy('month')
+            ->get()
+            ->keyBy('month');
+
+        $months = collect(range(5, 0))->map(function (int $offset) use ($monthlyTotals) {
             $month = now()->startOfMonth()->subMonths($offset);
+            $row = $monthlyTotals->get($month->format('Y-m'));
 
             return [
                 'month' => $month->format('Y-m'),
-                'collected' => (float) Fine::query()
-                    ->where('status', Fine::STATUS_PAID)
-                    ->whereYear('paid_at', $month->year)
-                    ->whereMonth('paid_at', $month->month)
-                    ->sum('amount'),
-                'unpaid' => (float) Fine::query()
-                    ->where('status', Fine::STATUS_UNPAID)
-                    ->whereYear('created_at', $month->year)
-                    ->whereMonth('created_at', $month->month)
-                    ->sum('amount'),
-                'waived' => (float) Fine::query()
-                    ->where('status', Fine::STATUS_WAIVED)
-                    ->whereYear('updated_at', $month->year)
-                    ->whereMonth('updated_at', $month->month)
-                    ->sum('amount'),
+                'collected' => (float) ($row->collected ?? 0),
+                'unpaid' => (float) ($row->unpaid ?? 0),
+                'waived' => (float) ($row->waived ?? 0),
             ];
         });
 
         return response()->json([
-            'total_collected' => $totalCollected,
-            'total_unpaid' => $totalUnpaid,
-            'total_waived' => $totalWaived,
-            'this_month_collected' => $thisMonthCollected,
+            'total_collected' => (float) ($totals->total_collected ?? 0),
+            'total_unpaid' => (float) ($totals->total_unpaid ?? 0),
+            'total_waived' => (float) ($totals->total_waived ?? 0),
+            'this_month_collected' => (float) ($totals->this_month_collected ?? 0),
             'by_month' => $months,
         ]);
     }
@@ -276,6 +322,95 @@ class FineController extends Controller
         ]);
     }
 
+    public function applyWaiver(Request $request, int $fineId, FineCalculationService $calculator)
+    {
+        $member = $request->user();
+
+        $fine = DB::transaction(function () use ($fineId, $member) {
+            $fine = Fine::query()
+                ->with(['member', 'borrowing.book'])
+                ->lockForUpdate()
+                ->find($fineId);
+
+            if (! $fine) {
+                abort(response()->json(['message' => 'Không tìm thấy phiếu phí phạt.'], 404));
+            }
+
+            if ($fine->member_id !== $member->member_id) {
+                abort(response()->json(['message' => 'Bạn không có quyền thực hiện hành động này.'], 403));
+            }
+
+            if ($fine->status !== Fine::STATUS_UNPAID) {
+                abort(response()->json(['message' => 'Khoản phí phạt này không còn ở trạng thái chưa thanh toán.'], 422));
+            }
+
+            if ($fine->reason === Fine::REASON_OVERDUE && 
+                $fine->borrowing && 
+                $fine->borrowing->status !== \App\Models\Borrowing::STATUS_RETURNED) {
+                abort(response()->json([
+                    'message' => 'Bạn cần trả sách trước khi sử dụng vé miễn phạt cho khoản phạt này.'
+                ], 422));
+            }
+
+            // Find an active fine_waiver ticket
+            $activeTicket = $member->rewards()
+                ->where('status', 'active')
+                ->whereHas('reward', function ($query) {
+                    $query->where('benefit_type', 'fine_waiver');
+                })
+                ->where(function ($query) {
+                    $query->whereNull('expires_at')
+                          ->orWhere('expires_at', '>', now());
+                })
+                ->with('reward')
+                ->first();
+
+            if (! $activeTicket) {
+                abort(response()->json(['message' => 'Bạn không có vé miễn phạt khả dụng.'], 400));
+            }
+
+            $benefitValue = $activeTicket->reward->benefit_value;
+            if ($fine->amount > $benefitValue) {
+                abort(response()->json([
+                    'message' => 'Vé miễn phạt này chỉ có thể áp dụng cho các khoản phạt từ ' . number_format($benefitValue) . ' VND trở xuống.'
+                ], 400));
+            }
+
+            // Consume ticket
+            $activeTicket->status = 'used';
+            $activeTicket->used_at = now();
+            $activeTicket->save();
+
+            // Waive fine
+            $fine->status = Fine::STATUS_WAIVED;
+            $fine->waived_reason = "Sử dụng vé miễn phạt: " . $activeTicket->reward->name;
+            $fine->save();
+
+            // Log gamify event
+            \App\Models\GamifyLog::create([
+                'member_id' => $member->member_id,
+                'event_type' => 'fine_waived',
+                'xp_gained' => 0,
+                'points_changed' => 0,
+                'description' => "Sử dụng vé miễn phạt " . number_format((float) $fine->amount) . " VND thành công",
+            ]);
+
+            // Audit log
+            AuditLoggerService::log(
+                'waive_fine',
+                'Sinh viên đã tự miễn phí phạt ' . number_format((float) $fine->amount) . ' VND bằng Vé miễn phạt: ' . $activeTicket->reward->name . ' (Mã phiếu phạt: #' . $fine->fine_id . ')',
+                $member
+            );
+
+            return $fine->fresh(['member', 'borrowing.book', 'payments', 'waivedBy']);
+        });
+
+        return response()->json([
+            'message' => 'Đã áp dụng vé miễn phạt thành công.',
+            'fine' => $this->formatFine($fine, $calculator, true),
+        ]);
+    }
+
     public function store(Request $request, FineCalculationService $calculator)
     {
         $validated = $request->validate([
@@ -328,6 +463,15 @@ class FineController extends Controller
             'message' => 'Đã tạo khoản phạt thủ công thành công.',
             'fine' => $this->formatFine($fine->load(['member', 'borrowing.book', 'payments']), $calculator, true),
         ], 201);
+    }
+
+    private function monthBucket(string $column): string
+    {
+        return match (DB::getDriverName()) {
+            'sqlite' => "strftime('%Y-%m', {$column})",
+            'pgsql' => "to_char({$column}, 'YYYY-MM')",
+            default => "DATE_FORMAT({$column}, '%Y-%m')",
+        };
     }
 
     private function formatFine(Fine $fine, FineCalculationService $calculator, bool $includeMember = false): array

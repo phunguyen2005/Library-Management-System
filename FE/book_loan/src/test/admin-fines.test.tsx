@@ -67,6 +67,12 @@ vi.mock('../api/fineApi', () => ({
   waiveFine: (...args: unknown[]) => waiveFineMock(...args),
 }));
 
+vi.mock('../auth/AuthContext', () => ({
+  useAuth: () => ({
+    hasPermission: () => true,
+  }),
+}));
+
 function renderAdminFines() {
   return render(
     <MemoryRouter>

@@ -3,6 +3,8 @@
 
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 html {
   scrollbar-gutter: stable;
 }
@@ -194,12 +196,18 @@ html.dark .shadow-slate-900\/10 {
   color: var(--color-on-surface);
 }
 
+.blog-rich-content {
+  font-size: 1.0625rem;
+  line-height: 1.85;
+}
+
 .blog-rich-content h2,
 .blog-editor-content h2 {
-  margin: 2rem 0 0.75rem;
+  margin: 2.4rem 0 0.75rem;
   font-size: 1.75rem;
   line-height: 1.2;
   font-weight: 800;
+  scroll-margin-top: 6rem;
 }
 
 .blog-rich-content h3,
@@ -208,12 +216,23 @@ html.dark .shadow-slate-900\/10 {
   font-size: 1.35rem;
   line-height: 1.25;
   font-weight: 800;
+  scroll-margin-top: 6rem;
 }
 
 .blog-rich-content p,
 .blog-editor-content p {
   margin: 0.9rem 0;
   line-height: 1.85;
+}
+
+.blog-rich-content p,
+.blog-rich-content li {
+  color: var(--color-on-surface-variant);
+}
+
+.blog-rich-content strong {
+  color: var(--color-on-surface);
+  font-weight: 800;
 }
 
 .blog-rich-content ul,
@@ -246,7 +265,7 @@ html.dark .shadow-slate-900\/10 {
   border-left: 4px solid var(--color-primary);
   background: color-mix(in srgb, var(--color-primary) 8%, transparent);
   padding: 1rem 1.25rem;
-  border-radius: 0.75rem;
+  border-radius: 0.5rem;
   font-weight: 500;
 }
 
@@ -262,8 +281,52 @@ html.dark .shadow-slate-900\/10 {
 .blog-editor-content img {
   margin: 1.5rem auto;
   max-width: 100%;
-  border-radius: 1rem;
+  border-radius: 0.5rem;
   box-shadow: 0 18px 45px -30px rgb(15 23 42 / 0.6);
+}
+
+.blog-rich-content code {
+  border-radius: 0.375rem;
+  background: var(--color-surface-container-low);
+  padding: 0.15rem 0.35rem;
+  color: var(--color-on-surface);
+  font-size: 0.9em;
+}
+
+.blog-rich-content pre {
+  margin: 1.5rem 0;
+  overflow-x: auto;
+  border: 1px solid var(--color-outline-variant);
+  border-radius: 0.5rem;
+  background: var(--color-surface-bright);
+  padding: 1rem;
+}
+
+.blog-rich-content pre code {
+  background: transparent;
+  padding: 0;
+}
+
+.blog-rich-content table {
+  margin: 1.5rem 0;
+  width: 100%;
+  border-collapse: collapse;
+  overflow: hidden;
+  border: 1px solid var(--color-outline-variant);
+  border-radius: 0.5rem;
+  font-size: 0.95rem;
+}
+
+.blog-rich-content th,
+.blog-rich-content td {
+  border-bottom: 1px solid var(--color-outline-variant);
+  padding: 0.75rem;
+  text-align: left;
+}
+
+.blog-rich-content th {
+  background: var(--color-surface-container-low);
+  color: var(--color-on-surface);
 }
 
 .blog-editor-content .ProseMirror {

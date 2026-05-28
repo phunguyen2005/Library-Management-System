@@ -12,6 +12,16 @@ class BookAiMetadataService
 {
     public function apply(Book $book): Book
     {
+        if (strtoupper($book->file_format ?: '') === 'AUDIO') {
+            $book->forceFill([
+                'ai_summary' => null,
+                'ai_tags' => [],
+                'ai_summary_generated_at' => null,
+            ])->save();
+
+            return $book->fresh();
+        }
+
         $metadata = $this->generate($book);
 
         $book->forceFill([

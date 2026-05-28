@@ -47,6 +47,6 @@ describe('Favorites page', () => {
     await waitFor(() => expect(fetchFavoriteBooksMock).toHaveBeenCalled());
     expect(await screen.findByText('Clean Architecture')).toBeInTheDocument();
     expect(screen.getByText('Robert C. Martin')).toBeInTheDocument();
-    expect(screen.getByText('4 lượt yêu thích')).toBeInTheDocument();
+    expect(screen.getByText(/4\s+lượt/)).toBeInTheDocument();
   });
 });

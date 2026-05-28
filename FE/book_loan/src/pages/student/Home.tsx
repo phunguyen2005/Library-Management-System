@@ -50,7 +50,7 @@ export default function Home() {
 
       try {
         const [booksResponse, requests, recsResponse, fineSummaryResponse] = await Promise.all([
-          fetchBorrowableBooks(1, '', 1000),
+          fetchBorrowableBooks(1, '', 5),
           getMyRequests(),
           fetchAiRecommendations(),
           getFineSummary(),

@@ -1,12 +1,13 @@
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Catalog from '../pages/student/Catalog';
 import type { FormattedBook } from '../types/book';
 
-const { fetchBorrowableBooksMock, fetchBooksMock, fetchFavoriteBooksMock } = vi.hoisted(() => ({
+const { autocompleteBooksMock, fetchBorrowableBooksMock, fetchBooksMock, fetchFavoriteBooksMock } = vi.hoisted(() => ({
+  autocompleteBooksMock: vi.fn(),
   fetchBorrowableBooksMock: vi.fn(),
   fetchBooksMock: vi.fn(),
   fetchFavoriteBooksMock: vi.fn(),
@@ -57,8 +58,16 @@ const legacyCategoryBook: FormattedBook = {
 };
 
 vi.mock('../api/bookApi', () => ({
+  autocompleteBooks: (...args: any[]) => autocompleteBooksMock(...args),
   fetchBooks: (...args: any[]) => fetchBooksMock(...args),
   fetchBorrowableBooks: (...args: any[]) => fetchBorrowableBooksMock(...args),
+}));
+
+vi.mock('../auth/AuthContext', () => ({
+  useAuth: () => ({
+    user: { email: '4801104101@student.hcmue.edu.vn' },
+    role: 'student',
+  }),
 }));
 
 vi.mock('../api/borrowApi', () => ({
@@ -92,9 +101,17 @@ vi.mock('../api/favoriteApi', () => ({
   },
 }));
 
+vi.mock('../components/LibraryMapModal', () => ({
+  default: () => null,
+}));
+
 describe('Catalog borrowable split', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('loads only borrowable books for the student catalog', async () => {
@@ -131,11 +148,63 @@ describe('Catalog borrowable split', () => {
       </MemoryRouter>,
     );
 
-    await waitFor(() => expect(fetchBorrowableBooksMock).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(fetchBorrowableBooksMock).toHaveBeenCalledWith(1, '', 12, 'all', 'title', undefined),
+    );
 
-    expect(screen.getByRole('button', { name: 'A - Khoa học Tự nhiên' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'C - Công nghệ - Kỹ thuật' })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'A - Khoa học Tự nhiên' })[0]).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'C - Công nghệ - Kỹ thuật' })[0]).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Reference' })).not.toBeInTheDocument();
+  });
+
+  it('waits for Vietnamese IME composition before syncing the search query', async () => {
+    fetchBorrowableBooksMock.mockResolvedValue({
+      data: [],
+      meta: { current_page: 1, last_page: 1, per_page: 12, total: 0 },
+    });
+    fetchFavoriteBooksMock.mockResolvedValue([]);
+    autocompleteBooksMock.mockResolvedValue([]);
+
+    render(
+      <MemoryRouter>
+        <Catalog />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() =>
+      expect(fetchBorrowableBooksMock).toHaveBeenCalledWith(1, '', 12, 'all', 'title', undefined),
+    );
+    fetchBorrowableBooksMock.mockClear();
+    vi.useFakeTimers();
+
+    const searchBox = screen.getByRole('searchbox');
+    const decomposedQuery = 'Toa\u0301n';
+    const normalizedQuery = decomposedQuery.normalize('NFC');
+
+    fireEvent.compositionStart(searchBox);
+    fireEvent.change(searchBox, { target: { value: decomposedQuery } });
+
+    await act(async () => {
+      vi.advanceTimersByTime(650);
+    });
+
+    expect(fetchBorrowableBooksMock).not.toHaveBeenCalled();
+
+    fireEvent.compositionEnd(searchBox, { target: { value: decomposedQuery } });
+
+    await act(async () => {
+      vi.advanceTimersByTime(350);
+      await Promise.resolve();
+    });
+
+    expect(fetchBorrowableBooksMock).toHaveBeenCalledWith(
+      1,
+      normalizedQuery,
+      12,
+      'all',
+      'title',
+      undefined,
+    );
   });
 
   it('opens details for unavailable books so students can reserve them', async () => {

@@ -106,10 +106,23 @@ export async function fetchBooks(page = 1, query = '', limit = 10) {
   };
 }
 
-export async function fetchBorrowableBooks(page = 1, query = '', limit = 10, genre?: string) {
+export async function fetchBorrowableBooks(
+  page = 1,
+  query = '',
+  limit = 10,
+  genre?: string,
+  sort?: string,
+  isAvailable?: boolean,
+) {
   let url = `/books?is_digital=false&limit=${limit}&page=${page}&query=${encodeURIComponent(query)}`;
   if (genre && genre !== 'all') {
     url += `&genre=${encodeURIComponent(genre)}`;
+  }
+  if (sort) {
+    url += `&sort=${encodeURIComponent(sort)}`;
+  }
+  if (isAvailable !== undefined) {
+    url += `&is_available=${isAvailable}`;
   }
   const data = await apiRequest<PaginatedResponse<BookApiRecord>>(url);
   return {

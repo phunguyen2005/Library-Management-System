@@ -8,8 +8,13 @@ import ReadingRoom from '../../components/ReadingRoom';
 import { applyImageFallback, getCoverUrl } from '../../lib/display';
 import { getErrorMessage } from '../../lib/errors';
 import { emitToast } from '../../notifications/events';
+import { useAuth } from '../../auth/AuthContext';
 
 export default function Digital() {
+  const { user, role } = useAuth();
+  const userLevel = typeof user?.level === 'number' ? user.level : 1;
+  const canDownload = role === 'admin' || role === 'librarian' || userLevel >= 5;
+
   const [searchParams, setSearchParams] = useSearchParams();
   const [isLoading, setIsLoading] = useState(true);
   const [documents, setDocuments] = useState<DigitalDocument[]>([]);
@@ -295,6 +300,14 @@ export default function Digital() {
                     type="button"
                     disabled={!resource.downloadUrl}
                     onClick={() => {
+                      if (!canDownload) {
+                        emitToast({
+                          tone: 'warning',
+                          title: 'Yêu cầu cấp độ 5',
+                          message: 'Bạn phải đạt cấp độ 5 trở lên trong hệ thống học giả để tải tài liệu số.',
+                        });
+                        return;
+                      }
                       if (resource.downloadUrl) {
                         window.open(resource.downloadUrl, '_blank', 'noopener,noreferrer');
                       }
@@ -312,7 +325,7 @@ export default function Digital() {
 
                 <div className="mt-2 flex flex-wrap items-center gap-1">
                   {/* AI Summary Button */}
-                  {resource.aiSummary && (
+                  {resource.aiSummary && resource.format.toUpperCase() !== 'AUDIO' && (
                     <button
                       type="button"
                       onClick={() => setActiveSummaryDoc(resource)}
@@ -322,7 +335,7 @@ export default function Digital() {
                       <span>Tóm tắt AI</span>
                     </button>
                   )}
-                  {resource.aiTags?.slice(0, 2).map((tag) => (
+                  {resource.format.toUpperCase() !== 'AUDIO' && resource.aiTags?.slice(0, 2).map((tag) => (
                     <span
                       key={tag}
                       className="rounded-md bg-primary/5 px-2 py-0.5 text-[10px] font-semibold text-primary"

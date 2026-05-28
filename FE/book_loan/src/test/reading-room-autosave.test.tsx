@@ -12,6 +12,13 @@ vi.mock('../api/readingProgressApi', () => ({
   syncReadingProgress: (...args: unknown[]) => syncReadingProgressMock(...args),
 }));
 
+vi.mock('../auth/AuthContext', () => ({
+  useAuth: () => ({
+    user: { id: 1, level: 5 },
+    role: 'student',
+  }),
+}));
+
 vi.mock('../notifications/events', () => ({
   emitToast: vi.fn(),
 }));

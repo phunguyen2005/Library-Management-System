@@ -230,31 +230,31 @@ class AuthController extends Controller
         }
 
         if (array_key_exists('notify_due_soon', $validated)) {
-            $user->notify_due_soon = $validated['notify_due_soon'];
+            $user->notify_due_soon = filter_var($validated['notify_due_soon'], FILTER_VALIDATE_BOOLEAN);
         }
 
         if (array_key_exists('notify_new_books', $validated)) {
-            $user->notify_new_books = $validated['notify_new_books'];
+            $user->notify_new_books = filter_var($validated['notify_new_books'], FILTER_VALIDATE_BOOLEAN);
         }
 
         if (array_key_exists('notify_borrow_status', $validated)) {
-            $user->notify_borrow_status = $validated['notify_borrow_status'];
+            $user->notify_borrow_status = filter_var($validated['notify_borrow_status'], FILTER_VALIDATE_BOOLEAN);
         }
 
         if (array_key_exists('notify_room_status', $validated)) {
-            $user->notify_room_status = $validated['notify_room_status'];
+            $user->notify_room_status = filter_var($validated['notify_room_status'], FILTER_VALIDATE_BOOLEAN);
         }
 
         if (array_key_exists('notify_room_reminder', $validated)) {
-            $user->notify_room_reminder = $validated['notify_room_reminder'];
+            $user->notify_room_reminder = filter_var($validated['notify_room_reminder'], FILTER_VALIDATE_BOOLEAN);
         }
 
         if (array_key_exists('notify_fine_status', $validated)) {
-            $user->notify_fine_status = $validated['notify_fine_status'];
+            $user->notify_fine_status = filter_var($validated['notify_fine_status'], FILTER_VALIDATE_BOOLEAN);
         }
 
         if (array_key_exists('notify_reservation', $validated)) {
-            $user->notify_reservation = $validated['notify_reservation'];
+            $user->notify_reservation = filter_var($validated['notify_reservation'], FILTER_VALIDATE_BOOLEAN);
         }
 
         $user->save();

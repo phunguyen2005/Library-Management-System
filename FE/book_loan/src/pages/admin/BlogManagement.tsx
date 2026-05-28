@@ -148,10 +148,10 @@ export default function BlogManagement() {
         </button>
       </div>
 
-      <section className="overflow-hidden rounded-2xl border border-surface-container-low bg-surface-bright scholar-shadow">
-        <div className="flex flex-col gap-3 border-b border-surface-container bg-slate-50/50 p-5 md:flex-row md:items-center md:justify-between">
+      <section className="overflow-hidden rounded-2xl border border-surface-container-high bg-surface-bright scholar-shadow">
+        <div className="flex flex-col gap-3 border-b border-surface-container-high bg-surface-container-low p-5 md:flex-row md:items-center md:justify-between">
           <label className="relative block w-full md:max-w-sm">
-            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-slate-400">
+            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-on-surface-variant">
               search
             </span>
             <input
@@ -159,14 +159,14 @@ export default function BlogManagement() {
               value={query}
               onChange={(event) => updateFilter('query', event.target.value)}
               placeholder="Tìm theo tiêu đề, tóm tắt, nội dung..."
-              className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+              className="w-full rounded-lg border border-surface-container-high bg-surface-bright py-2 pl-9 pr-3 text-sm text-on-surface outline-none placeholder:text-on-surface-variant focus:ring-2 focus:ring-primary/20"
             />
           </label>
           <div className="flex flex-wrap gap-2">
             <select
               value={status}
               onChange={(event) => updateFilter('status', event.target.value)}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+              className="rounded-lg border border-surface-container-high bg-surface-bright px-3 py-2 text-sm text-on-surface outline-none focus:ring-2 focus:ring-primary/20"
             >
               <option value="">Tất cả trạng thái</option>
               <option value="draft">Nháp</option>
@@ -176,7 +176,7 @@ export default function BlogManagement() {
             <select
               value={category}
               onChange={(event) => updateFilter('category', event.target.value)}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+              className="rounded-lg border border-surface-container-high bg-surface-bright px-3 py-2 text-sm text-on-surface outline-none focus:ring-2 focus:ring-primary/20"
             >
               <option value="">Tất cả phân loại</option>
               {BLOG_CATEGORY_OPTIONS.map((option) => {
@@ -194,7 +194,7 @@ export default function BlogManagement() {
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1060px] text-left">
             <thead>
-              <tr className="border-b border-surface-container bg-white text-[10px] font-bold uppercase tracking-widest text-slate-500">
+              <tr className="border-b border-surface-container-high bg-surface-container-low text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
                 <th className="px-6 py-4">Bài viết</th>
                 <th className="px-6 py-4">Phân loại</th>
                 <th className="px-6 py-4">Trạng thái</th>
@@ -207,7 +207,7 @@ export default function BlogManagement() {
             <tbody className="divide-y divide-surface-container">
               {isLoading ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-10 text-center text-slate-500">
+                  <td colSpan={7} className="px-6 py-10 text-center text-on-surface-variant">
                     Đang tải danh sách bài viết...
                   </td>
                 </tr>
@@ -221,19 +221,19 @@ export default function BlogManagement() {
                 posts.map((post) => {
                   const meta = getBlogCategoryMeta(post.category);
                   return (
-                    <tr key={post.id} className="transition-colors hover:bg-slate-50">
+                    <tr key={post.id} className="transition-colors hover:bg-surface-container-low">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
                           <div className="flex h-12 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-surface-container">
                             {post.cover_image ? (
                               <img src={post.cover_image} alt="" className="h-full w-full object-cover" />
                             ) : (
-                              <span className="material-symbols-outlined text-slate-400">article</span>
+                              <span className="material-symbols-outlined text-outline">article</span>
                             )}
                           </div>
                           <div className="min-w-0">
-                            <p className="line-clamp-1 text-sm font-bold text-slate-800">{post.title}</p>
-                            <p className="mt-1 line-clamp-1 text-xs text-slate-500">{post.excerpt || post.slug}</p>
+                            <p className="line-clamp-1 text-sm font-bold text-on-surface">{post.title}</p>
+                            <p className="mt-1 line-clamp-1 text-xs text-on-surface-variant">{post.excerpt || post.slug}</p>
                           </div>
                         </div>
                       </td>
@@ -246,10 +246,10 @@ export default function BlogManagement() {
                       <td className="px-6 py-4">
                         <span className={`rounded-md px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${
                           post.status === 'published'
-                            ? 'bg-green-50 text-green-700'
+                            ? 'bg-green-500/10 text-green-700 dark:text-green-300'
                             : post.status === 'archived'
-                              ? 'bg-slate-100 text-slate-600'
-                              : 'bg-amber-50 text-amber-700'
+                              ? 'bg-surface-container text-on-surface-variant'
+                              : 'bg-amber-500/10 text-amber-700 dark:text-amber-300'
                         }`}>
                           {STATUS_LABELS[post.status]}
                         </span>
@@ -259,16 +259,16 @@ export default function BlogManagement() {
                           </span>
                         ) : null}
                       </td>
-                      <td className="px-6 py-4 text-sm text-slate-700">{post.author?.name || 'HCMUE Library'}</td>
-                      <td className="px-6 py-4 text-sm text-slate-700">{formatDisplayDate(post.published_at, 'Chưa xuất bản')}</td>
-                      <td className="px-6 py-4 text-sm font-bold text-slate-700">{post.views.toLocaleString()}</td>
+                      <td className="px-6 py-4 text-sm text-on-surface-variant">{post.author?.name || 'HCMUE Library'}</td>
+                      <td className="px-6 py-4 text-sm text-on-surface-variant">{formatDisplayDate(post.published_at, 'Chưa xuất bản')}</td>
+                      <td className="px-6 py-4 text-sm font-bold text-on-surface">{post.views.toLocaleString()}</td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-1">
                           {post.status === 'published' ? (
                             <Link
                               to={`/blog/${post.slug}`}
                               target="_blank"
-                              className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-primary"
+                              className="rounded-lg p-2 text-on-surface-variant transition hover:bg-surface-container-high hover:text-primary"
                               title="Xem bài viết"
                             >
                               <span className="material-symbols-outlined text-[18px]">open_in_new</span>
@@ -285,7 +285,7 @@ export default function BlogManagement() {
                           <button
                             type="button"
                             onClick={() => handlePublishToggle(post)}
-                            className="rounded-lg p-2 text-green-600 transition hover:bg-green-50"
+                            className="rounded-lg p-2 text-green-600 transition hover:bg-green-500/10 dark:text-green-300"
                             title={post.status === 'published' ? 'Gỡ xuất bản' : 'Xuất bản'}
                           >
                             <span className="material-symbols-outlined text-[18px]">
@@ -295,7 +295,7 @@ export default function BlogManagement() {
                           <button
                             type="button"
                             onClick={() => handlePinToggle(post)}
-                            className="rounded-lg p-2 text-amber-600 transition hover:bg-amber-50"
+                            className="rounded-lg p-2 text-amber-600 transition hover:bg-amber-500/10 dark:text-amber-300"
                             title={post.is_pinned ? 'Bỏ ghim' : 'Ghim'}
                           >
                             <span className={`material-symbols-outlined text-[18px] ${post.is_pinned ? 'filled' : ''}`}>push_pin</span>
@@ -303,7 +303,7 @@ export default function BlogManagement() {
                           <button
                             type="button"
                             onClick={() => setPostToDelete(post)}
-                            className="rounded-lg p-2 text-red-500 transition hover:bg-red-50"
+                            className="rounded-lg p-2 text-red-500 transition hover:bg-error-container"
                             title="Xóa"
                           >
                             <span className="material-symbols-outlined text-[18px]">delete</span>

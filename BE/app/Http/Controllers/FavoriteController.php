@@ -12,15 +12,33 @@ class FavoriteController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $books = $request->user()
+        $validated = $request->validate([
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
+
+        $paginator = $request->user()
             ->favoriteBooks()
-            ->withCount(['favoritedBy as favorite_count'])
+            ->withCount([
+                'favoritedBy as favorite_count',
+                'digitalDownloads as digital_downloads_count',
+                'reviews as reviews_count',
+            ])
+            ->withAvg('reviews', 'rating')
             ->orderByDesc('favorites.created_at')
-            ->get()
+            ->paginate($validated['per_page'] ?? 15);
+
+        $books = $paginator->getCollection()
             ->each(fn (Book $book) => $book->setAttribute('is_favorite', true));
 
         return response()->json([
             'data' => BookResource::collection($books)->resolve($request),
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+            ],
         ]);
     }
 
@@ -53,7 +71,12 @@ class FavoriteController extends Controller
     private function decorateBook(Book $book, bool $isFavorite): Book
     {
         return $book->fresh()
-            ->loadCount(['favoritedBy as favorite_count'])
+            ->loadCount([
+                'favoritedBy as favorite_count',
+                'digitalDownloads as digital_downloads_count',
+                'reviews as reviews_count',
+            ])
+            ->loadAvg('reviews', 'rating')
             ->setAttribute('is_favorite', $isFavorite);
     }
 }

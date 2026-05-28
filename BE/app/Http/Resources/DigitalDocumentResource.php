@@ -12,6 +12,7 @@ class DigitalDocumentResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        $isAudio = strtoupper((string) $this->file_format) === 'AUDIO';
         $openUrl = URL::temporarySignedRoute(
             'digital-documents.download',
             now()->addMinutes(30),
@@ -35,9 +36,9 @@ class DigitalDocumentResource extends JsonResource
             'download_url' => $downloadUrl,
             'has_attached_file' => filled($this->file_path) || filled($this->file_url),
             'download_count' => $this->realDownloadCount(),
-            'ai_summary' => $this->ai_summary,
-            'ai_tags' => $this->ai_tags ?? [],
-            'ai_summary_generated_at' => $this->ai_summary_generated_at?->toISOString(),
+            'ai_summary' => $isAudio ? null : $this->ai_summary,
+            'ai_tags' => $isAudio ? [] : ($this->ai_tags ?? []),
+            'ai_summary_generated_at' => $isAudio ? null : $this->ai_summary_generated_at?->toISOString(),
             'cover' => $this->cover,
             'is_digital' => (bool) $this->is_digital,
             'avg_rating' => (float) round($this->reviews_avg_rating ?? ($this->reviews()->avg('rating') ?? 0), 1),

@@ -8,6 +8,18 @@ type Feedback = {
   tone: 'success' | 'error' | 'info';
   message: string;
 };
+
+const parseBool = (val: any, defVal = true): boolean => {
+  if (val === null || val === undefined) return defVal;
+  if (typeof val === 'boolean') return val;
+  if (typeof val === 'number') return val !== 0;
+  if (typeof val === 'string') {
+    const s = val.toLowerCase().trim();
+    return s === 'true' || s === '1';
+  }
+  return !!val;
+};
+
 export default function StudentSettings() {
   const { user, updateUser } = useAuth();
   const [form, setForm] = useState({
@@ -194,13 +206,13 @@ export default function StudentSettings() {
       name: user?.name || '',
       email: user?.email || '',
       phone_number: user?.phone_number || '',
-      notify_due_soon: user?.notify_due_soon ?? true,
-      notify_new_books: user?.notify_new_books ?? true,
-      notify_borrow_status: user?.notify_borrow_status ?? true,
-      notify_room_status: user?.notify_room_status ?? true,
-      notify_room_reminder: user?.notify_room_reminder ?? true,
-      notify_fine_status: user?.notify_fine_status ?? true,
-      notify_reservation: user?.notify_reservation ?? true,
+      notify_due_soon: parseBool(user?.notify_due_soon, true),
+      notify_new_books: parseBool(user?.notify_new_books, true),
+      notify_borrow_status: parseBool(user?.notify_borrow_status, true),
+      notify_room_status: parseBool(user?.notify_room_status, true),
+      notify_room_reminder: parseBool(user?.notify_room_reminder, true),
+      notify_fine_status: parseBool(user?.notify_fine_status, true),
+      notify_reservation: parseBool(user?.notify_reservation, true),
     }));
   }, [user]);
 

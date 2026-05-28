@@ -8,9 +8,9 @@ type FavoriteMutationResponse = {
   book: BookApiRecord;
 };
 
-export async function fetchFavoriteBooks() {
+export async function fetchFavoriteBooks(page = 1, perPage = 100) {
   const response = await apiRequest<PaginatedResponse<BookApiRecord> | BookApiRecord[]>(
-    '/favorites',
+    `/favorites?page=${page}&per_page=${perPage}`,
   );
 
   return unwrapCollection(response).map((book) => ({

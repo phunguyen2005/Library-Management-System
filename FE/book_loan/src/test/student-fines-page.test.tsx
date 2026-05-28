@@ -49,9 +49,9 @@ describe('StudentFines', () => {
 
     expect(await screen.findByText('Khoản phạt của tôi')).toBeInTheDocument();
     expect(screen.getAllByText(/65\.000/)[0]).toBeInTheDocument();
-    expect(screen.getByText('Giáo trình Lập trình Web')).toBeInTheDocument();
-    expect(screen.getByText('13 ngày')).toBeInTheDocument();
-    expect(screen.getByText('Chưa trả')).toBeInTheDocument();
+    expect(screen.getAllByText('Giáo trình Lập trình Web')[0]).toBeInTheDocument();
+    expect(screen.getAllByText('13 ngày')[0]).toBeInTheDocument();
+    expect(screen.getAllByText('Chưa trả')[0]).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /Xem hướng dẫn thanh toán/ }));
 

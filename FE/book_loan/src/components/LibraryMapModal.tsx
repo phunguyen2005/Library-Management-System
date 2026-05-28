@@ -862,7 +862,7 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
                   
                   {/* Self-study Area */}
                   <div
-                    className={`rounded-xl border-2 p-3 transition-all duration-300 h-[21rem] flex flex-col justify-between ${
+                    className={`rounded-xl border-2 p-3 transition-all duration-300 h-[23rem] flex flex-col justify-between ${
                       isZoneHighlighted('study_area')
                         ? 'border-primary bg-primary/5'
                         : 'border-slate-300 dark:border-slate-700'
@@ -971,10 +971,10 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
                       })}
                     </div>
 
-                    {/* Desks Grid (S-13 to S-20) */}
+                    {/* Desks Grid (S-13 to S-28) */}
                     <div className="mt-1.5">
                       <div className="grid grid-cols-4 gap-1">
-                        {Array.from({ length: 8 }, (_, i) => {
+                        {Array.from({ length: 16 }, (_, i) => {
                           const code = `S${i + 13}`;
                           const isHigh = parsed.shelf === code;
                           return (
@@ -1002,7 +1002,7 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
 
                   {/* Internal Staff / Storage */}
                   <div
-                    className={`rounded-xl border-2 p-3 transition-all duration-300 cursor-pointer h-[7rem] flex flex-col justify-between ${
+                    className={`rounded-xl border-2 p-3 transition-all duration-300 cursor-pointer h-[5rem] flex flex-col justify-between ${
                       isZoneHighlighted('internal_staff')
                         ? 'animate-pulse-glow border-amber-500 bg-amber-500/10'
                         : 'border-slate-350 bg-slate-50/20 dark:border-slate-700 hover:border-primary hover:bg-primary/5'
