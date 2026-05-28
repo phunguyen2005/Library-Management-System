@@ -8,15 +8,19 @@ use Illuminate\Support\Str;
 
 class CloudinaryService
 {
-    protected string $cloudName;
-    protected string $apiKey;
-    protected string $apiSecret;
+    protected ?string $cloudName = null;
+    protected ?string $apiKey = null;
+    protected ?string $apiSecret = null;
 
     public function __construct()
     {
         $this->cloudName = config('services.cloudinary.cloud_name') ?: env('CLOUDINARY_CLOUD_NAME');
         $this->apiKey = config('services.cloudinary.api_key') ?: env('CLOUDINARY_API_KEY');
         $this->apiSecret = config('services.cloudinary.api_secret') ?: env('CLOUDINARY_API_SECRET');
+
+        if (empty($this->cloudName) || empty($this->apiKey) || empty($this->apiSecret)) {
+            throw new \Exception('Chưa cấu hình thông tin kết nối Cloudinary (CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET) trong file .env của máy chủ.');
+        }
     }
 
     /**

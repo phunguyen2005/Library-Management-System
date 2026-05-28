@@ -287,19 +287,17 @@ export default function Header({ onToggleSidebar, onOpenMap }: HeaderProps) {
                     </span>
                     <span>{t('header.accountMenu.profile')}</span>
                   </button>
-                  {!isGuest && (
-                    <button
-                      type="button"
-                      role="menuitem"
-                      onClick={() => handleAccountNavigate('/gamify')}
-                      className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-low focus:bg-surface-container-low focus:outline-none cursor-pointer"
-                    >
-                      <span className="material-symbols-outlined text-[20px] text-on-surface-variant" aria-hidden="true">
-                        emoji_events
-                      </span>
-                      <span>{t('header.accountMenu.rewards')}</span>
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => handleAccountNavigate('/gamify')}
+                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-low focus:bg-surface-container-low focus:outline-none cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[20px] text-on-surface-variant" aria-hidden="true">
+                      emoji_events
+                    </span>
+                    <span>{t('header.accountMenu.rewards')}</span>
+                  </button>
                   <button
                     type="button"
                     role="menuitem"

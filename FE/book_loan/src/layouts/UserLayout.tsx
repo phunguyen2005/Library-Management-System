@@ -27,7 +27,7 @@ export default function UserLayout() {
   ));
 
   useEffect(() => {
-    if (role !== 'student' || !user || !isOutlookStudent) {
+    if (role !== 'student' || !user) {
       return;
     }
 

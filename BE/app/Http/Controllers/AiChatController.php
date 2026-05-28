@@ -70,7 +70,7 @@ class AiChatController extends Controller
                     'parts' => [['text' => $message]]
                 ];
 
-                $model = env('GEMINI_MODEL', 'gemini-2.5-flash');
+                $model = env('GEMINI_MODEL', 'gemini-1.5-flash');
                 $response = Http::post("https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}", [
                     'systemInstruction' => [
                         'parts' => [['text' => $systemPrompt]]
@@ -226,7 +226,7 @@ class AiChatController extends Controller
                     . "  }\n"
                     . "]";
 
-                $model = env('GEMINI_MODEL', 'gemini-2.5-flash');
+                $model = env('GEMINI_MODEL', 'gemini-1.5-flash');
                 $response = Http::post("https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}", [
                     'contents' => [
                         ['role' => 'user', 'parts' => [['text' => $prompt]]]
@@ -447,7 +447,7 @@ class AiChatController extends Controller
                     ];
 
                     $ch = curl_init();
-                    $model = env('GEMINI_MODEL', 'gemini-2.5-flash');
+                    $model = env('GEMINI_MODEL', 'gemini-1.5-flash');
                     curl_setopt($ch, CURLOPT_URL, "https://generativelanguage.googleapis.com/v1beta/models/{$model}:streamGenerateContent?alt=sse&key={$apiKey}");
                     curl_setopt($ch, CURLOPT_RETURNTRANSFER, false);
                     curl_setopt($ch, CURLOPT_POST, true);
@@ -595,7 +595,7 @@ class AiChatController extends Controller
     {
         // Limit recursive function calling to 5 iterations
         for ($i = 0; $i < 5; $i++) {
-            $model = env('GEMINI_MODEL', 'gemini-2.5-flash');
+            $model = env('GEMINI_MODEL', 'gemini-1.5-flash');
             $response = Http::post("https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}", [
                 'systemInstruction' => [
                     'parts' => [['text' => $systemPrompt]]

@@ -81,7 +81,7 @@ export default function App() {
             <Route path="/room-booking" element={isGuest ? <Navigate to="/home" replace /> : <RoomBookingPage />} />
             <Route path="/history" element={isGuest ? <Navigate to="/home" replace /> : <History />} />
             <Route path="/fines" element={isGuest ? <Navigate to="/home" replace /> : <StudentFines />} />
-            <Route path="/gamify" element={isGuest ? <Navigate to="/home" replace /> : <Gamification />} />
+            <Route path="/gamify" element={<Gamification />} />
             <Route path="/settings" element={<StudentSettings />} />
           </Route>
         </Route>

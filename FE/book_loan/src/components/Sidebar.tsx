@@ -37,7 +37,7 @@ export default function Sidebar({ isOpen, onClose, onOpenMap }: SidebarProps) {
   const isGuest = role === 'student' && !isOutlookStudent;
 
   const filteredNavItems = navItems.filter((item) => {
-    if (isGuest && ['/requests', '/room-booking', '/history', '/fines', '/gamify'].includes(item.path)) {
+    if (isGuest && ['/requests', '/room-booking', '/history', '/fines'].includes(item.path)) {
       return false;
     }
     return true;
