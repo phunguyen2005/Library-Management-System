@@ -63,16 +63,22 @@ export default function CSVImportWizard({
 
   if (!isOpen) return null;
 
-  // Native CSV line parser supporting double quotes
-  const parseCsvLine = (line: string): string[] => {
+  // Native CSV line parser supporting double quotes and configurable delimiter
+  const parseCsvLine = (line: string, delimiter: string): string[] => {
     const result: string[] = [];
     let current = '';
     let inQuotes = false;
     for (let i = 0; i < line.length; i++) {
       const char = line[i];
       if (char === '"') {
-        inQuotes = !inQuotes;
-      } else if (char === ',' && !inQuotes) {
+        // Handle escaped double-quotes ("")
+        if (inQuotes && line[i + 1] === '"') {
+          current += '"';
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (char === delimiter && !inQuotes) {
         result.push(current.trim());
         current = '';
       } else {
@@ -81,6 +87,13 @@ export default function CSVImportWizard({
     }
     result.push(current.trim());
     return result;
+  };
+
+  // Detect delimiter from first line: prefer tab (exported files) then comma
+  const detectDelimiter = (firstLine: string): string => {
+    const tabCount = (firstLine.match(/\t/g) || []).length;
+    const commaCount = (firstLine.match(/,/g) || []).length;
+    return tabCount > 0 && tabCount >= commaCount ? '\t' : ',';
   };
 
   const handleFileChange = (selectedFile: File | null) => {
@@ -98,8 +111,16 @@ export default function CSVImportWizard({
     // Read and parse headers/preview
     const reader = new FileReader();
     reader.onload = (e) => {
-      const text = e.target?.result as string;
-      if (!text) return;
+      // e.target.result may be an ArrayBuffer (for binary read) or string
+      const rawResult = e.target?.result;
+      if (rawResult === null || rawResult === undefined) return;
+
+      let text = rawResult as string;
+
+      // Strip UTF-8 BOM (\xEF\xBB\xBF) if present
+      if (text.charCodeAt(0) === 0xFEFF) {
+        text = text.slice(1);
+      }
 
       const lines = text.split(/\r?\n/).filter(line => line.trim().length > 0);
       if (lines.length === 0) {
@@ -112,14 +133,17 @@ export default function CSVImportWizard({
         return;
       }
 
+      // Auto-detect delimiter (tab for system exports, comma for standard CSV)
+      const delimiter = detectDelimiter(lines[0]);
+
       // Parse headers
-      const rawHeaders = parseCsvLine(lines[0]);
-      // Clean UTF-8 BOM if present
-      const cleanedHeaders = rawHeaders.map(h => h.replace(/[\uFEFF\u200B]/g, '').trim());
+      const rawHeaders = parseCsvLine(lines[0], delimiter);
+      // Clean BOM characters from header cells
+      const cleanedHeaders = rawHeaders.map(h => h.replace(/[\uFEFF\u200B\x00]/g, '').trim());
       setCsvHeaders(cleanedHeaders);
 
       // Parse first 5 preview rows
-      const previewRows = lines.slice(1, 6).map(line => parseCsvLine(line));
+      const previewRows = lines.slice(1, 6).map(line => parseCsvLine(line, delimiter));
       setCsvRowsPreview(previewRows);
 
       // Auto match headers based on expected field fallbacks

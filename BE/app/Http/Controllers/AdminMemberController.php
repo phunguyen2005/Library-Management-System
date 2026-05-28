@@ -145,14 +145,28 @@ class AdminMemberController extends Controller
             return response()->json(['message' => 'Không thể mở tệp tin.'], 400);
         }
 
-        $header = fgetcsv($handle, 1000, ",");
+        // Auto-detect delimiter: read first line as raw text and count tabs vs commas
+        $firstLine = fgets($handle);
+        if ($firstLine === false) {
+            fclose($handle);
+            return response()->json(['message' => 'Tệp tin trống hoặc không hợp lệ.'], 400);
+        }
+        $tabCount   = substr_count($firstLine, "\t");
+        $commaCount = substr_count($firstLine, ',');
+        $delimiter  = ($tabCount > 0 && $tabCount >= $commaCount) ? "\t" : ",";
+
+        // Rewind to re-read the header with fgetcsv using the detected delimiter
+        rewind($handle);
+
+        $header = fgetcsv($handle, 0, $delimiter);
         if (!$header) {
             fclose($handle);
             return response()->json(['message' => 'Tệp tin trống hoặc không hợp lệ.'], 400);
         }
 
         $header = array_map(function($h) {
-            return trim(preg_replace('/[\x{FEFF}\x{200B}]/u', '', $h));
+            // Strip BOM, zero-width space, and null bytes (common in UTF-16 files)
+            return trim(preg_replace('/[\x{FEFF}\x{200B}\x00]/u', '', $h));
         }, $header);
 
         $columnMapping = [];
@@ -208,7 +222,7 @@ class AdminMemberController extends Controller
 
         DB::beginTransaction();
         try {
-            while (($row = fgetcsv($handle, 1000, ",")) !== false) {
+            while (($row = fgetcsv($handle, 0, $delimiter)) !== false) {
                 $rowNum++;
                 
                 if (empty(array_filter($row))) {

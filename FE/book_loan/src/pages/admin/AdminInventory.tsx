@@ -44,8 +44,8 @@ const EXPECTED_FIELDS = [
   { key: 'is_digital', label: 'Sách số / Tài nguyên (1/0)', required: false, fallbacks: ['sach_so', 'is_digital', 'sach so'] },
 ];
 
-const SAMPLE_CSV_PHYSICAL = "\uFEFFten_sach,tac_gia,the_loai,nam_xuat_ban,vi_tri,so_luong,sach_so\nĐắc Nhân Tâm,Dale Carnegie,Triết học & Tâm lý học,2020,Kệ J1,5,0\nLược sử thời gian,Stephen Hawking,Khoa học Tự nhiên,2018,Kệ A1,3,0";
-const SAMPLE_CSV_DIGITAL = "\uFEFFten_sach,tac_gia,the_loai,nam_xuat_ban,vi_tri,so_luong,sach_so\nGiáo trình Triết học Mác - Lênin,Bộ Giáo dục và Đào tạo,Giáo trình,2021,,0,1\nBáo cáo Phát triển Bền vững,Tổng cục Thống kê,Báo cáo,2025,,0,1";
+const SAMPLE_CSV_PHYSICAL = "ten_sach,tac_gia,the_loai,nam_xuat_ban,vi_tri,so_luong,sach_so\nĐắc Nhân Tâm,Dale Carnegie,Triết học & Tâm lý học,2020,Kệ J1,5,0\nLược sử thời gian,Stephen Hawking,Khoa học Tự nhiên,2018,Kệ A1,3,0";
+const SAMPLE_CSV_DIGITAL = "ten_sach,tac_gia,the_loai,nam_xuat_ban,vi_tri,so_luong,sach_so\nGiáo trình Triết học Mác - Lênin,Bộ Giáo dục và Đào tạo,Giáo trình,2021,,0,1\nBáo cáo Phát triển Bền vững,Tổng cục Thống kê,Báo cáo,2025,,0,1";
 
 const AVAILABLE_EXPORT_COLUMNS = [
   { key: 'book_id', label: 'Mã tài liệu' },

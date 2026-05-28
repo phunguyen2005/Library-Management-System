@@ -643,16 +643,16 @@ class ReportController extends Controller
         $books = $query->orderByDesc('book_id')->get();
 
         $headerMap = [
-            'book_id' => 'Mã tài liệu',
-            'title' => 'Tên tài liệu',
-            'author' => 'Tác giả',
-            'genre' => 'Thể loại / Danh mục',
-            'published_year' => 'Năm xuất bản',
-            'location' => 'Vị trí kệ',
-            'total_quantity' => 'Tổng số bản',
-            'available_quantity' => 'Khả dụng',
-            'is_digital' => 'Loại tài liệu',
-            'download_count' => 'Số lượt tải số',
+            'book_id'            => 'Mã tài liệu',
+            'title'              => 'Tên tài liệu',
+            'author'             => 'Tác giả',
+            'genre'              => 'Thể loại / Danh mục',
+            'published_year'     => 'Năm xuất bản',
+            'location'           => 'Vị trí kệ',
+            'total_quantity'     => 'Tổng số bản',
+            'available_quantity' => 'Bản khả dụng',
+            'is_digital'         => 'Loại tài liệu',
+            'download_count'     => 'Số lượt tải số',
         ];
 
         $columns = $request->input('columns');
@@ -665,12 +665,13 @@ class ReportController extends Controller
             $columns = array_keys($headerMap);
         }
 
+        // UTF-16LE + tab-delimited (same format as exportFines/exportMembers)
         $headers = [
-            'Content-Type' => 'text/csv; charset=UTF-16LE',
+            'Content-Type'        => 'text/csv; charset=UTF-16LE',
             'Content-Disposition' => 'attachment; filename="xuat-kho-sach-' . now()->format('Ymd') . '.csv"',
-            'Pragma' => 'no-cache',
-            'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
-            'Expires' => '0',
+            'Pragma'              => 'no-cache',
+            'Cache-Control'       => 'must-revalidate, post-check=0, pre-check=0',
+            'Expires'             => '0',
         ];
 
         $callback = function () use ($books, $columns, $headerMap) {
@@ -686,12 +687,14 @@ class ReportController extends Controller
                 $row = [];
                 foreach ($columns as $col) {
                     $row[] = match ($col) {
-                        'book_id' => '#' . $book->book_id,
-                        'is_digital' => $book->is_digital ? 'Tài nguyên số' : 'Sách mượn vật lý',
-                        'total_quantity' => $book->is_digital ? 'N/A' : $book->total_quantity,
-                        'available_quantity' => $book->is_digital ? 'N/A' : $book->available_quantity,
-                        'download_count' => $book->is_digital ? $book->download_count : 'N/A',
-                        default => $book->$col ?? '',
+                        'book_id'            => (string) $book->book_id,
+                        'is_digital'         => $book->is_digital ? 'Tài nguyên số' : 'Sách mượn vật lý',
+                        'total_quantity'     => $book->is_digital ? 'N/A' : (string) $book->total_quantity,
+                        'available_quantity' => $book->is_digital ? 'N/A' : (string) $book->available_quantity,
+                        'download_count'     => $book->is_digital ? (string) $book->download_count : 'N/A',
+                        'published_year'     => $book->published_year ? (string) $book->published_year : 'Chưa cập nhật',
+                        'location'           => $book->location ?: 'Chưa cập nhật',
+                        default              => (string) ($book->$col ?? ''),
                     };
                 }
                 $this->writeCsvRow($file, $row);
@@ -719,14 +722,14 @@ class ReportController extends Controller
         $members = $query->orderBy('member_id')->get();
 
         $headerMap = [
-            'member_id' => 'Mã sinh viên',
-            'name' => 'Họ và tên',
-            'email' => 'Địa chỉ Email',
+            'member_id'    => 'Mã sinh viên',
+            'name'         => 'Họ và tên',
+            'email'        => 'Địa chỉ Email',
             'phone_number' => 'Số điện thoại',
-            'level' => 'Cấp độ học giả',
-            'xp' => 'Điểm kinh nghiệm (XP)',
-            'points' => 'Điểm Coin tích lũy',
-            'join_date' => 'Ngày tham gia',
+            'join_date'    => 'Ngày tham gia',
+            'level'        => 'Cấp độ học giả',
+            'xp'           => 'Điểm kinh nghiệm (XP)',
+            'points'       => 'Điểm Coin tích lũy',
         ];
 
         $columns = $request->input('columns');
@@ -739,73 +742,49 @@ class ReportController extends Controller
             $columns = array_keys($headerMap);
         }
 
-        // Use UTF-8 BOM + comma-delimited CSV (proper RFC 4180)
-        // This is universally recognized by Excel and spreadsheet apps without needing Text Import Wizard
-        $filename = 'danh-sach-sinh-vien-' . now()->format('Ymd') . '.csv';
-        $httpHeaders = [
-            'Content-Type'        => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+        // UTF-16LE + tab-delimited (same format as exportFines) — opens natively in Excel with full column separation
+        $headers = [
+            'Content-Type'        => 'text/csv; charset=UTF-16LE',
+            'Content-Disposition' => 'attachment; filename="danh-sach-thanh-vien-' . now()->format('Ymd') . '.csv"',
             'Pragma'              => 'no-cache',
             'Cache-Control'       => 'must-revalidate, post-check=0, pre-check=0',
             'Expires'             => '0',
-            'X-Content-Type-Options' => 'nosniff',
         ];
 
         $callback = function () use ($members, $columns, $headerMap) {
             $file = fopen('php://output', 'w');
+            // UTF-16LE BOM for absolute Excel compatibility with Vietnamese
+            fwrite($file, chr(0xFF) . chr(0xFE));
 
-            // UTF-8 BOM — makes Excel auto-detect UTF-8 and render Vietnamese correctly
-            fwrite($file, "\xEF\xBB\xBF");
-
-            // Write header row (Vietnamese column names)
+            // Header row
             $csvHeaders = array_map(fn($col) => $headerMap[$col], $columns);
-            $this->writeCsvRowUtf8($file, $csvHeaders);
+            $this->writeCsvRow($file, $csvHeaders);
 
-            // Write data rows
+            // Data rows
             foreach ($members as $member) {
                 $row = [];
                 foreach ($columns as $col) {
                     $row[] = match ($col) {
-                        // Plain numeric ID — no '#' prefix to prevent Excel formula warnings
-                        'member_id'  => (string) $member->member_id,
-                        'join_date'  => $member->join_date ? date('d/m/Y', strtotime($member->join_date)) : '',
-                        'level'      => 'Cấp ' . ($member->level ?? 1),
-                        'xp'         => (int) ($member->xp ?? 0),
-                        'points'     => (int) ($member->points ?? 0),
-                        default      => (string) ($member->$col ?? ''),
+                        'member_id'    => (string) $member->member_id,
+                        'join_date'    => $member->join_date
+                                            ? date('d/m/Y', strtotime($member->join_date))
+                                            : 'Chưa cập nhật',
+                        'level'        => 'Cấp ' . ($member->level ?? 1),
+                        'xp'           => (int) ($member->xp ?? 0),
+                        'points'       => (int) ($member->points ?? 0),
+                        'phone_number' => $member->phone_number ?? 'Chưa cập nhật',
+                        default        => (string) ($member->$col ?? ''),
                     };
                 }
-                $this->writeCsvRowUtf8($file, $row);
+                $this->writeCsvRow($file, $row);
             }
             fclose($file);
         };
 
-        return response()->stream($callback, 200, $httpHeaders);
+        return response()->stream($callback, 200, $headers);
     }
 
-    /**
-     * Write a single row to a file handle using proper RFC 4180 CSV format.
-     * Delimiter: comma. Encoding: UTF-8 (file must have been opened after writing the BOM).
-     * Fields containing commas, double-quotes, or newlines are wrapped in double-quotes.
-     * Existing double-quotes are escaped by doubling them ("").
-     */
-    private function writeCsvRowUtf8($file, array $fields): void
-    {
-        $escapedFields = array_map(function ($field) {
-            $value = $this->sanitizeCsvField($field);
-            if ($value === null) {
-                return '';
-            }
-            $str = str_replace(["\r\n", "\r"], "\n", (string) $value);
-            // RFC 4180: wrap in double-quotes if contains comma, double-quote, or newline
-            if (str_contains($str, ',') || str_contains($str, '"') || str_contains($str, "\n")) {
-                $str = '"' . str_replace('"', '""', $str) . '"';
-            }
-            return $str;
-        }, $fields);
 
-        fwrite($file, implode(',', $escapedFields) . "\r\n");
-    }
 
     public function exportFines(Request $request)
     {
