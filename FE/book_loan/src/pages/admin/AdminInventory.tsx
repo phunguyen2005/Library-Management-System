@@ -636,20 +636,13 @@ export default function AdminInventory() {
     const labels = books
       .map((book) => {
         const code = `SACH-${String(book.id).padStart(5, '0')}`;
-        const bars = String(book.id)
-          .padStart(12, '0')
-          .split('')
-          .map((digit) => {
-            const width = Number(digit) % 3 === 0 ? 3 : 1 + (Number(digit) % 3);
-            return `<span style="display:inline-block;width:${width}px;height:48px;background:#111;margin-right:2px"></span>`;
-          })
-          .join('');
+        const barcodeForFont = `*${code}*`;
 
         return `
           <article class="label">
             <strong>${escapeHtml(book.title)}</strong>
             <small>${escapeHtml(book.author)} | ${escapeHtml(book.location)}</small>
-            <div class="barcode">${bars}</div>
+            <div class="barcode-font">${escapeHtml(barcodeForFont)}</div>
             <code>${escapeHtml(code)}</code>
           </article>
         `;
@@ -661,16 +654,17 @@ export default function AdminInventory() {
       <html>
         <head>
           <title>Mã vạch sách</title>
+          <link href="https://fonts.googleapis.com/css2?family=Libre+Barcode+39&display=swap" rel="stylesheet">
           <style>
             * { box-sizing: border-box; }
             body { margin: 24px; font-family: Arial, sans-serif; color: #111827; }
             h1 { margin: 0 0 16px; font-size: 20px; }
             .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-            .label { min-height: 150px; border: 1px dashed #94a3b8; padding: 12px; page-break-inside: avoid; }
-            strong { display: block; font-size: 12px; line-height: 1.3; min-height: 32px; }
+            .label { min-height: 150px; border: 1px dashed #94a3b8; padding: 12px; page-break-inside: avoid; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+            strong { display: block; font-size: 12px; line-height: 1.3; min-height: 32px; font-weight: 700; width: 100%; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; }
             small { display: block; margin-top: 4px; color: #64748b; font-size: 10px; }
-            .barcode { margin: 12px 0 8px; white-space: nowrap; overflow: hidden; }
-            code { font-size: 11px; font-weight: 700; }
+            .barcode-font { font-family: 'Libre Barcode 39', cursive; font-size: 38px; line-height: 1; margin: 8px 0; }
+            code { font-size: 11px; font-weight: 700; font-family: monospace; }
             @media print { body { margin: 12mm; } }
           </style>
         </head>
@@ -682,7 +676,136 @@ export default function AdminInventory() {
     `);
     printWindow.document.close();
     printWindow.focus();
-    printWindow.print();
+    setTimeout(() => {
+      printWindow.print();
+    }, 300);
+  };
+
+  const handlePrintSingleCopy = (copy: BookCopy) => {
+    if (!copiesBook) return;
+
+    const printWindow = window.open('', '_blank', 'width=960,height=720');
+    if (!printWindow) {
+      emitToast({
+        tone: 'error',
+        title: 'Không thể mở cửa sổ in',
+        message: 'Vui lòng cho phép cửa sổ bật lên để in nhãn mã vạch.',
+      });
+      return;
+    }
+
+    const code = copy.barcode.toUpperCase();
+    const barcodeForFont = `*${code}*`;
+
+    const labelHtml = `
+      <article class="label">
+        <strong>${escapeHtml(copiesBook.title)}</strong>
+        <small>${escapeHtml(copiesBook.author)} | Kệ: ${escapeHtml(copiesBook.location)}</small>
+        <div class="barcode-font">${escapeHtml(barcodeForFont)}</div>
+        <code>${escapeHtml(code)}</code>
+        <small style="margin-top: 4px;">Tình trạng: ${escapeHtml(copy.condition === 'good' ? 'Tốt' : copy.condition === 'damaged' ? 'Hỏng' : 'Mất')}</small>
+      </article>
+    `;
+
+    printWindow.document.write(`
+      <!doctype html>
+      <html>
+        <head>
+          <title>In mã vạch bản sao</title>
+          <link href="https://fonts.googleapis.com/css2?family=Libre+Barcode+39&display=swap" rel="stylesheet">
+          <style>
+            * { box-sizing: border-box; }
+            body { margin: 24px; font-family: Arial, sans-serif; color: #111827; }
+            h1 { margin: 0 0 16px; font-size: 20px; }
+            .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+            .label { min-height: 150px; border: 1px dashed #94a3b8; padding: 12px; page-break-inside: avoid; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+            strong { display: block; font-size: 12px; line-height: 1.3; font-weight: 700; width: 100%; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; }
+            small { display: block; margin-top: 4px; color: #64748b; font-size: 10px; }
+            .barcode-font { font-family: 'Libre Barcode 39', cursive; font-size: 38px; line-height: 1; margin: 8px 0; }
+            code { font-size: 11px; font-weight: 700; font-family: monospace; }
+            @media print { body { margin: 12mm; } }
+          </style>
+        </head>
+        <body>
+          <h1>Nhãn mã vạch bản sao</h1>
+          <main class="grid">${labelHtml}</main>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+    }, 300);
+  };
+
+  const handlePrintAllCopies = () => {
+    if (!copiesBook || bookCopies.length === 0) {
+      emitToast({
+        tone: 'info',
+        title: 'Không có bản sao',
+        message: 'Không có bản sao nào để in.',
+      });
+      return;
+    }
+
+    const printWindow = window.open('', '_blank', 'width=960,height=720');
+    if (!printWindow) {
+      emitToast({
+        tone: 'error',
+        title: 'Không thể mở cửa sổ in',
+        message: 'Vui lòng cho phép cửa sổ bật lên để in nhãn mã vạch.',
+      });
+      return;
+    }
+
+    const labels = bookCopies
+      .map((copy) => {
+        const code = copy.barcode.toUpperCase();
+        const barcodeForFont = `*${code}*`;
+
+        return `
+          <article class="label">
+            <strong>${escapeHtml(copiesBook.title)}</strong>
+            <small>${escapeHtml(copiesBook.author)} | Kệ: ${escapeHtml(copiesBook.location)}</small>
+            <div class="barcode-font">${escapeHtml(barcodeForFont)}</div>
+            <code>${escapeHtml(code)}</code>
+            <small style="margin-top: 4px;">Tình trạng: ${escapeHtml(copy.condition === 'good' ? 'Tốt' : copy.condition === 'damaged' ? 'Hỏng' : 'Mất')}</small>
+          </article>
+        `;
+      })
+      .join('');
+
+    printWindow.document.write(`
+      <!doctype html>
+      <html>
+        <head>
+          <title>In tất cả mã vạch bản sao</title>
+          <link href="https://fonts.googleapis.com/css2?family=Libre+Barcode+39&display=swap" rel="stylesheet">
+          <style>
+            * { box-sizing: border-box; }
+            body { margin: 24px; font-family: Arial, sans-serif; color: #111827; }
+            h1 { margin: 0 0 16px; font-size: 20px; }
+            .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+            .label { min-height: 150px; border: 1px dashed #94a3b8; padding: 12px; page-break-inside: avoid; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+            strong { display: block; font-size: 12px; line-height: 1.3; font-weight: 700; width: 100%; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; }
+            small { display: block; margin-top: 4px; color: #64748b; font-size: 10px; }
+            .barcode-font { font-family: 'Libre Barcode 39', cursive; font-size: 38px; line-height: 1; margin: 8px 0; }
+            code { font-size: 11px; font-weight: 700; font-family: monospace; }
+            @media print { body { margin: 12mm; } }
+          </style>
+        </head>
+        <body>
+          <h1>Nhãn mã vạch bản sao - ${escapeHtml(copiesBook.title)}</h1>
+          <main class="grid">${labels}</main>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+    }, 300);
   };
 
   return (
@@ -1071,10 +1194,17 @@ export default function AdminInventory() {
                 placeholder="Để trống để tự sinh mã"
               />
               <button type="button" onClick={handleAddCopy} disabled={copyActionId === 'new'}
-                className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white disabled:cursor-wait disabled:opacity-60">
+                className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white disabled:cursor-wait disabled:opacity-60 cursor-pointer">
                 <span className="material-symbols-outlined text-[18px]">add</span>
                 {copyActionId === 'new' ? 'Đang thêm...' : 'Thêm bản sao'}
               </button>
+              {bookCopies.length > 0 && (
+                <button type="button" onClick={handlePrintAllCopies}
+                  className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors shadow-sm cursor-pointer">
+                  <span className="material-symbols-outlined text-[18px]">print</span>
+                  In tất cả nhãn
+                </button>
+              )}
             </div>
 
             <div className="overflow-auto">
@@ -1139,10 +1269,15 @@ export default function AdminInventory() {
                         </td>
                         <td className="px-4 py-3 text-xs text-slate-500">{copy.added_at ? copy.added_at.slice(0, 10) : '—'}</td>
                         <td className="px-4 py-3 text-xs text-slate-500">{copy.last_checked_out_at ? copy.last_checked_out_at.slice(0, 10) : '—'}</td>
-                        <td className="px-4 py-3 text-right">
+                        <td className="px-4 py-3 text-right flex items-center justify-end gap-1">
+                          <button type="button" onClick={() => handlePrintSingleCopy(copy)}
+                            className="rounded-lg p-2 text-slate-600 transition-colors hover:bg-slate-100 cursor-pointer"
+                            title="In mã vạch bản sao">
+                            <span className="material-symbols-outlined text-[18px]">print</span>
+                          </button>
                           <button type="button" onClick={() => void handleDeleteCopy(copy)}
                             disabled={copy.status === 'borrowed' || copyActionId === copy.id}
-                            className="rounded-lg p-2 text-red-500 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
+                            className="rounded-lg p-2 text-red-500 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
                             title={copy.status === 'borrowed' ? 'Không thể xóa bản sao đang mượn' : 'Xóa bản sao'}>
                             <span className="material-symbols-outlined text-[18px]">delete</span>
                           </button>
