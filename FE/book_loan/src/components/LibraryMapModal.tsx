@@ -566,9 +566,9 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
                       </div>
                       <span className="text-[10px] text-emerald-500">Mới 📰</span>
                     </div>
-                    <div className="mt-2 flex justify-center gap-3">
-                      <span className="rounded-lg bg-surface-container px-3 py-1 text-[10px] flex items-center gap-1">🪑 Ghế 1</span>
-                      <span className="rounded-lg bg-surface-container px-3 py-1 text-[10px] flex items-center gap-1">🪑 Ghế 2</span>
+                    <div className="mt-2 flex justify-center gap-2">
+                      <span className="rounded-lg bg-surface-container px-2 py-1 text-[9px] flex items-center gap-1 whitespace-nowrap">🪑 Ghế 1</span>
+                      <span className="rounded-lg bg-surface-container px-2 py-1 text-[9px] flex items-center gap-1 whitespace-nowrap">🪑 Ghế 2</span>
                     </div>
                   </div>
 
@@ -649,9 +649,14 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
                           <div className="space-y-3">
                             {/* Row A */}
                             <div className="space-y-1 border-b border-dashed border-slate-150/40 dark:border-slate-800/40 pb-2.5">
-                              <div className="flex justify-between items-center text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase">
-                                <span>Dãy A: Khoa học Tự nhiên</span>
-                                <span className="font-mono text-[9px] opacity-75">A1 - A4</span>
+                              <div className="flex flex-col text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase mb-1">
+                                <div className="flex justify-between items-center">
+                                  <span>Dãy A</span>
+                                  <span className="font-mono text-[9px] opacity-75">A1 - A4</span>
+                                </div>
+                                <div className="text-[8px] font-normal text-slate-400 dark:text-slate-500 normal-case truncate">
+                                  Khoa học Tự nhiên
+                                </div>
                               </div>
                               <div className="grid grid-cols-4 gap-2">
                                 {renderShelf('A1', 'sky')}
@@ -663,9 +668,14 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
 
                             {/* Row B */}
                             <div className="space-y-1">
-                              <div className="flex justify-between items-center text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase">
-                                <span>Dãy B: Kinh tế - Lịch sử</span>
-                                <span className="font-mono text-[9px] opacity-75">B1 - B8</span>
+                              <div className="flex flex-col text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase mb-1">
+                                <div className="flex justify-between items-center">
+                                  <span>Dãy B</span>
+                                  <span className="font-mono text-[9px] opacity-75">B1 - B8</span>
+                                </div>
+                                <div className="text-[8px] font-normal text-slate-400 dark:text-slate-500 normal-case truncate">
+                                  Kinh tế - Lịch sử
+                                </div>
                               </div>
                               <div className="grid grid-cols-4 gap-2">
                                 {renderShelf('B1', 'amber')}
@@ -684,9 +694,14 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
                           <div className="space-y-3">
                             {/* Row C */}
                             <div className="space-y-1 border-b border-dashed border-slate-150/40 dark:border-slate-800/40 pb-2.5">
-                              <div className="flex justify-between items-center text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase">
-                                <span>Dãy C: Công nghệ - Kỹ thuật</span>
-                                <span className="font-mono text-[9px] opacity-75">C1 - C3</span>
+                              <div className="flex flex-col text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase mb-1">
+                                <div className="flex justify-between items-center">
+                                  <span>Dãy C</span>
+                                  <span className="font-mono text-[9px] opacity-75">C1 - C3</span>
+                                </div>
+                                <div className="text-[8px] font-normal text-slate-400 dark:text-slate-500 normal-case truncate">
+                                  Công nghệ - Kỹ thuật
+                                </div>
                               </div>
                               <div className="grid grid-cols-3 gap-2">
                                 {renderShelf('C1', 'emerald')}
@@ -697,9 +712,14 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
 
                             {/* Row D */}
                             <div className="space-y-1 border-b border-dashed border-slate-150/40 dark:border-slate-800/40 pb-2.5">
-                              <div className="flex justify-between items-center text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase">
-                                <span>Dãy D: Văn học - Xã hội</span>
-                                <span className="font-mono text-[9px] opacity-75">D1 - D4</span>
+                              <div className="flex flex-col text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase mb-1">
+                                <div className="flex justify-between items-center">
+                                  <span>Dãy D</span>
+                                  <span className="font-mono text-[9px] opacity-75">D1 - D4</span>
+                                </div>
+                                <div className="text-[8px] font-normal text-slate-400 dark:text-slate-500 normal-case truncate">
+                                  Văn học - Xã hội
+                                </div>
                               </div>
                               <div className="grid grid-cols-4 gap-2">
                                 {renderShelf('D1', 'pink')}
@@ -711,9 +731,14 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
 
                             {/* Row E */}
                             <div className="space-y-1">
-                              <div className="flex justify-between items-center text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase">
-                                <span>Dãy E: Tham khảo & Từ điển</span>
-                                <span className="font-mono text-[9px] opacity-75">E1 - E3</span>
+                              <div className="flex flex-col text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase mb-1">
+                                <div className="flex justify-between items-center">
+                                  <span>Dãy E</span>
+                                  <span className="font-mono text-[9px] opacity-75">E1 - E3</span>
+                                </div>
+                                <div className="text-[8px] font-normal text-slate-400 dark:text-slate-500 normal-case truncate">
+                                  Tham khảo & Từ điển
+                                </div>
                               </div>
                               <div className="grid grid-cols-3 gap-2">
                                 {renderShelf('E1', 'violet')}
@@ -740,9 +765,14 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
                           <div className="space-y-3">
                             {/* Row F */}
                             <div className="space-y-1 border-b border-dashed border-slate-150/40 dark:border-slate-800/40 pb-2.5">
-                              <div className="flex justify-between items-center text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase">
-                                <span>Dãy F: Ngoại ngữ & Ngoại văn</span>
-                                <span className="font-mono text-[9px] opacity-75">F1 - F6</span>
+                              <div className="flex flex-col text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase mb-1">
+                                <div className="flex justify-between items-center">
+                                  <span>Dãy F</span>
+                                  <span className="font-mono text-[9px] opacity-75">F1 - F6</span>
+                                </div>
+                                <div className="text-[8px] font-normal text-slate-400 dark:text-slate-500 normal-case truncate">
+                                  Ngoại ngữ & Ngoại văn
+                                </div>
                               </div>
                               <div className="grid grid-cols-3 gap-2">
                                 {renderShelf('F1', 'orange')}
@@ -756,9 +786,14 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
 
                             {/* Row G */}
                             <div className="space-y-1">
-                              <div className="flex justify-between items-center text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase">
-                                <span>Dãy G: Giáo trình Đại học</span>
-                                <span className="font-mono text-[9px] opacity-75">G1 - G4</span>
+                              <div className="flex flex-col text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase mb-1">
+                                <div className="flex justify-between items-center">
+                                  <span>Dãy G</span>
+                                  <span className="font-mono text-[9px] opacity-75">G1 - G4</span>
+                                </div>
+                                <div className="text-[8px] font-normal text-slate-400 dark:text-slate-500 normal-case truncate">
+                                  Giáo trình Đại học
+                                </div>
                               </div>
                               <div className="grid grid-cols-4 gap-2">
                                 {renderShelf('G1', 'sky')}
@@ -773,9 +808,14 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
                           <div className="space-y-3">
                             {/* Row H */}
                             <div className="space-y-1 border-b border-dashed border-slate-150/40 dark:border-slate-800/40 pb-2.5">
-                              <div className="flex justify-between items-center text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase">
-                                <span>Dãy H: Pháp luật & Chính trị</span>
-                                <span className="font-mono text-[9px] opacity-75">H1 - H3</span>
+                              <div className="flex flex-col text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase mb-1">
+                                <div className="flex justify-between items-center">
+                                  <span>Dãy H</span>
+                                  <span className="font-mono text-[9px] opacity-75">H1 - H3</span>
+                                </div>
+                                <div className="text-[8px] font-normal text-slate-400 dark:text-slate-500 normal-case truncate">
+                                  Pháp luật & Chính trị
+                                </div>
                               </div>
                               <div className="grid grid-cols-3 gap-2">
                                 {renderShelf('H1', 'amber')}
@@ -786,9 +826,14 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
 
                             {/* Row I */}
                             <div className="space-y-1 border-b border-dashed border-slate-150/40 dark:border-slate-800/40 pb-2.5">
-                              <div className="flex justify-between items-center text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase">
-                                <span>Dãy I: Nghệ thuật & Thể thao</span>
-                                <span className="font-mono text-[9px] opacity-75">I1 - I2</span>
+                              <div className="flex flex-col text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase mb-1">
+                                <div className="flex justify-between items-center">
+                                  <span>Dãy I</span>
+                                  <span className="font-mono text-[9px] opacity-75">I1 - I2</span>
+                                </div>
+                                <div className="text-[8px] font-normal text-slate-400 dark:text-slate-500 normal-case truncate">
+                                  Nghệ thuật & Thể thao
+                                </div>
                               </div>
                               <div className="grid grid-cols-2 gap-2">
                                 {renderShelf('I1', 'pink')}
@@ -798,9 +843,14 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
 
                             {/* Row J */}
                             <div className="space-y-1">
-                              <div className="flex justify-between items-center text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase">
-                                <span>Dãy J: Triết học & Tâm lý học</span>
-                                <span className="font-mono text-[9px] opacity-75">J1 - J3</span>
+                              <div className="flex flex-col text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase mb-1">
+                                <div className="flex justify-between items-center">
+                                  <span>Dãy J</span>
+                                  <span className="font-mono text-[9px] opacity-75">J1 - J3</span>
+                                </div>
+                                <div className="text-[8px] font-normal text-slate-400 dark:text-slate-500 normal-case truncate">
+                                  Triết học & Tâm lý học
+                                </div>
                               </div>
                               <div className="grid grid-cols-3 gap-2">
                                 {renderShelf('J1', 'violet')}

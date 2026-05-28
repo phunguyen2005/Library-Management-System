@@ -235,7 +235,7 @@ class BookController extends Controller
     {
         $hasAnyBorrowing = $book->borrowings()->exists();
 
-        if ($hasAnyBorrowing) {
+        if (! $book->is_digital && $hasAnyBorrowing) {
             return response()->json([
                 'message' => 'Không thể xóa sách đã có lịch sử mượn.',
             ], 422);
