@@ -22,7 +22,7 @@ class DatabaseSeeder extends Seeder
         //     'email' => 'test@example.com',
         // ]);
 
-        $this->call([
+        $seeders = [
             RolePermissionSeeder::class,
             LibrarianSeeder::class,
             MemberSeeder::class,
@@ -34,6 +34,12 @@ class DatabaseSeeder extends Seeder
             NewBookImportSeeder::class,
             AdditionalBookImportSeeder::class,
             BookCopySeeder::class,
-        ]);
+        ];
+
+        if (!app()->runningUnitTests()) {
+            $seeders[] = BlogPostSeeder::class;
+        }
+
+        $this->call($seeders);
     }
 }

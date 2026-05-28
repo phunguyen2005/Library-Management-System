@@ -402,14 +402,16 @@ export default function ReadingRoom({ document, onClose, onProgressSaved }: Read
                   <div className="w-full space-y-4 bg-stone-900/60 p-4 rounded-xl border border-stone-800 backdrop-blur-xs">
                     {/* Progress Slider */}
                     <div className="space-y-1">
-                      <input
-                        type="range"
-                        min={0}
-                        max={duration || 100}
-                        value={currentTime}
-                        onChange={handleSeek}
-                        className="w-full h-1 bg-stone-800 rounded-lg appearance-none cursor-pointer accent-primary focus:outline-none"
-                      />
+                      <div className="py-2.5 flex items-center">
+                        <input
+                          type="range"
+                          min={0}
+                          max={duration || 100}
+                          value={currentTime}
+                          onChange={handleSeek}
+                          className="w-full h-1.5 bg-stone-800 rounded-lg appearance-none cursor-pointer accent-primary focus:outline-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:transition-transform [&::-webkit-slider-thumb]:hover:scale-125 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-primary [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:shadow-md [&::-moz-range-thumb]:transition-transform [&::-moz-range-thumb]:hover:scale-125"
+                        />
+                      </div>
                       <div className="flex justify-between text-[10px] font-mono text-stone-400">
                         <span>{formatTime(currentTime)}</span>
                         <span>{formatTime(duration)}</span>

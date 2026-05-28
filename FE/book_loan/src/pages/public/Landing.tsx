@@ -7,6 +7,9 @@ import { useAuth } from '../../auth/AuthContext';
 import ThemeToggle from '../../components/ThemeToggle';
 import LanguageToggle from '../../components/LanguageToggle';
 import logo from '../../assets/logo.png';
+import { fetchBlogPosts } from '../../api/blogApi';
+import type { BlogPostRecord } from '../../api/blogApi';
+import BlogCard from '../../components/BlogCard';
 
 /* ─── Animation Variants ─────────────────────────────────────── */
 const fadeInUp: Variants = {
@@ -105,6 +108,8 @@ export default function Landing() {
   const heroRef = useRef<HTMLElement>(null);
   const [iframeLoaded, setIframeLoaded] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [blogPosts, setBlogPosts] = useState<BlogPostRecord[]>([]);
+  const [isBlogLoading, setIsBlogLoading] = useState(true);
 
   useEffect(() => {
     if (isMobileMenuOpen) {
@@ -117,12 +122,35 @@ export default function Landing() {
     };
   }, [isMobileMenuOpen]);
 
+  useEffect(() => {
+    let isMounted = true;
+    const loadBlogPosts = async () => {
+      try {
+        const response = await fetchBlogPosts({ limit: 3 });
+        if (isMounted) {
+          setBlogPosts(response.data || []);
+        }
+      } catch (err) {
+        console.error('Failed to load landing blog posts:', err);
+      } finally {
+        if (isMounted) {
+          setIsBlogLoading(false);
+        }
+      }
+    };
+    void loadBlogPosts();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   const { scrollYProgress } = useScroll({ target: heroRef, offset: ['start start', 'end start'] });
   const heroY = useTransform(scrollYProgress, [0, 1], ['0%', '30%']);
   const navLinks = [
     { label: t('nav.home'), href: '#' },
     { label: t('landing.nav.collections'), href: '#collections' },
     { label: t('landing.nav.features'), href: '#features' },
+    { label: t('landing.nav.blog'), href: '#blog-posts' },
     { label: t('landing.nav.services'), href: '#services' },
   ];
   const landingFeatures = features.map((feature, index) => ({
@@ -574,6 +602,67 @@ export default function Landing() {
           </div>
         </section>
 
+        {/* ── Blog Posts Section ── */}
+        {(!isBlogLoading && blogPosts.length === 0) ? null : (
+          <section id="blog-posts" className="bg-surface py-24 border-t border-surface-container-high/40">
+            <div className="mx-auto max-w-screen-xl px-6">
+              <div className="mb-12 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <p className="mb-2 text-sm font-semibold uppercase tracking-widest text-primary">
+                    {t('blog.eyebrow')}
+                  </p>
+                  <h2 className="font-headline text-3xl font-extrabold tracking-tight text-on-surface">
+                    {t('blog.sectionTitle')}
+                  </h2>
+                </div>
+                <button
+                  onClick={() => navigate('/blog')}
+                  className="flex w-fit items-center gap-1.5 font-semibold text-primary transition-all hover:text-blue-700 hover:gap-2 text-sm cursor-pointer"
+                >
+                  <span>{t('blog.viewAll')}</span>
+                  <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+                </button>
+              </div>
+
+              {isBlogLoading ? (
+                <div className="grid gap-6 md:grid-cols-3">
+                  {Array.from({ length: 3 }).map((_, index) => (
+                    <div
+                      key={index}
+                      className="flex h-full flex-col overflow-hidden rounded-2xl border border-surface-container-high bg-surface-bright p-0 shadow-sm animate-pulse"
+                    >
+                      <div className="aspect-[16/10] bg-surface-container" />
+                      <div className="flex-1 p-5 space-y-4">
+                        <div className="h-4 w-1/4 rounded bg-surface-container" />
+                        <div className="h-6 w-3/4 rounded bg-surface-container" />
+                        <div className="h-16 w-full rounded bg-surface-container" />
+                        <div className="flex items-center justify-between pt-4 border-t border-surface-container-high/20">
+                          <div className="h-3 w-1/3 rounded bg-surface-container" />
+                          <div className="h-3 w-1/4 rounded bg-surface-container" />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <motion.div
+                  initial="hidden"
+                  whileInView="visible"
+                  viewport={{ once: true, margin: '-60px' }}
+                  variants={stagger}
+                  className="grid gap-6 md:grid-cols-3"
+                >
+                  {blogPosts.map((post) => (
+                    <motion.div key={post.id} variants={fadeInUp}>
+                      <BlogCard post={post} />
+                    </motion.div>
+                  ))}
+                </motion.div>
+              )}
+            </div>
+          </section>
+        )}
+
         {/* ── Services & Regulations ── */}
         <section id="services" className="relative overflow-hidden bg-gradient-to-br from-blue-900 to-slate-900 py-24 text-white">
           {/* Grid decoration */}
@@ -835,6 +924,7 @@ export default function Landing() {
                 { label: t('nav.home'), href: '#' },
                 { label: t('landing.footerCatalog'), href: '#collections' },
                 { label: t('landing.nav.features'), href: '#features' },
+                { label: t('landing.nav.blog'), href: '#blog-posts' },
                 { label: t('landing.servicesTitle'), href: '#services' },
               ].map(({ label, href }) => (
                 <li key={label}>

@@ -184,6 +184,7 @@ export default function AdminInventory() {
   // --- CSV Import/Export state ---
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleExportBooks = (columns: string[]) => {
     const token = getStoredToken();
@@ -561,6 +562,7 @@ export default function AdminInventory() {
       }
     }
 
+    setIsSubmitting(true);
     try {
       const payload = buildPayload(formData, activeTab);
       const savedBook =
@@ -605,6 +607,8 @@ export default function AdminInventory() {
 
       const message = getErrorMessage(error, 'Không thể lưu bản ghi này.');
       emitToast({ tone: 'error', title: 'Không thể lưu bản ghi', message });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -1395,16 +1399,29 @@ export default function AdminInventory() {
                 <button
                   type="button"
                   onClick={closeModal}
-                  className="rounded-xl bg-slate-100 px-5 py-2.5 font-bold text-slate-600 transition-colors hover:bg-slate-200"
+                  disabled={isSubmitting}
+                  className="rounded-xl bg-slate-100 px-5 py-2.5 font-bold text-slate-600 transition-colors hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                 >
                   Hủy
                 </button>
                 <button
                   type="submit"
+                  disabled={isSubmitting}
                   aria-label={isDigitalTab ? 'Lưu tài nguyên số' : 'Lưu sách mượn'}
-                  className="rounded-xl bg-primary px-5 py-2.5 font-bold text-white shadow-md shadow-primary/20 transition-opacity hover:opacity-90"
+                  className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 font-bold text-white shadow-md shadow-primary/20 transition-all hover:opacity-90 active:scale-95 disabled:scale-100 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                 >
-                  {isDigitalTab ? 'Lưu tài nguyên số' : 'Lưu sách mượn'}
+                  {isSubmitting && (
+                    <span className="material-symbols-outlined text-[18px] animate-spin">
+                      progress_activity
+                    </span>
+                  )}
+                  <span>
+                    {isSubmitting
+                      ? 'Đang lưu...'
+                      : isDigitalTab
+                      ? 'Lưu tài nguyên số'
+                      : 'Lưu sách mượn'}
+                  </span>
                 </button>
               </div>
             </form>

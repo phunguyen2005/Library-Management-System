@@ -18,7 +18,7 @@ class BookReservationTest extends TestCase
 
     private function createUnavailableBook(string $title = 'Test Book'): Book
     {
-        return Book::query()->create([
+        $book = Book::query()->create([
             'title' => $title,
             'author' => 'Test Author',
             'genre' => 'Fiction',
@@ -30,6 +30,14 @@ class BookReservationTest extends TestCase
             'total_quantity' => 1,
             'available_quantity' => 0,
         ]);
+
+        $copy = $book->copies()->first();
+        if ($copy) {
+            $copy->update(['status' => \App\Models\BookCopy::STATUS_BORROWED]);
+            \App\Models\BookCopy::syncBookCounters($book);
+        }
+
+        return $book;
     }
 
     private function createStudent(string $name, string $email): Member
