@@ -7,11 +7,15 @@ import {
   addDigitalResource,
   deleteBook,
   fetchBorrowableBooks,
+  fetchBookCopies,
   fetchDigitalResourceBooks,
   updateBorrowableBook,
   updateDigitalResource,
   uploadDigitalFile,
   importBooks,
+  updateBookCopy,
+  addBookCopy,
+  deleteBookCopy,
   type BookPayload,
 } from '../../api/bookApi';
 import EmptyState from '../../components/EmptyState';
@@ -22,7 +26,7 @@ import { useDebounce } from '../../hooks/useDebounce';
 import { applyImageFallback } from '../../lib/display';
 import { getErrorMessage, isUnauthorizedError } from '../../lib/errors';
 import { emitToast } from '../../notifications/events';
-import type { FormattedBook } from '../../types/book';
+import type { BookCopy, BookCopyCondition, BookCopyStatus, FormattedBook } from '../../types/book';
 import { BOOK_CLASSIFICATIONS, getDefaultShelfForCategory, findClassification, getShelvesForCategory } from '../../lib/bookClassification';
 import { AnimatePresence } from 'framer-motion';
 import CSVImportWizard from '../../components/CSVImportWizard';
@@ -58,6 +62,8 @@ const AVAILABLE_EXPORT_COLUMNS = [
 
 const DEFAULT_EXPORT_COLUMNS = ['book_id', 'title', 'author', 'genre', 'location', 'total_quantity', 'available_quantity'];
 
+const COPY_STATUSES: BookCopyStatus[] = ['available', 'borrowed', 'repairing', 'lost', 'damaged'];
+const COPY_CONDITIONS: BookCopyCondition[] = ['good', 'damaged', 'lost'];
 
 type InventoryTab = 'borrow' | 'digital';
 
@@ -169,6 +175,11 @@ export default function AdminInventory() {
   const [aiActionId, setAiActionId] = useState<number | null>(null);
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [repairActionId, setRepairActionId] = useState<number | null>(null);
+  const [copiesBook, setCopiesBook] = useState<FormattedBook | null>(null);
+  const [bookCopies, setBookCopies] = useState<BookCopy[]>([]);
+  const [isCopiesLoading, setIsCopiesLoading] = useState(false);
+  const [copyActionId, setCopyActionId] = useState<number | 'new' | null>(null);
+  const [newCopyBarcode, setNewCopyBarcode] = useState('');
 
   // --- CSV Import/Export state ---
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -436,6 +447,91 @@ export default function AdminInventory() {
       emitToast({ tone: 'error', title: 'Lỗi', message });
     } finally {
       setRepairActionId(null);
+    }
+  };
+
+  const openCopiesDrawer = async (book: FormattedBook) => {
+    setCopiesBook(book);
+    setBookCopies([]);
+    setNewCopyBarcode('');
+    setIsCopiesLoading(true);
+
+    try {
+      const copies = await fetchBookCopies(book.id);
+      setBookCopies(copies);
+    } catch (error: unknown) {
+      if (isUnauthorizedError(error)) {
+        return;
+      }
+      const message = getErrorMessage(error, 'Không thể tải danh sách bản sao.');
+      emitToast({ tone: 'error', title: 'Không thể tải bản sao', message });
+    } finally {
+      setIsCopiesLoading(false);
+    }
+  };
+
+  const refreshCopiesDrawer = async () => {
+    if (!copiesBook) return;
+    const copies = await fetchBookCopies(copiesBook.id);
+    setBookCopies(copies);
+    await loadBooks(false);
+  };
+
+  const handleCopyFieldChange = async (
+    copy: BookCopy,
+    field: 'barcode' | 'status' | 'condition',
+    value: string,
+  ) => {
+    if (!copiesBook) return;
+    setCopyActionId(copy.id);
+    try {
+      await updateBookCopy(copiesBook.id, copy.id, { [field]: value });
+      await refreshCopiesDrawer();
+    } catch (error: unknown) {
+      if (isUnauthorizedError(error)) {
+        return;
+      }
+      const message = getErrorMessage(error, 'Không thể cập nhật bản sao.');
+      emitToast({ tone: 'error', title: 'Không thể cập nhật bản sao', message });
+    } finally {
+      setCopyActionId(null);
+    }
+  };
+
+  const handleAddCopy = async () => {
+    if (!copiesBook) return;
+    setCopyActionId('new');
+    try {
+      await addBookCopy(copiesBook.id, newCopyBarcode.trim() ? { barcode: newCopyBarcode.trim() } : {});
+      setNewCopyBarcode('');
+      await refreshCopiesDrawer();
+      emitToast({ tone: 'success', title: 'Đã thêm bản sao', message: copiesBook.title });
+    } catch (error: unknown) {
+      if (isUnauthorizedError(error)) {
+        return;
+      }
+      const message = getErrorMessage(error, 'Không thể thêm bản sao.');
+      emitToast({ tone: 'error', title: 'Không thể thêm bản sao', message });
+    } finally {
+      setCopyActionId(null);
+    }
+  };
+
+  const handleDeleteCopy = async (copy: BookCopy) => {
+    if (!copiesBook) return;
+    setCopyActionId(copy.id);
+    try {
+      await deleteBookCopy(copiesBook.id, copy.id);
+      await refreshCopiesDrawer();
+      emitToast({ tone: 'success', title: 'Đã xóa bản sao', message: copy.barcode });
+    } catch (error: unknown) {
+      if (isUnauthorizedError(error)) {
+        return;
+      }
+      const message = getErrorMessage(error, 'Không thể xóa bản sao.');
+      emitToast({ tone: 'error', title: 'Không thể xóa bản sao', message });
+    } finally {
+      setCopyActionId(null);
     }
   };
 
@@ -873,6 +969,17 @@ export default function AdminInventory() {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-1">
+                        {!isDigitalTab && (
+                          <button
+                            type="button"
+                            onClick={() => openCopiesDrawer(book)}
+                            className="rounded-lg p-2 text-indigo-600 transition-all hover:bg-indigo-50"
+                            title="Xem bản sao"
+                            aria-label={`Xem bản sao ${book.title}`}
+                          >
+                            <span className="material-symbols-outlined text-[18px]">qr_code_2</span>
+                          </button>
+                        )}
                         {!isDigitalTab && book.repairing_quantity > 0 && (
                           <button
                             type="button"
@@ -935,6 +1042,116 @@ export default function AdminInventory() {
           </div>
         </div>
       </section>
+
+      {copiesBook ? (
+        <div role="dialog" aria-modal="true" aria-labelledby="book-copies-title"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+          <div className="flex max-h-[88vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl border border-surface-container bg-white shadow-2xl">
+            <div className="flex items-start justify-between gap-4 border-b border-surface-container p-5">
+              <div>
+                <h3 id="book-copies-title" className="text-lg font-bold text-slate-900">Bản sao vật lý</h3>
+                <p className="mt-1 text-sm text-slate-600">{copiesBook.title}</p>
+              </div>
+              <button type="button" onClick={() => setCopiesBook(null)}
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 border-b border-surface-container bg-slate-50/70 p-4">
+              <input
+                aria-label="Mã vạch bản sao mới"
+                value={newCopyBarcode}
+                onChange={(event) => setNewCopyBarcode(event.target.value)}
+                className="min-w-[220px] flex-1 rounded-lg border border-slate-200 px-3 py-2 font-mono text-sm outline-none focus:border-primary"
+                placeholder="Để trống để tự sinh mã"
+              />
+              <button type="button" onClick={handleAddCopy} disabled={copyActionId === 'new'}
+                className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white disabled:cursor-wait disabled:opacity-60">
+                <span className="material-symbols-outlined text-[18px]">add</span>
+                {copyActionId === 'new' ? 'Đang thêm...' : 'Thêm bản sao'}
+              </button>
+            </div>
+
+            <div className="overflow-auto">
+              <table className="w-full min-w-[860px] text-left text-sm">
+                <thead className="bg-slate-50 text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                  <tr>
+                    <th className="px-4 py-3">#</th>
+                    <th className="px-4 py-3">Mã vạch</th>
+                    <th className="px-4 py-3">Trạng thái</th>
+                    <th className="px-4 py-3">Tình trạng</th>
+                    <th className="px-4 py-3">Ngày thêm</th>
+                    <th className="px-4 py-3">Lần cuối mượn</th>
+                    <th className="px-4 py-3 text-right">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {isCopiesLoading ? (
+                    <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-500">Đang tải bản sao...</td></tr>
+                  ) : bookCopies.length === 0 ? (
+                    <tr><td colSpan={7} className="px-4 py-8"><EmptyState icon="qr_code_2" title="Chưa có bản sao" message="Thêm bản sao vật lý để quản lý mã vạch cho đầu sách này." /></td></tr>
+                  ) : (
+                    bookCopies.map((copy, index) => (
+                      <tr key={copy.id} className="hover:bg-slate-50/70">
+                        <td className="px-4 py-3 font-semibold text-slate-500">{index + 1}</td>
+                        <td className="px-4 py-3">
+                          <input
+                            aria-label={`Mã vạch ${copy.barcode}`}
+                            defaultValue={copy.barcode}
+                            disabled={copyActionId === copy.id}
+                            onBlur={(event) => {
+                              const next = event.currentTarget.value.trim();
+                              if (next && next !== copy.barcode) void handleCopyFieldChange(copy, 'barcode', next);
+                            }}
+                            className="w-full rounded border border-slate-200 px-2 py-1 font-mono text-xs outline-none focus:border-primary"
+                          />
+                        </td>
+                        <td className="px-4 py-3">
+                          <select
+                            aria-label={`Trạng thái ${copy.barcode}`}
+                            value={copy.status}
+                            disabled={copyActionId === copy.id || copy.status === 'borrowed'}
+                            onChange={(event) => void handleCopyFieldChange(copy, 'status', event.target.value)}
+                            className="rounded border border-slate-200 px-2 py-1 text-xs font-semibold outline-none focus:border-primary"
+                          >
+                            {COPY_STATUSES.map((status) => (
+                              <option key={status} value={status}>{status}</option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="px-4 py-3">
+                          <select
+                            aria-label={`Tình trạng ${copy.barcode}`}
+                            value={copy.condition}
+                            disabled={copyActionId === copy.id}
+                            onChange={(event) => void handleCopyFieldChange(copy, 'condition', event.target.value)}
+                            className="rounded border border-slate-200 px-2 py-1 text-xs font-semibold outline-none focus:border-primary"
+                          >
+                            {COPY_CONDITIONS.map((condition) => (
+                              <option key={condition} value={condition}>{condition}</option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="px-4 py-3 text-xs text-slate-500">{copy.added_at ? copy.added_at.slice(0, 10) : '—'}</td>
+                        <td className="px-4 py-3 text-xs text-slate-500">{copy.last_checked_out_at ? copy.last_checked_out_at.slice(0, 10) : '—'}</td>
+                        <td className="px-4 py-3 text-right">
+                          <button type="button" onClick={() => void handleDeleteCopy(copy)}
+                            disabled={copy.status === 'borrowed' || copyActionId === copy.id}
+                            className="rounded-lg p-2 text-red-500 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
+                            title={copy.status === 'borrowed' ? 'Không thể xóa bản sao đang mượn' : 'Xóa bản sao'}>
+                            <span className="material-symbols-outlined text-[18px]">delete</span>
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <ConfirmDialog
         isOpen={isConfirmDeleteOpen}

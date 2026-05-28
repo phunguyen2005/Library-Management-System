@@ -33,6 +33,7 @@ class DatabaseSeeder extends Seeder
             GamifySeeder::class,
             NewBookImportSeeder::class,
             AdditionalBookImportSeeder::class,
+            BookCopySeeder::class,
         ]);
     }
 }

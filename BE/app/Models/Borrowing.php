@@ -37,6 +37,7 @@ class Borrowing extends Model
 
     protected $fillable = [
         'book_id',
+        'copy_id',
         'member_id',
         'librarian_id',
         'approved_at',
@@ -62,6 +63,11 @@ class Borrowing extends Model
     public function book(): BelongsTo
     {
         return $this->belongsTo(Book::class, 'book_id', 'book_id')->withTrashed();
+    }
+
+    public function bookCopy(): BelongsTo
+    {
+        return $this->belongsTo(BookCopy::class, 'copy_id', 'id');
     }
 
     public function member(): BelongsTo

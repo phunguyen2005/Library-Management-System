@@ -287,7 +287,7 @@ export default function RoomBookingPage() {
                     )}
                   </div>
 
-                  <div className="flex gap-2 mt-6">
+                  <div className="mt-6">
                     <button
                       onClick={() => {
                         setSelectedRoom(room);
@@ -297,29 +297,10 @@ export default function RoomBookingPage() {
                         setEndTime('11:00');
                         setGroupSize(2);
                       }}
-                      className="flex-1 bg-slate-100 text-slate-700 hover:bg-slate-200 font-semibold py-2.5 rounded-xl transition-all text-xs cursor-pointer flex items-center justify-center gap-1 border border-slate-200/50"
+                      className="w-full bg-primary text-white hover:bg-opacity-95 font-semibold py-2.5 rounded-xl transition-all text-xs cursor-pointer flex items-center justify-center gap-1 border border-transparent shadow-xs hover:shadow-md"
                     >
                       <span className="material-symbols-outlined text-[16px]">event_available</span>
                       Đặt trước
-                    </button>
-                    <button
-                      onClick={() => {
-                        setSelectedRoom(room);
-                        setBookingDate(nowDateString());
-                        setIsWalkinBooking(true);
-                        const now = new Date();
-                        const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-                        setStartTime(timeStr);
-                        const later = new Date(now.getTime() + 60 * 60 * 1000);
-                        const endStr = `${String(later.getHours()).padStart(2, '0')}:${String(later.getMinutes()).padStart(2, '0')}`;
-                        setEndTime(endStr);
-                        setWalkinDuration(60);
-                        setGroupSize(1);
-                      }}
-                      className="flex-1 bg-primary text-white font-semibold py-2.5 rounded-xl shadow-xs transition-all hover:bg-opacity-95 hover:shadow-md text-xs cursor-pointer flex items-center justify-center gap-1"
-                    >
-                      <span className="material-symbols-outlined text-[16px]">bolt</span>
-                      Đặt nhanh (Walk-in)
                     </button>
                   </div>
                 </div>

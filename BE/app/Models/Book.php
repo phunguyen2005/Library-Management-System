@@ -32,6 +32,7 @@ class Book extends Model
         'file_size',
         'file_path',
         'file_url',
+        'cloudinary_public_id',
         'ai_summary',
         'ai_tags',
         'ai_summary_generated_at',
@@ -59,6 +60,11 @@ class Book extends Model
     public function borrowings(): HasMany
     {
         return $this->hasMany(Borrowing::class, 'book_id', 'book_id');
+    }
+
+    public function copies(): HasMany
+    {
+        return $this->hasMany(BookCopy::class, 'book_id', 'book_id');
     }
 
     public function reviews(): HasMany
@@ -110,5 +116,16 @@ class Book extends Model
         }
 
         return (int) $this->digitalDownloads()->count();
+    }
+
+    protected static function booted(): void
+    {
+        static::created(function (Book $book): void {
+            if ($book->is_digital) {
+                return;
+            }
+
+            BookCopy::createCopiesForBook($book, max(0, (int) $book->total_quantity));
+        });
     }
 }

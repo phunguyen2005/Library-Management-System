@@ -21,8 +21,13 @@ export default function UserLayout() {
   const [pointsGained, setPointsGained] = useState(10);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const isOutlookStudent = !!(user?.email && (
+    user.email.toLowerCase().endsWith('@student.hcmue.edu.vn') || 
+    user.email.toLowerCase().endsWith('@hcmue.edu.vn')
+  ));
+
   useEffect(() => {
-    if (role !== 'student' || !user) {
+    if (role !== 'student' || !user || !isOutlookStudent) {
       return;
     }
 
@@ -116,7 +121,7 @@ export default function UserLayout() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-surface text-on-surface">
-      <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
+      <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} onOpenMap={() => setIsMapOpen(true)} />
       <div className="flex-1 flex flex-col overflow-hidden relative">
         <Header 
           onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} 

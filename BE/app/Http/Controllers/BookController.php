@@ -5,10 +5,13 @@ namespace App\Http\Controllers;
 use App\Http\Requests\BookIndexRequest;
 use App\Http\Requests\BookUpsertRequest;
 use App\Http\Requests\DigitalFileUploadRequest;
+use App\Http\Resources\BookCopyResource;
 use App\Http\Resources\BookResource;
 use App\Http\Resources\DigitalDocumentResource;
 use App\Jobs\GenerateBookAiMetadataJob;
 use App\Models\Book;
+use App\Models\BookCopy;
+use App\Models\Borrowing;
 use App\Models\DigitalDocumentAccess;
 use App\Models\Librarian;
 use App\Models\Member;
@@ -18,6 +21,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class BookController extends Controller
 {
@@ -143,13 +147,14 @@ class BookController extends Controller
 
         \App\Services\AuditLoggerService::log('book_create', 'Đã thêm tài liệu mới: ' . $book->title . ' (ID: ' . $book->book_id . ')');
 
-        return response()->json(new BookResource($book), 201);
+        return response()->json(new BookResource($book->fresh()), 201);
     }
 
     public function update(BookUpsertRequest $request, Book $book)
     {
         $validated = $request->validated();
         $isDigital = (bool) ($validated['is_digital'] ?? $book->is_digital);
+
         if (! $isDigital) {
             $normalizedClassification = BookClassification::normalizePhysical(
                 array_key_exists('genre', $validated) ? $validated['genre'] : $book->genre,
@@ -167,33 +172,36 @@ class BookController extends Controller
 
             $validated = array_merge($validated, $normalizedClassification);
         }
-        $checkedOut = max(0, $book->total_quantity - $book->available_quantity);
+
         $nextQuantity = array_key_exists('quantity', $validated) ? (int) $validated['quantity'] : $book->total_quantity;
 
-        if ($nextQuantity < $checkedOut) {
-            return response()->json([
-                'message' => 'Số lượng mới không thể nhỏ hơn số sách đang được mượn.',
-            ], 422);
-        }
+        $book = DB::transaction(function () use ($book, $validated, $isDigital, $nextQuantity) {
+            $book = Book::query()->lockForUpdate()->findOrFail($book->book_id);
 
-        $book->fill([
-            'title' => $validated['title'],
-            'author' => $validated['author'],
-            'genre' => array_key_exists('genre', $validated) ? $validated['genre'] : $book->genre,
-            'published_year' => array_key_exists('published_year', $validated) ? $validated['published_year'] : $book->published_year,
-            'location' => array_key_exists('location', $validated) ? $validated['location'] : $book->location,
-            'cover' => array_key_exists('cover', $validated) ? $validated['cover'] : $book->cover,
-            'is_digital' => $isDigital,
-            'resource_type' => array_key_exists('resource_type', $validated) ? $validated['resource_type'] : $book->resource_type,
-            'file_format' => array_key_exists('file_format', $validated) ? $validated['file_format'] : $book->file_format,
-            'file_size' => array_key_exists('file_size', $validated) ? $validated['file_size'] : $book->file_size,
-            'file_path' => array_key_exists('file_path', $validated) ? $validated['file_path'] : $book->file_path,
-            'file_url' => array_key_exists('file_url', $validated) ? $validated['file_url'] : $book->file_url,
-        ]);
-        $book->total_quantity = $nextQuantity;
-        $book->available_quantity = max(0, $nextQuantity - $checkedOut);
-        $book->is_available = $book->available_quantity > 0;
-        $book->save();
+            $book->fill([
+                'title' => $validated['title'],
+                'author' => $validated['author'],
+                'genre' => array_key_exists('genre', $validated) ? $validated['genre'] : $book->genre,
+                'published_year' => array_key_exists('published_year', $validated) ? $validated['published_year'] : $book->published_year,
+                'location' => array_key_exists('location', $validated) ? $validated['location'] : $book->location,
+                'cover' => array_key_exists('cover', $validated) ? $validated['cover'] : $book->cover,
+                'is_digital' => $isDigital,
+                'resource_type' => array_key_exists('resource_type', $validated) ? $validated['resource_type'] : $book->resource_type,
+                'file_format' => array_key_exists('file_format', $validated) ? $validated['file_format'] : $book->file_format,
+                'file_size' => array_key_exists('file_size', $validated) ? $validated['file_size'] : $book->file_size,
+                'file_path' => array_key_exists('file_path', $validated) ? $validated['file_path'] : $book->file_path,
+                'file_url' => array_key_exists('file_url', $validated) ? $validated['file_url'] : $book->file_url,
+            ]);
+            $book->save();
+
+            if (! $isDigital) {
+                $this->reconcilePhysicalCopies($book, $nextQuantity);
+            } else {
+                BookCopy::syncBookCounters($book);
+            }
+
+            return $book->fresh();
+        });
 
         GenerateBookAiMetadataJob::dispatch($book->book_id);
         $this->bookCache->bump();
@@ -219,6 +227,12 @@ class BookController extends Controller
             ], 422);
         }
 
+        // Xóa file Cloudinary liên quan nếu có
+        if ($book->cloudinary_public_id) {
+            $cloudinaryService = new \App\Services\CloudinaryService();
+            $cloudinaryService->delete($book->cloudinary_public_id, $book->file_format ?: 'pdf');
+        }
+
         $book->delete();
         $this->bookCache->bump();
 
@@ -233,14 +247,23 @@ class BookController extends Controller
     {
         $file = $request->file('file');
         $extension = strtolower($file->getClientOriginalExtension());
-        $filename = $this->storedDigitalFilename($file->getClientOriginalName(), $extension);
-        $directory = 'digital-documents/'.$book->book_id;
 
-        if ($book->file_path && Storage::disk('local')->exists($book->file_path)) {
-            Storage::disk('local')->delete($book->file_path);
+        // Khởi tạo CloudinaryService
+        $cloudinaryService = new \App\Services\CloudinaryService();
+
+        // Nếu đã có file cũ trên Cloudinary, tiến hành xóa
+        if ($book->cloudinary_public_id) {
+            $cloudinaryService->delete($book->cloudinary_public_id, $book->file_format ?: $extension);
         }
 
-        $path = $file->storeAs($directory, $filename, 'local');
+        // Upload file mới lên Cloudinary
+        try {
+            $uploadResult = $cloudinaryService->upload($file, 'library_digital_files');
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Tải file lên Cloudinary thất bại: ' . $e->getMessage(),
+            ], 500);
+        }
 
         $format = $this->digitalFormatFromExtension($extension);
         $isAudio = $format === 'AUDIO';
@@ -250,8 +273,9 @@ class BookController extends Controller
             'resource_type' => $book->resource_type ?: ($isAudio ? 'Audio Book' : 'Tài liệu số'),
             'file_format' => $format,
             'file_size' => $this->formatFileSize((int) $file->getSize()),
-            'file_path' => $path,
-            'file_url' => null,
+            'file_path' => null, // Đặt null vì không lưu local nữa
+            'file_url' => $uploadResult['secure_url'],
+            'cloudinary_public_id' => $uploadResult['public_id'],
         ]);
         $book->save();
 
@@ -265,7 +289,7 @@ class BookController extends Controller
 
         $this->bookCache->bump();
 
-        \App\Services\AuditLoggerService::log('digital_file_upload', 'Đã tải lên tệp tài liệu số cho sách: ' . $book->title . ' (ID: ' . $book->book_id . ')');
+        \App\Services\AuditLoggerService::log('digital_file_upload', 'Đã tải lên tệp tài liệu số (Cloudinary) cho sách: ' . $book->title . ' (ID: ' . $book->book_id . ')');
 
         $book->loadCount([
             'favoritedBy as favorite_count',
@@ -314,6 +338,12 @@ class BookController extends Controller
 
         $filename = $this->digitalFilename($book);
 
+        // Chỉ redirect nếu file được lưu trên Cloudinary (có public_id)
+        if ($book->cloudinary_public_id && $book->file_url) {
+            return redirect()->away($book->file_url);
+        }
+
+        // Còn lại đọc từ Local Disk
         if ($book->file_path) {
             if (Storage::disk('local')->exists($book->file_path)) {
                 return response(Storage::disk('local')->get($book->file_path), 200, [
@@ -339,6 +369,7 @@ class BookController extends Controller
             }
         }
 
+        // Fallback cho URL ngoài khác (nếu có)
         if ($book->file_url) {
             return redirect()->away($book->file_url);
         }
@@ -347,6 +378,67 @@ class BookController extends Controller
             'Content-Type' => 'text/plain; charset=UTF-8',
             'Content-Disposition' => $disposition.'; filename="'.$filename.'"',
         ]);
+    }
+
+    private function reconcilePhysicalCopies(Book $book, int $nextQuantity): void
+    {
+        $trackedTotal = $book->copies()
+            ->where('status', '!=', BookCopy::STATUS_LOST)
+            ->count();
+
+        if ($trackedTotal === 0 && $nextQuantity > 0) {
+            BookCopy::createCopiesForBook($book, $nextQuantity);
+            return;
+        }
+
+        if ($nextQuantity > $trackedTotal) {
+            BookCopy::createCopiesForBook($book, $nextQuantity - $trackedTotal);
+            return;
+        }
+
+        if ($nextQuantity < $trackedTotal) {
+            $removeCount = $trackedTotal - $nextQuantity;
+            $availableCopies = $book->copies()
+                ->where('status', BookCopy::STATUS_AVAILABLE)
+                ->count();
+            $approvedHolds = $book->borrowings()
+                ->where('status', Borrowing::STATUS_APPROVED)
+                ->whereNull('copy_id')
+                ->count();
+            $removableCopies = max(0, $availableCopies - $approvedHolds);
+
+            if ($removeCount > $removableCopies) {
+                throw new \Illuminate\Http\Exceptions\HttpResponseException(response()->json([
+                    'message' => 'Số lượng mới không thể nhỏ hơn số bản sao đang được mượn, sửa chữa hoặc giữ chỗ.',
+                ], 422));
+            }
+
+            $book->copies()
+                ->where('status', BookCopy::STATUS_AVAILABLE)
+                ->orderByDesc('id')
+                ->limit($removeCount)
+                ->get()
+                ->each
+                ->delete();
+        }
+
+        BookCopy::syncBookCounters($book->fresh());
+    }
+
+    private function statusForCondition(string $condition): string
+    {
+        return match ($condition) {
+            BookCopy::CONDITION_DAMAGED => BookCopy::STATUS_REPAIRING,
+            BookCopy::CONDITION_LOST => BookCopy::STATUS_LOST,
+            default => BookCopy::STATUS_AVAILABLE,
+        };
+    }
+
+    private function ensureCopyBelongsToBook(Book $book, BookCopy $copy): void
+    {
+        if ((int) $copy->book_id !== (int) $book->book_id) {
+            abort(404);
+        }
     }
 
     private function recordDigitalDocumentAccess(Request $request, Book $book, string $accessType): void
@@ -687,33 +779,194 @@ class BookController extends Controller
         }
     }
 
+    public function getCopies(Book $book)
+    {
+        if ($book->is_digital) {
+            return response()->json([
+                'message' => 'Tài nguyên số không có bản sao vật lý.',
+            ], 422);
+        }
+
+        return BookCopyResource::collection(
+            $book->copies()->orderBy('id')->get()
+        );
+    }
+
+    public function addCopy(Request $request, Book $book)
+    {
+        if ($book->is_digital) {
+            return response()->json([
+                'message' => 'Không thể thêm bản sao vật lý cho tài nguyên số.',
+            ], 422);
+        }
+
+        $validated = $request->validate([
+            'barcode' => ['nullable', 'string', 'max:255', Rule::unique('book_copies', 'barcode')],
+            'status' => ['nullable', 'string', Rule::in(BookCopy::statuses())],
+            'condition' => ['nullable', 'string', Rule::in(BookCopy::conditions())],
+        ]);
+
+        $copy = DB::transaction(function () use ($book, $validated) {
+            $book = Book::query()->lockForUpdate()->findOrFail($book->book_id);
+            $condition = $validated['condition'] ?? BookCopy::CONDITION_GOOD;
+            $status = $validated['status'] ?? $this->statusForCondition($condition);
+
+            $copy = BookCopy::query()->create([
+                'book_id' => $book->book_id,
+                'barcode' => $validated['barcode'] ?? BookCopy::generateBarcode($book),
+                'status' => $status,
+                'condition' => $condition,
+                'added_at' => now(),
+            ]);
+
+            BookCopy::syncBookCounters($book);
+
+            return $copy->fresh();
+        });
+
+        $this->bookCache->bump();
+
+        return response()->json(new BookCopyResource($copy), 201);
+    }
+
+    public function updateCopy(Request $request, Book $book, BookCopy $copy)
+    {
+        $this->ensureCopyBelongsToBook($book, $copy);
+
+        $validated = $request->validate([
+            'barcode' => ['nullable', 'string', 'max:255', Rule::unique('book_copies', 'barcode')->ignore($copy->id)],
+            'status' => ['nullable', 'string', Rule::in(BookCopy::statuses())],
+            'condition' => ['nullable', 'string', Rule::in(BookCopy::conditions())],
+        ]);
+
+        $copy = DB::transaction(function () use ($book, $copy, $validated) {
+            $book = Book::query()->lockForUpdate()->findOrFail($book->book_id);
+            $copy = BookCopy::query()->where('book_id', $book->book_id)->lockForUpdate()->findOrFail($copy->id);
+
+            $activeBorrowing = $copy->borrowings()
+                ->where('status', Borrowing::STATUS_BORROWED)
+                ->exists();
+            $nextStatus = $validated['status'] ?? (
+                array_key_exists('condition', $validated)
+                    ? $this->statusForCondition($validated['condition'])
+                    : $copy->status
+            );
+
+            if ($activeBorrowing && $nextStatus !== BookCopy::STATUS_BORROWED) {
+                throw new \Illuminate\Http\Exceptions\HttpResponseException(response()->json([
+                    'message' => 'Không thể đổi trạng thái bản sao đang được mượn.',
+                ], 422));
+            }
+
+            if ($nextStatus === BookCopy::STATUS_BORROWED && ! $activeBorrowing) {
+                throw new \Illuminate\Http\Exceptions\HttpResponseException(response()->json([
+                    'message' => 'Chỉ quy trình giao sách mới được chuyển bản sao sang trạng thái đang mượn.',
+                ], 422));
+            }
+
+            $copy->fill([
+                'barcode' => array_key_exists('barcode', $validated) ? $validated['barcode'] : $copy->barcode,
+                'status' => $nextStatus,
+                'condition' => array_key_exists('condition', $validated) ? $validated['condition'] : $copy->condition,
+            ])->save();
+
+            BookCopy::syncBookCounters($book);
+
+            return $copy->fresh();
+        });
+
+        $this->bookCache->bump();
+
+        return response()->json(new BookCopyResource($copy));
+    }
+
+    public function deleteCopy(Book $book, BookCopy $copy)
+    {
+        $this->ensureCopyBelongsToBook($book, $copy);
+
+        DB::transaction(function () use ($book, $copy) {
+            $book = Book::query()->lockForUpdate()->findOrFail($book->book_id);
+            $copy = BookCopy::query()->where('book_id', $book->book_id)->lockForUpdate()->findOrFail($copy->id);
+
+            if ($copy->status === BookCopy::STATUS_BORROWED) {
+                throw new \Illuminate\Http\Exceptions\HttpResponseException(response()->json([
+                    'message' => 'Không thể xóa bản sao đang được mượn.',
+                ], 422));
+            }
+
+            if ($copy->status === BookCopy::STATUS_AVAILABLE) {
+                $availableCopies = $book->copies()->where('status', BookCopy::STATUS_AVAILABLE)->count();
+                $approvedHolds = $book->borrowings()
+                    ->where('status', Borrowing::STATUS_APPROVED)
+                    ->whereNull('copy_id')
+                    ->count();
+
+                if (($availableCopies - 1) < $approvedHolds) {
+                    throw new \Illuminate\Http\Exceptions\HttpResponseException(response()->json([
+                        'message' => 'Không thể xóa bản sao đang được giữ chỗ cho phiếu đã duyệt.',
+                    ], 422));
+                }
+            }
+
+            $copy->delete();
+            BookCopy::syncBookCounters($book);
+        });
+
+        $this->bookCache->bump();
+
+        return response()->json([
+            'message' => 'Đã xóa bản sao sách.',
+        ]);
+    }
+
     public function completeRepair(Request $request, int $bookId)
     {
         $librarian = $request->user();
+        $validated = $request->validate([
+            'copy_id' => ['nullable', 'integer', 'exists:book_copies,id'],
+            'barcode' => ['nullable', 'string', 'max:255'],
+        ]);
 
-        $book = DB::transaction(function () use ($bookId, $librarian) {
+        $book = DB::transaction(function () use ($bookId, $librarian, $validated) {
             $book = Book::query()->lockForUpdate()->findOrFail($bookId);
 
-            if (($book->repairing_quantity ?? 0) <= 0) {
+            $copyQuery = $book->copies()
+                ->where('status', BookCopy::STATUS_REPAIRING)
+                ->lockForUpdate();
+
+            if (! empty($validated['copy_id'])) {
+                $copyQuery->where('id', $validated['copy_id']);
+            }
+
+            if (! empty($validated['barcode'])) {
+                $copyQuery->where('barcode', $validated['barcode']);
+            }
+
+            $copy = $copyQuery->orderBy('id')->first();
+
+            if (! $copy) {
                 abort(response()->json([
                     'message' => 'Không có bản sao nào của sách này đang ở trạng thái sửa chữa.'
                 ], 422));
             }
 
-            // Decrement repairing
-            $book->repairing_quantity = max(0, $book->repairing_quantity - 1);
-            $book->save();
+            $copy->forceFill([
+                'status' => BookCopy::STATUS_AVAILABLE,
+                'condition' => BookCopy::CONDITION_GOOD,
+                'last_checked_in_at' => now(),
+            ])->save();
 
             // Trigger reservations queue check to release or assign to next student
             \App\Http\Controllers\BorrowController::processNextInQueue($book->book_id);
+            BookCopy::syncBookCounters($book->fresh());
 
             \App\Services\AuditLoggerService::log(
                 'book_repair_complete',
-                'Hoàn tất sửa chữa 1 bản sao sách: ' . $book->title . ' (ID: ' . $book->book_id . ')',
+                'Hoàn tất sửa chữa bản sao ' . $copy->barcode . ' của sách: ' . $book->title . ' (ID: ' . $book->book_id . ')',
                 $librarian
             );
 
-            return $book;
+            return $book->fresh();
         });
 
         // Bump cache

@@ -66,6 +66,7 @@ const PERMISSION_DETAILS: Record<string, { label: string; color: string }> = {
   view_reports: { label: 'Báo Cáo', color: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/20 dark:text-blue-400 dark:border-blue-900/30' },
   view_audit_logs: { label: 'Nhật Ký', color: 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800/30 dark:text-slate-400 dark:border-slate-700/30' },
   manage_librarians: { label: 'Phân Quyền', color: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/20 dark:text-rose-400 dark:border-rose-900/30' },
+  manage_blog: { label: 'Blog', color: 'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/20 dark:text-sky-400 dark:border-sky-900/30' },
 };
 
 function mapLibrarian(lib: LibrarianApiRecord): LibrarianListItem {

@@ -9,7 +9,7 @@ export default function NotFound() {
   
   const handleGoHome = () => {
     if (isAuthenticated) {
-      navigate(role === 'admin' ? '/admin/dashboard' : '/home');
+      navigate(role === 'admin' || role === 'librarian' ? '/admin/dashboard' : '/home');
     } else {
       navigate('/');
     }

@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import logo from '../assets/logo.png';
+import ThemeToggle from './ThemeToggle';
+import LanguageToggle from './LanguageToggle';
 
 const navItems = [
   { path: '/home', icon: 'home', labelKey: 'nav.home' },
@@ -20,12 +22,26 @@ const navItems = [
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
+  onOpenMap?: () => void;
 }
 
-export default function Sidebar({ isOpen, onClose }: SidebarProps) {
+export default function Sidebar({ isOpen, onClose, onOpenMap }: SidebarProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { user, role, logout } = useAuth();
+
+  const isOutlookStudent = !!(user?.email && (
+    user.email.toLowerCase().endsWith('@student.hcmue.edu.vn') || 
+    user.email.toLowerCase().endsWith('@hcmue.edu.vn')
+  ));
+  const isGuest = role === 'student' && !isOutlookStudent;
+
+  const filteredNavItems = navItems.filter((item) => {
+    if (isGuest && ['/requests', '/room-booking', '/history', '/fines', '/gamify'].includes(item.path)) {
+      return false;
+    }
+    return true;
+  });
 
   const handleLogout = async () => {
     await logout();
@@ -58,7 +74,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           </div>
         </Link>
         <nav className="custom-scrollbar flex-1 space-y-1 overflow-y-auto px-4 py-4">
-          {navItems.map((item) => (
+          {filteredNavItems.map((item) => (
             <NavLink
               key={item.path}
               to={item.path}
@@ -82,7 +98,27 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
             </NavLink>
           ))}
         </nav>
-        <div className="space-y-1 border-t border-surface-container-high p-4">
+        <div className="space-y-4 border-t border-surface-container-high p-4">
+          {/* Mobile controls - only visible on mobile/tablet */}
+          <div className="flex lg:hidden items-center justify-around py-2 rounded-xl bg-surface-container-low border border-surface-container-high/60">
+            <ThemeToggle />
+            <LanguageToggle />
+            {onOpenMap && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenMap();
+                }}
+                className="flex h-10 w-10 items-center justify-center rounded-xl text-on-surface-variant hover:bg-surface-container transition-colors cursor-pointer"
+                title={t('header.libraryMap')}
+                aria-label={t('header.libraryMap')}
+              >
+                <span className="material-symbols-outlined text-2xl">map</span>
+              </button>
+            )}
+          </div>
+
           <NavLink
             to="/settings"
             onClick={onClose}

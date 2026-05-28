@@ -52,6 +52,12 @@ class RoomBookingController extends Controller
         $endTimeStr = $validated['end_time'];
         $isWalkin = filter_var($validated['is_walkin'] ?? false, FILTER_VALIDATE_BOOLEAN);
 
+        if ($isWalkin && !($user instanceof \App\Models\Librarian)) {
+            return response()->json([
+                'message' => 'Tính năng đặt phòng walk-in chỉ dành cho thủ thư.'
+            ], 403);
+        }
+
         // 1. Verify room exists and is bookable
         $room = Room::bookable()->findOrFail($roomId);
 

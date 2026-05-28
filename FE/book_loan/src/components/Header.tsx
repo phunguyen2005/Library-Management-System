@@ -17,7 +17,14 @@ interface HeaderProps {
 export default function Header({ onToggleSidebar, onOpenMap }: HeaderProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user, role, logout } = useAuth();
+
+  const isOutlookStudent = !!(user?.email && (
+    user.email.toLowerCase().endsWith('@student.hcmue.edu.vn') || 
+    user.email.toLowerCase().endsWith('@hcmue.edu.vn')
+  ));
+  const isGuest = role === 'student' && !isOutlookStudent;
+
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<FormattedBook[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -195,18 +202,20 @@ export default function Header({ onToggleSidebar, onOpenMap }: HeaderProps) {
             {t('common.digitalLibrary')}
           </span>
         </div>
-        <div className="flex items-center gap-4">
-          <ThemeToggle />
-          <LanguageToggle />
-          <button
-            type="button"
-            onClick={onOpenMap}
-            className="flex h-10 w-10 items-center justify-center rounded-xl text-on-surface-variant hover:bg-surface-container transition-colors cursor-pointer"
-            title={t('header.libraryMap')}
-            aria-label={t('header.libraryMap')}
-          >
-            <span className="material-symbols-outlined text-2xl">map</span>
-          </button>
+        <div className="flex items-center gap-2 sm:gap-4">
+          <div className="hidden md:flex items-center gap-4">
+            <ThemeToggle />
+            <LanguageToggle />
+            <button
+              type="button"
+              onClick={onOpenMap}
+              className="flex h-10 w-10 items-center justify-center rounded-xl text-on-surface-variant hover:bg-surface-container transition-colors cursor-pointer"
+              title={t('header.libraryMap')}
+              aria-label={t('header.libraryMap')}
+            >
+              <span className="material-symbols-outlined text-2xl">map</span>
+            </button>
+          </div>
           <NotificationDropdown />
           <div
             className="relative ml-2 border-l border-surface-container-high pl-4"
@@ -278,17 +287,19 @@ export default function Header({ onToggleSidebar, onOpenMap }: HeaderProps) {
                     </span>
                     <span>{t('header.accountMenu.profile')}</span>
                   </button>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    onClick={() => handleAccountNavigate('/gamify')}
-                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-low focus:bg-surface-container-low focus:outline-none cursor-pointer"
-                  >
-                    <span className="material-symbols-outlined text-[20px] text-on-surface-variant" aria-hidden="true">
-                      emoji_events
-                    </span>
-                    <span>{t('header.accountMenu.rewards')}</span>
-                  </button>
+                  {!isGuest && (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => handleAccountNavigate('/gamify')}
+                      className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-low focus:bg-surface-container-low focus:outline-none cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-[20px] text-on-surface-variant" aria-hidden="true">
+                        emoji_events
+                      </span>
+                      <span>{t('header.accountMenu.rewards')}</span>
+                    </button>
+                  )}
                   <button
                     type="button"
                     role="menuitem"

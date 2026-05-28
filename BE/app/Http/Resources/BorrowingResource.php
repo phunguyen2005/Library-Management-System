@@ -14,6 +14,8 @@ class BorrowingResource extends JsonResource
         return [
             'loan_id' => $this->loan_id,
             'book_id' => $this->book_id,
+            'copy_id' => $this->copy_id,
+            'barcode' => $this->bookCopy?->barcode,
             'member_id' => $this->member_id,
             'librarian_id' => $this->librarian_id,
             'status' => $this->status,

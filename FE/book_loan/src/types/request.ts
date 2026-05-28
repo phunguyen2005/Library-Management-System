@@ -9,6 +9,8 @@ export interface BorrowRequestListItem {
   code: string;
   book: string;
   bookCode: string;
+  copy_id?: number | null;
+  barcode?: string | null;
   status: string;
   date: string;
   requested_at?: string;
@@ -34,6 +36,8 @@ export interface BorrowRequestListItem {
 export interface MemberBorrowRequest {
   id: number;
   book_id?: number;
+  copy_id?: number | null;
+  barcode?: string | null;
   bookTitle: string;
   author: string;
   cover?: string | null;

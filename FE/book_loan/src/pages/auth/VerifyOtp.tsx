@@ -46,7 +46,7 @@ export default function VerifyOtp() {
         role: response.role,
         token: response.token,
       });
-      navigate(response.role === 'admin' ? '/admin/dashboard' : '/home');
+      navigate(response.role === 'admin' || response.role === 'librarian' ? '/admin/dashboard' : '/home');
     } catch (error: unknown) {
       setErrorMsg(getErrorMessage(error, 'Mã xác thực không hợp lệ.'));
     } finally {

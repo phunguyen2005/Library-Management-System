@@ -1,6 +1,6 @@
 import { motion, useScroll, useTransform } from 'motion/react';
 import type { Variants } from 'motion/react';
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
@@ -104,6 +104,19 @@ export default function Landing() {
   const userInitial = userName.charAt(0).toUpperCase();
   const heroRef = useRef<HTMLElement>(null);
   const [iframeLoaded, setIframeLoaded] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  useEffect(() => {
+    if (isMobileMenuOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isMobileMenuOpen]);
+
   const { scrollYProgress } = useScroll({ target: heroRef, offset: ['start start', 'end start'] });
   const heroY = useTransform(scrollYProgress, [0, 1], ['0%', '30%']);
   const navLinks = [
@@ -147,7 +160,7 @@ export default function Landing() {
             <div className="flex h-9 w-14 items-center justify-center rounded-xl bg-surface-container p-1 shadow-md">
               <img src={logo} alt="HCMUE Logo" className="h-full w-auto object-contain" />
             </div>
-            <span className="font-headline text-lg font-bold tracking-tight text-primary">
+            <span className="font-headline text-sm sm:text-base md:text-lg font-bold tracking-tight text-primary">
               {t('common.digitalLibrary')}
             </span>
           </div>
@@ -165,8 +178,8 @@ export default function Landing() {
             ))}
           </nav>
 
-          {/* Actions */}
-          <div className="flex items-center gap-3">
+          {/* Desktop Actions */}
+          <div className="hidden md:flex items-center gap-3">
             <ThemeToggle />
             <LanguageToggle />
             {isAuthenticated ? (
@@ -177,7 +190,7 @@ export default function Landing() {
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-primary to-blue-600 font-bold text-white text-sm shadow-sm">
                   {userInitial}
                 </div>
-                <div className="hidden sm:flex flex-col">
+                <div className="flex flex-col">
                   <span className="text-xs font-bold text-on-surface line-clamp-1">
                     {userName}
                   </span>
@@ -201,8 +214,76 @@ export default function Landing() {
               </button>
             )}
           </div>
+
+          {/* Hamburger menu button for mobile */}
+          <button
+            type="button"
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="flex h-10 w-10 items-center justify-center rounded-xl text-on-surface-variant hover:bg-surface-container md:hidden cursor-pointer"
+            aria-label="Toggle mobile menu"
+          >
+            <span className="material-symbols-outlined text-2xl">
+              {isMobileMenuOpen ? 'close' : 'menu'}
+            </span>
+          </button>
         </div>
       </header>
+
+      {/* Mobile Drawer Menu Overlay */}
+      {isMobileMenuOpen && (
+        <div className="fixed inset-0 z-40 bg-surface-bright md:hidden flex flex-col pt-24 px-6 pb-8 transition-all duration-300">
+          <nav className="flex flex-col gap-4 mb-8">
+            {navLinks.map(({ label, href }) => (
+              <a
+                key={label}
+                href={href}
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="text-base font-semibold text-on-surface hover:text-primary transition-colors py-2.5 border-b border-surface-container-low"
+              >
+                {label}
+              </a>
+            ))}
+          </nav>
+          
+          <div className="flex flex-col gap-5 mt-auto border-t border-surface-container-low pt-6">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">Giao diện</span>
+              <ThemeToggle />
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wider text-on-surface-variant">Ngôn ngữ</span>
+              <LanguageToggle />
+            </div>
+            
+            {isAuthenticated ? (
+              <button
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  handleCTA();
+                }}
+                className="w-full flex items-center justify-center gap-3 rounded-xl bg-primary py-3.5 font-bold text-white shadow-md shadow-primary/20"
+              >
+                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-white/20 font-bold text-white text-xs shadow-sm">
+                  {userInitial}
+                </div>
+                <span className="text-sm">Trang cá nhân ({userName})</span>
+                <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  handleCTA();
+                }}
+                className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary to-blue-600 py-3.5 font-bold text-white shadow-md shadow-primary/20 hover:from-blue-600 hover:to-blue-700"
+              >
+                <span>{t('landing.login')}</span>
+                <span className="material-symbols-outlined text-[18px]">login</span>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       <main className="flex-grow pt-20">
 
@@ -211,9 +292,9 @@ export default function Landing() {
           ref={heroRef}
           className="relative flex min-h-[calc(100vh-4rem)] w-full items-center justify-center overflow-hidden bg-surface-container-low"
         >
-          {/* Spline 3D background */}
+          {/* Spline 3D background - hidden on mobile for performance and gesture scroll compatibility */}
           <div
-            className="absolute inset-0 z-0 w-full h-full overflow-hidden"
+            className="absolute inset-0 z-0 w-full h-full overflow-hidden hidden md:block"
             onMouseEnter={() => {
               document.body.style.overflow = 'hidden';
             }}
@@ -249,6 +330,12 @@ export default function Landing() {
             />
           </div>
 
+          {/* Mobile premium mesh gradient background */}
+          <div className="absolute inset-0 z-0 w-full h-full md:hidden overflow-hidden bg-surface-container-low">
+            <div className="absolute -right-12 top-12 h-64 w-64 rounded-full bg-primary/15 blur-3xl animate-pulse" style={{ animationDuration: '8s' }} />
+            <div className="absolute -left-12 bottom-20 h-64 w-64 rounded-full bg-tertiary/10 blur-3xl animate-pulse" style={{ animationDuration: '12s' }} />
+          </div>
+
           {/* Readability gradient overlay - fades from solid background color to transparent */}
           <div className="absolute inset-0 z-1 pointer-events-none bg-gradient-to-b from-surface-container-low/95 via-surface-container-low/80 to-surface-container-low/40 lg:bg-gradient-to-r lg:from-surface-container-low/95 lg:via-surface-container-low/60 lg:to-transparent" />
 
@@ -266,7 +353,7 @@ export default function Landing() {
               {/* Headline */}
               <motion.h1
                 variants={fadeInUp}
-                className="font-headline text-5xl font-extrabold leading-tight tracking-tight text-on-background lg:text-6xl xl:text-7xl drop-shadow-sm"
+                className="font-headline text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-extrabold leading-tight tracking-tight text-on-background drop-shadow-sm"
               >
                 {t('landing.heroTitleA')}{' '}
                 <span className="relative inline-block text-primary">
@@ -284,7 +371,7 @@ export default function Landing() {
               </motion.h1>
 
               {/* Sub */}
-              <motion.p variants={fadeInUp} className="max-w-xl text-lg leading-relaxed text-on-surface-variant font-medium drop-shadow-sm">
+              <motion.p variants={fadeInUp} className="max-w-xl text-base sm:text-lg leading-relaxed text-on-surface-variant font-medium drop-shadow-sm">
                 {t('landing.heroBody')}
               </motion.p>
 
@@ -369,18 +456,17 @@ export default function Landing() {
               </button>
             </div>
 
-            {/* Bento grid */}
             <motion.div
               initial="hidden"
               whileInView="visible"
               viewport={{ once: true, margin: '-60px' }}
               variants={stagger}
-              className="grid auto-rows-[220px] grid-cols-1 gap-5 md:grid-cols-4"
+              className="grid auto-rows-auto md:auto-rows-[220px] grid-cols-1 gap-5 md:grid-cols-4"
             >
               {/* Large — Education */}
               <motion.div
                 variants={fadeIn}
-                className="group relative col-span-1 row-span-2 cursor-pointer overflow-hidden rounded-2xl shadow-md md:col-span-2"
+                className="group relative col-span-1 row-span-1 md:row-span-2 min-h-[360px] md:min-h-0 cursor-pointer overflow-hidden rounded-2xl shadow-md md:col-span-2"
               >
                 <img
                   src={landingCategories[0].image}
@@ -393,13 +479,13 @@ export default function Landing() {
                 <div className="absolute right-4 top-4 h-32 w-32 rounded-full bg-white/10 blur-2xl" />
                 <div className="absolute bottom-16 left-4 h-24 w-24 rounded-full bg-white/5 blur-xl" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
-                <div className="relative flex h-full flex-col justify-end p-8 text-white">
-                  <span className="mb-3 inline-block rounded bg-white/20 px-3 py-1 text-xs font-semibold uppercase tracking-wider backdrop-blur-sm">
+                <div className="relative flex h-full flex-col justify-end p-6 sm:p-8 text-white">
+                  <span className="mb-3 inline-block w-fit rounded bg-white/20 px-3 py-1 text-xs font-semibold uppercase tracking-wider backdrop-blur-sm">
                     {landingCategories[0].label}
                   </span>
-                  <h3 className="font-headline mb-2 text-3xl font-bold">{landingCategories[0].title}</h3>
-                  <p className="mb-4 max-w-md text-sm text-white/80">{landingCategories[0].desc}</p>
-                  <span className="flex items-center gap-1 text-sm text-white/90 transition-all group-hover:gap-2">
+                  <h3 className="font-headline mb-2 text-2xl sm:text-3xl font-bold">{landingCategories[0].title}</h3>
+                  <p className="mb-4 max-w-md text-xs sm:text-sm text-white/80">{landingCategories[0].desc}</p>
+                  <span className="flex items-center gap-1 text-xs sm:text-sm text-white/90 transition-all group-hover:gap-2">
                     {t('landing.exploreCount')}
                     <span className="material-symbols-outlined text-[16px]">trending_flat</span>
                   </span>
@@ -409,7 +495,7 @@ export default function Landing() {
               {/* Small — IT */}
               <motion.div
                 variants={fadeIn}
-                className="group relative col-span-1 row-span-1 cursor-pointer overflow-hidden rounded-2xl shadow-md"
+                className="group relative col-span-1 row-span-1 min-h-[220px] md:min-h-0 cursor-pointer overflow-hidden rounded-2xl shadow-md"
               >
                 <img
                   src={landingCategories[1].image}
@@ -426,7 +512,7 @@ export default function Landing() {
                     </div>
                   </div>
                   <div>
-                    <h3 className="font-headline mb-1 font-bold">{landingCategories[1].title}</h3>
+                    <h3 className="font-headline mb-1 font-bold text-lg">{landingCategories[1].title}</h3>
                     <p className="text-xs text-white/75">{landingCategories[1].desc}</p>
                   </div>
                 </div>
@@ -435,7 +521,7 @@ export default function Landing() {
               {/* Small — Science */}
               <motion.div
                 variants={fadeIn}
-                className="group relative col-span-1 row-span-1 cursor-pointer overflow-hidden rounded-2xl shadow-md"
+                className="group relative col-span-1 row-span-1 min-h-[220px] md:min-h-0 cursor-pointer overflow-hidden rounded-2xl shadow-md"
               >
                 <img
                   src={landingCategories[2].image}
@@ -452,7 +538,7 @@ export default function Landing() {
                     </div>
                   </div>
                   <div>
-                    <h3 className="font-headline mb-1 font-bold">{landingCategories[2].title}</h3>
+                    <h3 className="font-headline mb-1 font-bold text-lg">{landingCategories[2].title}</h3>
                     <p className="text-xs text-white/75">{landingCategories[2].desc}</p>
                   </div>
                 </div>
@@ -461,7 +547,7 @@ export default function Landing() {
               {/* Wide — Literature */}
               <motion.div
                 variants={fadeIn}
-                className="group relative col-span-1 row-span-1 cursor-pointer overflow-hidden rounded-2xl shadow-md md:col-span-2"
+                className="group relative col-span-1 row-span-1 min-h-[220px] md:min-h-0 cursor-pointer overflow-hidden rounded-2xl shadow-md md:col-span-2"
               >
                 <img
                   src={landingCategories[3].image}
@@ -471,14 +557,14 @@ export default function Landing() {
                 />
                 <div className={`absolute inset-0 bg-gradient-to-br ${landingCategories[3].bg} opacity-80 transition-opacity duration-300 group-hover:opacity-85`} />
                 <div className="absolute -right-8 -top-8 h-40 w-40 rounded-full bg-white/10 blur-2xl" />
-                <div className="relative flex h-full items-center gap-6 p-6 text-white">
+                <div className="relative flex h-full flex-col sm:flex-row items-center justify-center sm:justify-start gap-4 sm:gap-6 p-6 text-white text-center sm:text-left">
                   <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-sm">
                     <span className="material-symbols-outlined text-3xl">{landingCategories[3].icon}</span>
                   </div>
                   <div>
                     <h3 className="font-headline mb-1 text-xl font-bold">{landingCategories[3].title}</h3>
-                    <p className="mb-3 text-sm text-white/80">{landingCategories[3].desc}</p>
-                    <span className="flex items-center gap-1 text-sm font-medium text-white/90 transition-all group-hover:gap-2">
+                    <p className="mb-3 text-xs sm:text-sm text-white/80">{landingCategories[3].desc}</p>
+                    <span className="flex items-center justify-center sm:justify-start gap-1 text-xs sm:text-sm font-medium text-white/90 transition-all group-hover:gap-2">
                       {t('landing.explore')} <span className="material-symbols-outlined text-[16px]">chevron_right</span>
                     </span>
                   </div>

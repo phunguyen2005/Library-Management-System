@@ -84,14 +84,8 @@ class RoomBookingQuotaAndWalkinTest extends TestCase
             ->assertStatus(201);
     }
 
-    public function test_student_walkin_booking_mechanism(): void
+    public function test_student_cannot_perform_walkin_booking(): void
     {
-        $settings = LibrarySetting::singleton();
-        $settings->forceFill([
-            'room_min_group_size' => 3, // require 3 normally
-            'room_booking_requires_approval' => true, // require approval normally
-        ])->save();
-
         $room = Room::query()->firstOrFail();
         $member = Member::query()->findOrFail(1);
         $token = $member->createToken('walkin-test', ['role:student'])->plainTextToken;
@@ -102,17 +96,14 @@ class RoomBookingQuotaAndWalkinTest extends TestCase
                 'room_id' => $room->room_id,
                 'is_walkin' => true,
                 'end_time' => now()->addHour()->format('H:i'), // 1 hour from now
-                'group_size' => 1, // bypasses min_group_size of 3!
+                'group_size' => 1,
                 'purpose' => 'Walkin study',
             ]);
 
-        $response->assertStatus(201);
-        $booking = $response->json();
-
-        $this->assertTrue($booking['is_walkin']);
-        $this->assertSame(RoomBooking::STATUS_APPROVED, $booking['status']); // Bypasses requires_approval
-        $this->assertNotNull($booking['check_in_at']); // Auto check-in
-        $this->assertSame(now()->format('Y-m-d'), $booking['date']); // Locked to today
+        $response->assertStatus(403)
+            ->assertJsonFragment([
+                'message' => 'Tính năng đặt phòng walk-in chỉ dành cho thủ thư.'
+            ]);
     }
 
     public function test_librarian_can_book_on_behalf_of_student(): void

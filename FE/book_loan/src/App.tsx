@@ -12,6 +12,8 @@ const VerifyOtp = lazy(() => import('./pages/auth/VerifyOtp'));
 const OAuthCallback = lazy(() => import('./pages/auth/OAuthCallback'));
 const ForgotPassword = lazy(() => import('./pages/auth/ForgotPassword'));
 const NotFound = lazy(() => import('./pages/public/NotFound'));
+const Blog = lazy(() => import('./pages/public/Blog'));
+const BlogPost = lazy(() => import('./pages/public/BlogPost'));
 const TermsOfUse = lazy(() => import('./pages/public/TermsOfUse'));
 const PrivacyPolicy = lazy(() => import('./pages/public/PrivacyPolicy'));
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
@@ -37,10 +39,17 @@ const VnpayMockCheckout = lazy(() => import('./pages/student/VnpayMockCheckout')
 const RoomBookingPage = lazy(() => import('./pages/student/RoomBooking'));
 const AdminRoomBookings = lazy(() => import('./pages/admin/AdminRoomBookings'));
 const AdminLibrarians = lazy(() => import('./pages/admin/AdminLibrarians'));
+const BlogManagement = lazy(() => import('./pages/admin/BlogManagement'));
 
 export default function App() {
-  const { isAuthReady, isAuthenticated, role } = useAuth();
+  const { isAuthReady, isAuthenticated, role, user } = useAuth();
   const homePath = (role === 'admin' || role === 'librarian') ? '/admin/dashboard' : '/home';
+
+  const isOutlookStudent = !!(user?.email && (
+    user.email.toLowerCase().endsWith('@student.hcmue.edu.vn') || 
+    user.email.toLowerCase().endsWith('@hcmue.edu.vn')
+  ));
+  const isGuest = role === 'student' && !isOutlookStudent;
 
   if (!isAuthReady) {
     return <PageLoader />;
@@ -50,6 +59,8 @@ export default function App() {
     <Suspense fallback={<PageLoader />}>
       <Routes>
         <Route path="/" element={<Landing />} />
+        <Route path="/blog" element={<Blog />} />
+        <Route path="/blog/:slug" element={<BlogPost />} />
         <Route path="/terms" element={<TermsOfUse />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route path="/login" element={isAuthenticated ? <Navigate to={homePath} replace /> : <Login />} />
@@ -66,11 +77,11 @@ export default function App() {
             <Route path="/favorites" element={<Favorites />} />
             <Route path="/my-books" element={<MyBooks />} />
             <Route path="/digital" element={<Digital />} />
-            <Route path="/requests" element={<StudentRequests />} />
-            <Route path="/room-booking" element={<RoomBookingPage />} />
-            <Route path="/history" element={<History />} />
-            <Route path="/fines" element={<StudentFines />} />
-            <Route path="/gamify" element={<Gamification />} />
+            <Route path="/requests" element={isGuest ? <Navigate to="/home" replace /> : <StudentRequests />} />
+            <Route path="/room-booking" element={isGuest ? <Navigate to="/home" replace /> : <RoomBookingPage />} />
+            <Route path="/history" element={isGuest ? <Navigate to="/home" replace /> : <History />} />
+            <Route path="/fines" element={isGuest ? <Navigate to="/home" replace /> : <StudentFines />} />
+            <Route path="/gamify" element={isGuest ? <Navigate to="/home" replace /> : <Gamification />} />
             <Route path="/settings" element={<StudentSettings />} />
           </Route>
         </Route>
@@ -106,6 +117,9 @@ export default function App() {
             </Route>
             <Route element={<ProtectedRoute permission="manage_librarians" />}>
               <Route path="librarians" element={<AdminLibrarians />} />
+            </Route>
+            <Route element={<ProtectedRoute permission="manage_blog" />}>
+              <Route path="blog" element={<BlogManagement />} />
             </Route>
           </Route>
         </Route>

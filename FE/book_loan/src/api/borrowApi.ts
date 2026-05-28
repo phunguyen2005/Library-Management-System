@@ -11,6 +11,8 @@ type PaginatedResponse<T> = {
 type BorrowingResource = {
   loan_id: number;
   book_id: number;
+  copy_id?: number | null;
+  barcode?: string | null;
   member_id: number;
   librarian_id?: number | null;
   status: string;
@@ -96,6 +98,8 @@ function mapBorrowingToAdminItem(item: BorrowingResource): BorrowRequestListItem
     days_overdue: Number(item.days_overdue ?? 0),
     due_status: item.due_status,
     raw_status: item.status as BorrowRequestListItem['raw_status'],
+    copy_id: item.copy_id ?? null,
+    barcode: item.barcode ?? null,
     fine: item.fine || null,
   };
 }
@@ -117,6 +121,8 @@ function mapBorrowingToMemberItem(item: BorrowingResource): MemberBorrowRequest 
     is_overdue: Boolean(item.is_overdue),
     days_overdue: Number(item.days_overdue ?? 0),
     due_status: item.due_status,
+    copy_id: item.copy_id ?? null,
+    barcode: item.barcode ?? null,
     is_reviewed: Boolean(item.is_reviewed),
     fine: item.fine || null,
   };
@@ -159,11 +165,12 @@ export async function approveBorrow(loanId: number) {
   );
 }
 
-export async function confirmPickup(loanId: number) {
+export async function confirmPickup(loanId: number, barcode?: string) {
   return apiRequest<{ message: string; loan: BorrowingResource }>(
     `/requests/${loanId}/confirm-pickup`,
     {
       method: 'POST',
+      body: { barcode },
     },
   );
 }
@@ -187,12 +194,12 @@ export async function cancelBorrow(loanId: number) {
   );
 }
 
-export async function returnBook(loanId: number, condition: BookCondition = 'good', conditionNote?: string) {
+export async function returnBook(loanId: number, condition: BookCondition = 'good', conditionNote?: string, barcode?: string) {
   return apiRequest<{ message: string; loan: BorrowingResource }>(
     `/requests/${loanId}/return`,
     {
       method: 'POST',
-      body: { condition, condition_note: conditionNote ?? null },
+      body: { condition, condition_note: conditionNote ?? null, barcode: barcode ?? null },
     },
   );
 }

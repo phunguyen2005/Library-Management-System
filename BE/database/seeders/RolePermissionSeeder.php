@@ -27,6 +27,7 @@ class RolePermissionSeeder extends Seeder
             'view_reports' => 'Xem báo cáo thống kê thư viện',
             'view_audit_logs' => 'Xem nhật ký vận hành hệ thống',
             'manage_librarians' => 'Quản lý thủ thư & phân quyền',
+            'manage_blog' => 'Tạo, sửa, xóa và quản lý bài đăng blog',
         ];
 
         $permissionModels = [];

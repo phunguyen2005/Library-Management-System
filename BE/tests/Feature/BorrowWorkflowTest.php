@@ -3,10 +3,12 @@
 namespace Tests\Feature;
 
 use App\Models\Book;
+use App\Models\BookCopy;
 use App\Models\Borrowing;
 use App\Models\Librarian;
 use App\Models\Member;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class BorrowWorkflowTest extends TestCase
@@ -117,32 +119,64 @@ class BorrowWorkflowTest extends TestCase
     {
         $librarian = Librarian::query()->findOrFail(1);
         $token = $librarian->createToken('librarian-access', ['role:admin']);
+        $member = Member::query()->findOrFail(3);
+        $book = Book::query()->create([
+            'title' => 'Approve Return Fixture',
+            'author' => 'Library Ops',
+            'genre' => 'Technology',
+            'published_year' => 2026,
+            'is_available' => true,
+            'cover' => null,
+            'location' => 'C1',
+            'is_digital' => false,
+            'resource_type' => null,
+            'file_format' => null,
+            'file_size' => null,
+            'download_count' => 0,
+            'total_quantity' => 1,
+            'available_quantity' => 1,
+            'repairing_quantity' => 0,
+        ]);
+        $loan = Borrowing::query()->create([
+            'book_id' => $book->book_id,
+            'member_id' => $member->member_id,
+            'status' => Borrowing::STATUS_PENDING,
+            'borrow_date' => today()->toDateString(),
+        ]);
 
         $this->withToken($token->plainTextToken)
-            ->postJson('/api/requests/2/approve')
+            ->postJson("/api/requests/{$loan->loan_id}/approve")
             ->assertOk()
             ->assertJsonPath('loan.status', 'approved')
             ->assertJsonPath('loan.librarian_id', 1);
 
         $this->assertDatabaseHas('books', [
-            'book_id' => 2,
+            'book_id' => $book->book_id,
             'available_quantity' => 0,
             'is_available' => 0,
         ]);
 
+        $barcode = DB::table('book_copies')
+            ->where('book_id', $book->book_id)
+            ->where('status', BookCopy::STATUS_AVAILABLE)
+            ->value('barcode');
+
+        $this->assertNotNull($barcode);
+
         $this->withToken($token->plainTextToken)
-            ->postJson('/api/requests/2/confirm-pickup')
+            ->postJson("/api/requests/{$loan->loan_id}/confirm-pickup", ['barcode' => $barcode])
             ->assertOk()
             ->assertJsonPath('loan.status', 'borrowed')
+            ->assertJsonPath('loan.barcode', $barcode)
             ->assertJsonPath('loan.due_date', today()->addDays(14)->toDateString());
 
         $this->withToken($token->plainTextToken)
-            ->postJson('/api/requests/2/return')
+            ->postJson("/api/requests/{$loan->loan_id}/return")
             ->assertOk()
             ->assertJsonPath('loan.status', 'returned')
             ->assertJsonPath('loan.return_date', today()->toDateString());
         $this->assertDatabaseHas('books', [
-            'book_id' => 2,
+            'book_id' => $book->book_id,
             'available_quantity' => 1,
             'is_available' => 1,
         ]);
@@ -261,13 +295,29 @@ class BorrowWorkflowTest extends TestCase
         $librarian = Librarian::query()->findOrFail(1);
         $token = $librarian->createToken('librarian-access', ['role:admin']);
 
-        $loan = Borrowing::find(1);
-        $book = $loan->book;
-        $book->update([
-            'total_quantity' => 5,
-            'available_quantity' => 2,
-            'repairing_quantity' => 1
+        $book = Book::query()->create([
+            'title' => 'Repair Workflow Fixture',
+            'author' => 'Library Ops',
+            'genre' => 'Technology',
+            'published_year' => 2026,
+            'is_available' => true,
+            'cover' => null,
+            'location' => 'C1',
+            'is_digital' => false,
+            'resource_type' => null,
+            'file_format' => null,
+            'file_size' => null,
+            'download_count' => 0,
+            'total_quantity' => 3,
+            'available_quantity' => 3,
+            'repairing_quantity' => 0,
         ]);
+        $copy = $book->copies()->firstOrFail();
+        $copy->forceFill([
+            'status' => BookCopy::STATUS_REPAIRING,
+            'condition' => BookCopy::CONDITION_DAMAGED,
+        ])->save();
+        BookCopy::syncBookCounters($book->fresh());
 
         $this->withToken($token->plainTextToken)
             ->postJson("/api/books/{$book->book_id}/complete-repair")
@@ -277,7 +327,7 @@ class BorrowWorkflowTest extends TestCase
 
         $this->assertDatabaseHas('books', [
             'book_id' => $book->book_id,
-            'total_quantity' => 5,
+            'total_quantity' => 3,
             'available_quantity' => 3,
             'repairing_quantity' => 0,
         ]);

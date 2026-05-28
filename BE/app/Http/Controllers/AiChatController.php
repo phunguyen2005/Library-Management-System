@@ -325,14 +325,15 @@ class AiChatController extends Controller
         $message = $request->input('message');
         $history = $request->input('history', []);
         $apiKey = $this->getApiKey();
-        $member = $request->user();
+        // Optional auth: works for both guests and logged-in users
+        $member = auth('sanctum')->user();
 
         // Load entire book catalog as context
         $books = Book::all(['book_id', 'title', 'author', 'genre', 'is_available', 'available_quantity', 'location']);
         $catalogText = $books->map(fn($b) => "- [ID: {$b->book_id}] \"{$b->title}\" của tác giả {$b->author} (Thể loại: {$b->genre}, Kệ: {$b->location}, " . ($b->is_available ? "Còn sách" : "Hết sách") . ")")->join("\n");
 
         $systemPrompt = "Bạn là thủ thư AI thông thái và thân thiện của Thư viện trường Đại học Sư phạm TP.HCM (HCMUE).\n"
-            . "Nhiệm vụ của bạn là tư vấn, tìm kiếm sách, giải đáp các thắc mắc của sinh viên đang đăng nhập và hướng dẫn quy trình một cách lịch sự, chuyên nghiệp bằng tiếng Việt.\n\n"
+            . "Nhiệm vụ của bạn là tư vấn, tìm kiếm sách, giải đáp các thắc mắc của sinh viên và hướng dẫn quy trình một cách lịch sự, chuyên nghiệp bằng tiếng Việt.\n\n"
             . "Đây là danh mục sách hiện có trong hệ thống thư viện:\n"
             . $catalogText . "\n\n"
             . "HƯỚNG DẪN TRẢ LỜI:\n"
@@ -341,7 +342,10 @@ class AiChatController extends Controller
             . "3. QUAN TRỌNG: Khi gợi ý sách, bạn PHẢI viết kèm mã ID sách chính xác dưới dạng '[ID: X]' (ví dụ: 'Tôi gợi ý cuốn Clean Code [ID: 5]...'). Giao diện người dùng sẽ dùng mã này để tạo liên kết cho phép click xem trực tiếp. Đừng quên định dạng [ID: X] này!\n"
             . "4. Nếu người dùng hỏi về quy trình mượn sách, hãy giải thích: Sinh viên gửi yêu cầu trực tuyến trên web -> Thủ thư duyệt -> Sinh viên nhận mã QR trên mail/in-app -> Sinh viên đến thư viện đưa thủ thư quét QR để nhận sách. Thời hạn nhận sách là 24 giờ.\n"
             . "5. Nếu sách họ muốn mượn đã hết (available_quantity = 0), hãy nhắc họ có thể click vào chi tiết sách để sử dụng tính năng 'Đặt chỗ trước' (Reservation Queue) để xếp hàng chờ tự động.\n"
-            . "6. Bạn được cung cấp các công cụ (Tools) để xem sách đang mượn (getMyBorrowings), xem tiền phạt (getMyFines), và xem lịch đặt phòng tự học (getMyRoomBookings) của sinh viên này. Hãy gọi công cụ khi họ hỏi về thông tin cá nhân của họ.";
+            . ($member
+                ? "6. Bạn được cung cấp các công cụ (Tools) để xem sách đang mượn (getMyBorrowings), xem tiền phạt (getMyFines), và xem lịch đặt phòng tự học (getMyRoomBookings) của sinh viên này. Hãy gọi công cụ khi họ hỏi về thông tin cá nhân của họ."
+                : "6. Người dùng hiện chưa đăng nhập. Nếu họ hỏi về thông tin cá nhân (lịch sử mượn, tiền phạt, phòng tự học), hãy nhắc họ đăng nhập để xem thông tin đó."
+            );
 
         // Declare tools schema for Gemini
         $tools = [
@@ -401,8 +405,9 @@ class AiChatController extends Controller
                 ];
 
                 // Check if user is asking about personal details that require tools
+                // Only attempt function-calling if the user is authenticated
                 $normalizedMsg = mb_strtolower($message, 'UTF-8');
-                $needsTools = Str::contains($normalizedMsg, [
+                $needsTools = $member && Str::contains($normalizedMsg, [
                     'của tôi', 'cá nhân', 'tôi mượn', 'đang mượn', 'lịch sử mượn',
                     'tiền phạt', 'phạt', 'đóng phạt', 'nợ phạt',
                     'đặt phòng', 'phòng tự học', 'phòng nhóm', 'lịch đặt phòng', 'phòng của tôi'
@@ -451,17 +456,29 @@ class AiChatController extends Controller
                     
                     $isError = false;
                     $errorBuffer = '';
+                    $firstChunkChecked = false;
 
                     // Buffer function to echo chunks immediately to client
-                    curl_setopt($ch, CURLOPT_WRITEFUNCTION, function ($ch, $data) use (&$isError, &$errorBuffer) {
-                        // Check if the response is a JSON error (starts with '{')
-                        if (!$isError && empty($errorBuffer) && strpos(trim($data), '{') === 0) {
-                            $isError = true;
+                    curl_setopt($ch, CURLOPT_WRITEFUNCTION, function ($ch, $data) use (&$isError, &$errorBuffer, &$firstChunkChecked) {
+                        // On the very first chunk, check if it is a JSON error object
+                        // (Gemini returns {"error":{...}} on failures, NOT valid SSE data)
+                        if (!$firstChunkChecked) {
+                            $firstChunkChecked = true;
+                            $trimmed = trim($data);
+                            // A real error response looks like {"error": ...} with no 'data:' prefix
+                            if (strpos($trimmed, '{') === 0) {
+                                $decoded = json_decode($trimmed, true);
+                                if (is_array($decoded) && isset($decoded['error'])) {
+                                    $isError = true;
+                                    $errorBuffer .= $data;
+                                    return strlen($data); // consume but don't echo
+                                }
+                            }
                         }
 
                         if ($isError) {
                             $errorBuffer .= $data;
-                            return 0; // Abort curl stream
+                            return strlen($data); // consume remaining error data
                         }
 
                         echo $data;
@@ -477,8 +494,9 @@ class AiChatController extends Controller
                     curl_close($ch);
 
                     if ($isError || $httpCode !== 200 || $res === false) {
-                        Log::error("Gemini SSE API stream failed. HTTP Code: {$httpCode}, Raw Error: " . $errorBuffer);
-                        $this->streamOfflineFallbackData($message, $errorBuffer ?: "cURL execution failed");
+                        $errDetail = $errorBuffer ?: (curl_error($ch) ?: "cURL execution failed, HTTP {$httpCode}");
+                        Log::error("Gemini SSE API stream failed. HTTP Code: {$httpCode}, Raw Error: " . $errDetail);
+                        $this->streamOfflineFallbackData($message, $errDetail);
                     }
                 }, 200, [
                     'Content-Type' => 'text/event-stream',

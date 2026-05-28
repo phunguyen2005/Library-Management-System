@@ -7,6 +7,7 @@ use App\Http\Requests\BorrowingIndexRequest;
 use App\Http\Requests\RejectBorrowRequest;
 use App\Http\Resources\BorrowingResource;
 use App\Models\Book;
+use App\Models\BookCopy;
 use App\Models\Borrowing;
 use App\Models\Fine;
 use App\Models\LibrarySetting;
@@ -155,9 +156,7 @@ class BorrowController extends Controller
             $loan->approved_at = now();
             $loan->save();
 
-            $book->available_quantity = $book->available_quantity - 1;
-            $book->is_available = $book->available_quantity > 0;
-            $book->save();
+            BookCopy::syncBookCounters($book);
 
             try {
                 $loan->member->notify(new \App\Notifications\BorrowingStatusNotification($loan, 'approved'));
@@ -168,7 +167,7 @@ class BorrowController extends Controller
 
             \App\Services\AuditLoggerService::log('borrow_approve', 'Đã duyệt yêu cầu mượn sách: ' . $loan->book->title . ' cho thành viên: ' . $loan->member->name . ' (Mã phiếu: #' . $loan->loan_id . ')', $librarian);
 
-            return $loan->fresh(['book', 'member', 'librarian']);
+            return $loan->fresh(['book', 'bookCopy', 'member', 'librarian']);
         });
 
         return response()->json([
@@ -180,9 +179,13 @@ class BorrowController extends Controller
     public function confirmPickup(Request $request, int $loanId)
     {
         $librarian = $request->user();
+        $validated = $request->validate([
+            'barcode' => ['required', 'string', 'max:255'],
+        ]);
+        $barcode = trim($validated['barcode']);
 
-        $loan = DB::transaction(function () use ($loanId, $librarian) {
-            $loan = Borrowing::query()->lockForUpdate()->find($loanId);
+        $loan = DB::transaction(function () use ($loanId, $librarian, $barcode) {
+            $loan = Borrowing::query()->with(['book', 'member'])->lockForUpdate()->find($loanId);
 
             if (! $loan) {
                 throw new HttpResponseException(response()->json(['message' => __('messages.borrow.request_not_found')], 404));
@@ -192,7 +195,23 @@ class BorrowController extends Controller
                 throw new HttpResponseException(response()->json(['message' => __('messages.borrow.pickup_requires_approved')], 422));
             }
 
+            $copy = BookCopy::query()
+                ->where('book_id', $loan->book_id)
+                ->where('barcode', $barcode)
+                ->lockForUpdate()
+                ->first();
+
+            if (! $copy || $copy->status !== BookCopy::STATUS_AVAILABLE) {
+                throw new HttpResponseException(response()->json([
+                    'message' => 'Mã vạch không tồn tại hoặc bản sao không khả dụng cho phiếu mượn này.',
+                    'errors' => [
+                        'barcode' => ['Mã vạch không tồn tại hoặc bản sao không khả dụng cho phiếu mượn này.'],
+                    ],
+                ], 422));
+            }
+
             $loan->status = Borrowing::STATUS_BORROWED;
+            $loan->copy_id = $copy->id;
             $loan->librarian_id = $librarian->librarian_id;
             $settings = LibrarySetting::singleton();
             $loanPeriodDays = max(1, (int) $settings->loan_period_days);
@@ -203,6 +222,14 @@ class BorrowController extends Controller
             $loan->borrow_date = now()->toDateString();
             $loan->due_date = now()->addDays($loanPeriodDays + $extraDays)->toDateString();
             $loan->save();
+
+            $copy->forceFill([
+                'status' => BookCopy::STATUS_BORROWED,
+                'condition' => BookCopy::CONDITION_GOOD,
+                'last_checked_out_at' => now(),
+            ])->save();
+
+            BookCopy::syncBookCounters($loan->book);
 
             // Award XP for checkout
             app(\App\Services\GamifyService::class)->awardXpAndPoints(
@@ -215,7 +242,7 @@ class BorrowController extends Controller
 
             \App\Services\AuditLoggerService::log('borrow_pickup', 'Đã giao sách vật lý: ' . $loan->book->title . ' cho thành viên: ' . $loan->member->name . ' (Mã phiếu: #' . $loan->loan_id . ')', $librarian);
 
-            return $loan->fresh(['book', 'member', 'librarian']);
+            return $loan->fresh(['book', 'bookCopy', 'member', 'librarian']);
         });
 
         return response()->json([
@@ -269,15 +296,17 @@ class BorrowController extends Controller
         $librarian = $request->user();
 
         $validated = $request->validate([
+            'barcode' => ['nullable', 'string', 'max:255'],
             'condition' => ['nullable', 'string', 'in:good,damaged,lost'],
             'condition_note' => ['nullable', 'string', 'max:500'],
         ]);
 
+        $barcode = isset($validated['barcode']) ? trim((string) $validated['barcode']) : null;
         $condition = $validated['condition'] ?? 'good';
         $conditionNote = $validated['condition_note'] ?? null;
 
-        $loan = DB::transaction(function () use ($loanId, $librarian, $condition, $conditionNote) {
-            $loan = Borrowing::query()->lockForUpdate()->find($loanId);
+        $loan = DB::transaction(function () use ($loanId, $librarian, $barcode, $condition, $conditionNote) {
+            $loan = Borrowing::query()->with(['book', 'member', 'bookCopy'])->lockForUpdate()->find($loanId);
 
             if (! $loan) {
                 throw new HttpResponseException(response()->json(['message' => __('messages.borrow.loan_not_found')], 404));
@@ -288,8 +317,48 @@ class BorrowController extends Controller
             }
 
             $book = Book::query()->lockForUpdate()->find($loan->book_id);
+            $copy = null;
+
+            if ($barcode !== null && $barcode !== '') {
+                $copy = BookCopy::query()
+                    ->where('barcode', $barcode)
+                    ->lockForUpdate()
+                    ->first();
+
+                if (! $copy || (int) $copy->book_id !== (int) $loan->book_id) {
+                    throw new HttpResponseException(response()->json([
+                        'message' => 'Mã vạch không thuộc sách của phiếu mượn này.',
+                        'errors' => [
+                            'barcode' => ['Mã vạch không thuộc sách của phiếu mượn này.'],
+                        ],
+                    ], 422));
+                }
+
+                if ($loan->copy_id && (int) $loan->copy_id !== (int) $copy->id) {
+                    throw new HttpResponseException(response()->json([
+                        'message' => 'Mã vạch không khớp với bản sao đã giao cho phiếu mượn này.',
+                        'errors' => [
+                            'barcode' => ['Mã vạch không khớp với bản sao đã giao cho phiếu mượn này.'],
+                        ],
+                    ], 422));
+                }
+            } elseif ($loan->copy_id) {
+                $copy = BookCopy::query()->lockForUpdate()->find($loan->copy_id);
+            }
+
+            if ($copy && $copy->status !== BookCopy::STATUS_BORROWED) {
+                throw new HttpResponseException(response()->json([
+                    'message' => 'Bản sao này không ở trạng thái đang mượn.',
+                    'errors' => [
+                        'barcode' => ['Bản sao này không ở trạng thái đang mượn.'],
+                    ],
+                ], 422));
+            }
 
             $loan->status = Borrowing::STATUS_RETURNED;
+            if ($copy && ! $loan->copy_id) {
+                $loan->copy_id = $copy->id;
+            }
             $loan->return_date = now()->toDateString();
             
             // Check if return is overdue
@@ -298,6 +367,18 @@ class BorrowController extends Controller
             $isOverdue = $today->gt($due);
             
             $loan->save();
+
+            if ($copy) {
+                $copy->forceFill([
+                    'status' => match ($condition) {
+                        'damaged' => BookCopy::STATUS_REPAIRING,
+                        'lost' => BookCopy::STATUS_LOST,
+                        default => BookCopy::STATUS_AVAILABLE,
+                    },
+                    'condition' => $condition,
+                    'last_checked_in_at' => now(),
+                ])->save();
+            }
 
             // Sync overdue fine (if any)
             app(FineCalculationService::class)->syncOverdueFine($loan);
@@ -351,7 +432,12 @@ class BorrowController extends Controller
                 }
             }
 
-            if ($book && $condition === 'good') {
+            if ($book && $copy && $condition === 'good') {
+                self::processNextInQueue($book->book_id);
+                BookCopy::syncBookCounters($book->fresh());
+            } elseif ($book && $copy) {
+                BookCopy::syncBookCounters($book);
+            } elseif ($book && $condition === 'good') {
                 self::processNextInQueue($book->book_id);
             } elseif ($book && $condition === 'damaged') {
                 $book->repairing_quantity = ($book->repairing_quantity ?? 0) + 1;
@@ -372,7 +458,7 @@ class BorrowController extends Controller
 
             \App\Services\AuditLoggerService::log('borrow_return', 'Đã nhận sách trả: ' . $loan->book->title . ' từ thành viên: ' . $loan->member->name . ' (Tình trạng: ' . $condition . ', Mã phiếu: #' . $loan->loan_id . ')', $librarian);
 
-            return $loan->fresh(['book', 'member', 'librarian', 'fine']);
+            return $loan->fresh(['book', 'bookCopy', 'member', 'librarian', 'fine']);
         });
 
         return response()->json([
@@ -512,7 +598,7 @@ class BorrowController extends Controller
     private function buildBorrowingQuery(array $filters, ?int $memberId = null): Builder
     {
         $query = Borrowing::query()
-            ->with(['member', 'book', 'librarian', 'fine'])
+            ->with(['member', 'book', 'bookCopy', 'librarian', 'fine'])
             ->withExists('review')
             ->orderByDesc('loan_id');
 
@@ -546,6 +632,9 @@ class BorrowController extends Controller
                         $bookQuery
                             ->where('title', 'like', '%'.$search.'%')
                             ->orWhere('author', 'like', '%'.$search.'%');
+                    })
+                    ->orWhereHas('bookCopy', function (Builder $copyQuery) use ($search) {
+                        $copyQuery->where('barcode', 'like', '%'.$search.'%');
                     });
 
                 if (preg_match('/^SACH-(\d+)$/i', $search, $matches)) {
@@ -605,12 +694,18 @@ class BorrowController extends Controller
                     // Ignore mail failures in tests/local
                 }
             } else {
-                // No reservations, just release to available inventory
-                $totalQuantity = max(0, (int) $book->total_quantity);
-                $nextAvailable = min($totalQuantity, (int) $book->available_quantity + 1);
-                $book->available_quantity = $nextAvailable;
-                $book->is_available = $nextAvailable > 0;
-                $book->save();
+                if (! $book->copies()->exists()) {
+                    // Legacy fallback for databases that have not been backfilled.
+                    $totalQuantity = max(0, (int) $book->total_quantity);
+                    $nextAvailable = min($totalQuantity, (int) $book->available_quantity + 1);
+                    $book->available_quantity = $nextAvailable;
+                    $book->is_available = $nextAvailable > 0;
+                    $book->save();
+                }
+            }
+
+            if ($book->copies()->exists()) {
+                BookCopy::syncBookCounters($book->fresh());
             }
         });
     }

@@ -170,7 +170,14 @@ class DigitalDocumentAccessTest extends TestCase
 
     public function test_admin_can_upload_digital_file_for_book(): void
     {
-        Storage::fake('local');
+        $this->withoutExceptionHandling();
+        \Illuminate\Support\Facades\Http::fake([
+            'https://api.cloudinary.com/*' => \Illuminate\Support\Facades\Http::response([
+                'secure_url' => 'https://res.cloudinary.com/dxohf6ubp/raw/upload/v12345/library_digital_files/lecture.pdf',
+                'public_id' => 'library_digital_files/lecture',
+            ], 200)
+        ]);
+
         $librarian = Librarian::query()->findOrFail(1);
         $token = $librarian->createToken('digital-upload-access', ['role:admin']);
         $file = UploadedFile::fake()->create('lecture.pdf', 128, 'application/pdf');
@@ -186,13 +193,19 @@ class DigitalDocumentAccessTest extends TestCase
 
         $book = Book::query()->findOrFail(7);
 
-        $this->assertNotNull($book->file_path);
-        Storage::disk('local')->assertExists($book->file_path);
+        $this->assertNotNull($book->file_url);
+        $this->assertSame('library_digital_files/lecture', $book->cloudinary_public_id);
     }
 
     public function test_admin_can_upload_audio_file_for_book(): void
     {
-        Storage::fake('local');
+        \Illuminate\Support\Facades\Http::fake([
+            'https://api.cloudinary.com/*' => \Illuminate\Support\Facades\Http::response([
+                'secure_url' => 'https://res.cloudinary.com/dxohf6ubp/video/upload/v12345/library_digital_files/lecture.mp3',
+                'public_id' => 'library_digital_files/lecture_audio',
+            ], 200)
+        ]);
+
         $librarian = Librarian::query()->findOrFail(1);
         $token = $librarian->createToken('audio-upload-access', ['role:admin']);
         $file = UploadedFile::fake()->create('lecture.mp3', 256, 'audio/mpeg');
@@ -208,8 +221,8 @@ class DigitalDocumentAccessTest extends TestCase
 
         $book = Book::query()->findOrFail(7);
 
-        $this->assertNotNull($book->file_path);
-        Storage::disk('local')->assertExists($book->file_path);
+        $this->assertNotNull($book->file_url);
+        $this->assertSame('library_digital_files/lecture_audio', $book->cloudinary_public_id);
     }
 
     public function test_students_cannot_upload_digital_file_for_book(): void
@@ -244,7 +257,14 @@ class DigitalDocumentAccessTest extends TestCase
 
     public function test_signed_digital_document_route_serves_uploaded_storage_file(): void
     {
-        Storage::fake('local');
+        // Cấu hình Mock cho Cloudinary upload trong test
+        \Illuminate\Support\Facades\Http::fake([
+            'https://api.cloudinary.com/*' => \Illuminate\Support\Facades\Http::response([
+                'secure_url' => 'https://res.cloudinary.com/dxohf6ubp/raw/upload/v12345/library_digital_files/lecture.pdf',
+                'public_id' => 'library_digital_files/lecture',
+            ], 200)
+        ]);
+
         $librarian = Librarian::query()->findOrFail(1);
         $token = $librarian->createToken('digital-upload-download-access', ['role:admin']);
         $file = UploadedFile::fake()->createWithContent(
@@ -264,8 +284,8 @@ class DigitalDocumentAccessTest extends TestCase
             ['book' => $book->book_id, 'disposition' => 'inline'],
         );
 
+        // Mong đợi redirect (302) sang URL của Cloudinary thay vì đọc local 200
         $this->get($url)
-            ->assertOk()
-            ->assertSee('%PDF-1.4 uploaded library file', false);
+            ->assertRedirect($book->file_url);
     }
 }

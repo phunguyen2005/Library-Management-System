@@ -81,6 +81,7 @@ trait HasRolesAndPermissions
                 'view_reports',
                 'view_audit_logs',
                 'manage_librarians',
+                'manage_blog',
             ];
         }
 

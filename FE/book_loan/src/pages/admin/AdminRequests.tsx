@@ -4,6 +4,7 @@ import { Scanner } from '@yudiel/react-qr-scanner';
 import {
   approveBorrow,
   cancelBorrow,
+  confirmPickup,
   extendLoan,
   getAllRequests,
   rejectBorrow,
@@ -89,6 +90,10 @@ export default function AdminRequests() {
   const [rejectError, setRejectError] = useState<string | null>(null);
   const [detailTarget, setDetailTarget] = useState<BorrowRequest | null>(null);
   const [showScanner, setShowScanner] = useState(false);
+  const [pickupTarget, setPickupTarget] = useState<BorrowRequest | null>(null);
+  const [pickupBarcode, setPickupBarcode] = useState('');
+  const [pickupError, setPickupError] = useState<string | null>(null);
+  const [showPickupScanner, setShowPickupScanner] = useState(false);
 
   // Feature 5 – Search bar state
   const [searchQuery, setSearchQuery] = useState('');
@@ -98,6 +103,7 @@ export default function AdminRequests() {
   const [returnTarget, setReturnTarget] = useState<BorrowRequest | null>(null);
   const [returnCondition, setReturnCondition] = useState<BookCondition>('good');
   const [returnNote, setReturnNote] = useState('');
+  const [returnBarcode, setReturnBarcode] = useState('');
 
   // Feature 7 – Extend dialog state
   const [extendTarget, setExtendTarget] = useState<BorrowRequest | null>(null);
@@ -172,12 +178,36 @@ export default function AdminRequests() {
     }
   };
 
-  const handleConfirmPickup = async (loanId: number) => {
-    setActiveRequestId(loanId);
+  const openPickupDialog = (request: BorrowRequest) => {
+    setPickupTarget(request);
+    setPickupBarcode('');
+    setPickupError(null);
+    setShowPickupScanner(false);
+    setDetailTarget(null);
+  };
+
+  const closePickupDialog = () => {
+    setPickupTarget(null);
+    setPickupBarcode('');
+    setPickupError(null);
+    setShowPickupScanner(false);
+  };
+
+  const handleConfirmPickup = async () => {
+    if (!pickupTarget) return;
+    const barcode = pickupBarcode.trim();
+    if (!barcode) {
+      setPickupError('Vui lòng nhập hoặc quét mã vạch bản sao.');
+      return;
+    }
+
+    setActiveRequestId(pickupTarget.id);
     try {
-      await import('../../api/borrowApi').then((m) => m.confirmPickup(loanId));
-      startTransition(() => applyOptimisticUpdate(loanId, 'borrowed'));
+      await confirmPickup(pickupTarget.id, barcode);
+      startTransition(() => applyOptimisticUpdate(pickupTarget.id, 'borrowed', { barcode }));
+      closePickupDialog();
       void fetchRequests(false);
+      emitToast({ tone: 'success', title: 'Đã giao sách', message: `Đã gán bản sao ${barcode}.` });
     } catch (error: unknown) {
       if (isUnauthorizedError(error)) return;
       emitToast({ tone: 'error', title: 'Không thể xác nhận giao sách', message: getErrorMessage(error, 'Lỗi khi giao sách') });
@@ -225,6 +255,7 @@ export default function AdminRequests() {
     setReturnTarget(request);
     setReturnCondition('good');
     setReturnNote('');
+    setReturnBarcode(request.barcode || '');
     setDetailTarget(null);
   };
 
@@ -232,8 +263,9 @@ export default function AdminRequests() {
     if (!returnTarget) return;
     setActiveRequestId(returnTarget.id);
     try {
-      await returnBook(returnTarget.id, returnCondition, returnNote || undefined);
-      startTransition(() => applyOptimisticUpdate(returnTarget.id, 'returned'));
+      const barcode = returnBarcode.trim() || undefined;
+      await returnBook(returnTarget.id, returnCondition, returnNote || undefined, barcode);
+      startTransition(() => applyOptimisticUpdate(returnTarget.id, 'returned', { barcode: barcode ?? returnTarget.barcode }));
       setReturnTarget(null);
       void fetchRequests(false);
       emitToast({ tone: 'success', title: 'Thành công', message: 'Đã xử lý trả sách.' });
@@ -474,6 +506,9 @@ export default function AdminRequests() {
                       <td className="px-6 py-4">
                         <p className="text-sm font-bold text-slate-700">{request.book}</p>
                         <p className="text-[10px] text-slate-500">Mã kho: {request.bookCode}</p>
+                        {request.barcode ? (
+                          <p className="mt-1 font-mono text-[10px] font-semibold text-indigo-600">{request.barcode}</p>
+                        ) : null}
                         {request.raw_status === 'rejected' && request.rejection_reason ? (
                           <p className="mt-1 max-w-xs text-xs text-red-600">Lý do: {request.rejection_reason}</p>
                         ) : null}
@@ -512,7 +547,7 @@ export default function AdminRequests() {
                           </div>
                         ) : request.raw_status === 'approved' ? (
                           <div className="flex justify-end gap-2">
-                            <button onClick={() => handleConfirmPickup(request.id)} disabled={isBusy}
+                            <button onClick={() => openPickupDialog(request)} disabled={isBusy}
                               className="whitespace-nowrap rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm shadow-indigo-600/30 transition-opacity hover:opacity-90 disabled:cursor-wait disabled:opacity-60">
                               {isBusy ? 'Đang xử lý...' : 'Xác nhận giao sách'}
                             </button>
@@ -547,6 +582,71 @@ export default function AdminRequests() {
           </table>
         </div>
       </section>
+
+      {pickupTarget ? (
+        <div role="dialog" aria-modal="true" aria-labelledby="pickup-dialog-title"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+          <div className="w-full max-w-md rounded-xl border border-surface-container bg-white p-6 shadow-xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 id="pickup-dialog-title" className="text-lg font-bold text-slate-900">Xác nhận giao sách #{pickupTarget.id}</h3>
+                <p className="mt-1 text-sm text-slate-600">{pickupTarget.book} — {pickupTarget.name}</p>
+              </div>
+              <button type="button" onClick={closePickupDialog}
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            <div className="mt-5">
+              <label htmlFor="pickup-barcode" className="text-xs font-bold uppercase tracking-widest text-slate-500">Mã vạch bản sao</label>
+              <div className="mt-2 flex gap-2">
+                <input
+                  id="pickup-barcode"
+                  aria-label="Mã vạch bản sao"
+                  value={pickupBarcode}
+                  onChange={(event) => { setPickupBarcode(event.target.value); setPickupError(null); }}
+                  autoFocus
+                  className="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2 font-mono text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                  placeholder="BC-SACH-104-01"
+                />
+                <button type="button" onClick={() => setShowPickupScanner((value) => !value)}
+                  className="rounded-lg border border-indigo-200 px-3 py-2 text-indigo-600 hover:bg-indigo-50"
+                  title="Quét camera">
+                  <span className="material-symbols-outlined text-[18px]">qr_code_scanner</span>
+                </button>
+              </div>
+              {pickupError ? <p role="alert" className="mt-2 text-sm text-red-600">{pickupError}</p> : null}
+            </div>
+
+            {showPickupScanner ? (
+              <div className="mt-4 overflow-hidden rounded-xl bg-black">
+                <Scanner
+                  onScan={(result) => {
+                    const scannedValue = result?.[0]?.rawValue?.trim();
+                    if (!scannedValue) return;
+                    setPickupBarcode(scannedValue);
+                    setPickupError(null);
+                    setShowPickupScanner(false);
+                  }}
+                  components={{ finder: true }}
+                />
+              </div>
+            ) : null}
+
+            <div className="mt-6 flex justify-end gap-2">
+              <button type="button" onClick={closePickupDialog} disabled={activeRequestId === pickupTarget.id}
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-60">
+                Hủy
+              </button>
+              <button type="button" onClick={handleConfirmPickup} disabled={activeRequestId === pickupTarget.id}
+                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700 disabled:cursor-wait disabled:opacity-60">
+                {activeRequestId === pickupTarget.id ? 'Đang xử lý...' : 'Xác nhận giao sách'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {/* Reject dialog */}
       {rejectTarget ? (
@@ -584,6 +684,18 @@ export default function AdminRequests() {
           <div className="w-full max-w-md rounded-xl border border-surface-container bg-white p-6 shadow-xl">
             <h3 id="return-dialog-title" className="text-lg font-bold text-slate-900">Nhận trả sách #{returnTarget.id}</h3>
             <p className="mt-1 text-sm text-slate-600">{returnTarget.book} — {returnTarget.name}</p>
+
+            <div className="mt-5">
+              <label htmlFor="return-barcode" className="text-xs font-bold uppercase tracking-widest text-slate-500">Mã vạch bản sao</label>
+              <input
+                id="return-barcode"
+                aria-label="Mã vạch bản sao"
+                value={returnBarcode}
+                onChange={(event) => setReturnBarcode(event.target.value)}
+                className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 font-mono text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                placeholder="Quét hoặc nhập mã trên cuốn sách"
+              />
+            </div>
 
             <p className="mt-5 text-xs font-bold uppercase tracking-widest text-slate-500">Tình trạng sách khi trả</p>
             <div className="mt-3 flex flex-col gap-2">
@@ -732,7 +844,7 @@ export default function AdminRequests() {
                     className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white hover:opacity-90">Duyệt</button>
                 </>
               ) : detailTarget.raw_status === 'approved' ? (
-                <button onClick={() => { setDetailTarget(null); handleConfirmPickup(detailTarget.id); }}
+                <button onClick={() => openPickupDialog(detailTarget)}
                   className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:opacity-90">Xác nhận giao sách</button>
               ) : detailTarget.raw_status === 'borrowed' ? (
                 <>
@@ -762,6 +874,25 @@ export default function AdminRequests() {
                 onScan={(result) => {
                   if (result && result.length > 0) {
                     const scannedValue = result[0].rawValue.trim();
+
+                    if (scannedValue.toUpperCase().startsWith('BC-')) {
+                      const target = requests.find(
+                        (request) => request.barcode?.toUpperCase() === scannedValue.toUpperCase(),
+                      );
+
+                      setShowScanner(false);
+                      if (target?.raw_status === 'borrowed') {
+                        openReturnDialog(target);
+                        emitToast({ tone: 'success', title: 'Đã nhận diện bản sao', message: scannedValue });
+                      } else if (target?.raw_status === 'approved') {
+                        openPickupDialog(target);
+                        setPickupBarcode(scannedValue);
+                      } else {
+                        handleSearchChange(scannedValue);
+                        emitToast({ tone: 'info', title: 'Đang tìm mã bản sao', message: scannedValue });
+                      }
+                      return;
+                    }
                     
                     // Case 1: Scanned value is a Book Barcode (e.g., SACH-00045)
                     if (scannedValue.toUpperCase().startsWith('SACH-')) {

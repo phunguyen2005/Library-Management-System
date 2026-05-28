@@ -21,6 +21,7 @@ export default function AdminSidebar() {
     { path: '/admin/inventory', icon: 'inventory', labelKey: 'nav.inventory', permission: 'manage_books' },
     { path: '/admin/requests', icon: 'pending_actions', labelKey: 'nav.adminRequests', permission: 'approve_requests' },
     { path: '/admin/members', icon: 'group', labelKey: 'nav.members', permission: 'manage_members' },
+    { path: '/admin/blog', icon: 'article', labelKey: 'nav.blogAdmin', permission: 'manage_blog' },
     { path: '/admin/librarians', icon: 'manage_accounts', labelKey: 'nav.librarians', permission: 'manage_librarians' },
     { path: '/admin/reports', icon: 'bar_chart', labelKey: 'nav.reports', permission: 'view_reports' },
     { path: '/admin/fines', icon: 'payments', labelKey: 'nav.fines', permissions: ['manage_fines', 'waive_fines'] },

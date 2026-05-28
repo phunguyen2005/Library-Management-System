@@ -64,6 +64,20 @@ export interface FormattedBook {
   ai_summary_generated_at?: string | null;
 }
 
+export type BookCopyStatus = 'available' | 'borrowed' | 'damaged' | 'lost' | 'repairing';
+export type BookCopyCondition = 'good' | 'damaged' | 'lost';
+
+export interface BookCopy {
+  id: number;
+  book_id: number;
+  barcode: string;
+  status: BookCopyStatus;
+  condition: BookCopyCondition;
+  added_at?: string | null;
+  last_checked_out_at?: string | null;
+  last_checked_in_at?: string | null;
+}
+
 export interface DigitalDocument {
   id: number;
   title: string;

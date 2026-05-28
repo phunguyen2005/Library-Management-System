@@ -62,7 +62,7 @@ export default function Login() {
         token: response.token,
       });
 
-      navigate(response.role === 'admin' ? '/admin/dashboard' : '/home');
+      navigate(response.role === 'admin' || response.role === 'librarian' ? '/admin/dashboard' : '/home');
     } catch (error: unknown) {
       if (error instanceof ApiError && error.details && (error.details as any).require_otp) {
         navigate('/verify-otp', { state: { email: (error.details as any).email } });

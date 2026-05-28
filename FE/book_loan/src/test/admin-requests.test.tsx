@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
@@ -17,7 +17,16 @@ const approveBorrowMock = vi.fn(async (loanId: number) => {
   return { message: 'Đã duyệt', loan: {} };
 });
 
-const returnBookMock = vi.fn(async (loanId: number) => {
+const confirmPickupMock = vi.fn(async (loanId: number, barcode?: string) => {
+  requestsState = requestsState.map((request) =>
+    request.id === loanId
+      ? { ...request, raw_status: 'borrowed', status: 'Đang mượn', barcode }
+      : request,
+  );
+  return { message: 'Đã giao sách', loan: {} };
+});
+
+const returnBookMock = vi.fn(async (loanId: number, _condition?: string, _conditionNote?: string, _barcode?: string) => {
   requestsState = requestsState.map((request) =>
     request.id === loanId
       ? { ...request, raw_status: 'returned', status: 'Đã trả' }
@@ -57,8 +66,10 @@ vi.mock('../api/borrowApi', async () => {
     ...actual,
     getAllRequests: () => getAllRequestsMock(),
     approveBorrow: (loanId: number) => approveBorrowMock(loanId),
+    confirmPickup: (loanId: number, barcode?: string) => confirmPickupMock(loanId, barcode),
     rejectBorrow: (loanId: number, reason: string) => rejectBorrowMock(loanId, reason),
-    returnBook: (loanId: number) => returnBookMock(loanId),
+    returnBook: (loanId: number, condition?: string, conditionNote?: string, barcode?: string) =>
+      returnBookMock(loanId, condition, conditionNote, barcode),
   };
 });
 
@@ -91,6 +102,39 @@ describe('AdminRequests', () => {
     });
   });
 
+  it('requires a barcode before confirming pickup for an approved request', async () => {
+    requestsState = [
+      {
+        id: 4,
+        name: 'Pham Minh Quan',
+        role: 'SV',
+        roleColor: 'bg-primary-container text-primary',
+        code: '4',
+        book: 'Clean Architecture',
+        bookCode: '104',
+        status: 'Chờ nhận sách',
+        date: '2026-04-13',
+        raw_status: 'approved',
+      },
+    ];
+
+    const user = userEvent.setup();
+    renderAdminRequests();
+
+    await screen.findByText('Chờ nhận sách');
+    await user.click(screen.getByRole('button', { name: 'Chờ nhận sách' }));
+    await user.click(screen.getByRole('button', { name: 'Xác nhận giao sách' }));
+
+    const barcodeInput = await screen.findByLabelText('Mã vạch bản sao');
+    await user.type(barcodeInput, 'BC-SACH-104-01');
+    const dialog = screen.getByRole('dialog', { name: /Xác nhận giao sách/ });
+    await user.click(within(dialog).getByRole('button', { name: 'Xác nhận giao sách' }));
+
+    await waitFor(() => {
+      expect(confirmPickupMock).toHaveBeenCalledWith(4, 'BC-SACH-104-01');
+    });
+  });
+
   it('updates a borrowed request to returned after return action', async () => {
     requestsState = [
       {
@@ -104,6 +148,7 @@ describe('AdminRequests', () => {
         status: 'Đang mượn',
         date: '2026-04-10',
         raw_status: 'borrowed',
+        barcode: 'BC-SACH-102-01',
       },
     ];
 
@@ -114,9 +159,12 @@ describe('AdminRequests', () => {
     expect(await screen.findByRole('button', { name: 'Nhận trả sách' })).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Nhận trả sách' }));
+    await user.clear(screen.getByLabelText('Mã vạch bản sao'));
+    await user.type(screen.getByLabelText('Mã vạch bản sao'), 'BC-SACH-102-01');
+    await user.click(screen.getByRole('button', { name: 'Xác nhận trả sách' }));
 
     await waitFor(() => {
-      expect(returnBookMock).toHaveBeenCalledWith(2);
+      expect(returnBookMock).toHaveBeenCalledWith(2, 'good', undefined, 'BC-SACH-102-01');
       expect(screen.queryByRole('button', { name: 'Nhận trả sách' })).not.toBeInTheDocument();
     });
   });

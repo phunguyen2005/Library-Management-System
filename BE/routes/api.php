@@ -4,6 +4,7 @@ use App\Http\Controllers\AdminMemberController;
 use App\Http\Controllers\AdminLibrarianController;
 use App\Http\Controllers\AiMetadataController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\BlogPostController;
 use App\Http\Controllers\BookController;
 use App\Http\Controllers\BorrowController;
 use App\Http\Controllers\FavoriteController;
@@ -35,6 +36,8 @@ Route::get('/auth/{provider}/redirect', [\App\Http\Controllers\OAuthController::
 Route::get('/auth/{provider}/callback', [\App\Http\Controllers\OAuthController::class, 'callback']);
 
 Route::get('/books', [BookController::class, 'index']);
+Route::get('/blog/posts', [BlogPostController::class, 'index']);
+Route::get('/blog/posts/{slug}', [BlogPostController::class, 'show']);
 Route::get('/books/{book}', [BookController::class, 'show']);
 Route::get('/rooms', [RoomController::class, 'index']);
 Route::get('/rooms/{room}', [RoomController::class, 'show']);
@@ -51,6 +54,12 @@ Route::post('/momo/simulate-ipn', [\App\Http\Controllers\MomoPaymentController::
 Route::get('/vnpay/ipn', [\App\Http\Controllers\VnpayPaymentController::class, 'ipn']);
 Route::post('/vnpay/ipn', [\App\Http\Controllers\VnpayPaymentController::class, 'ipn']);
 Route::post('/vnpay/simulate-ipn', [\App\Http\Controllers\VnpayPaymentController::class, 'simulateIpn']);
+
+// AI Chat Stream — public (no auth required); logged-in users get extra function-calling features
+// Uses Sanctum token parsing if present (optional auth pattern)
+Route::middleware(['throttle:10,1'])
+    ->post('/ai/chat-stream', [\App\Http\Controllers\AiChatController::class, 'chatStream']);
+
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
@@ -69,7 +78,6 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::middleware('throttle:10,1')->group(function () {
         Route::post('/ai/chat', [\App\Http\Controllers\AiChatController::class, 'chat']);
-        Route::post('/ai/chat-stream', [\App\Http\Controllers\AiChatController::class, 'chatStream']);
         Route::get('/ai/recommendations', [\App\Http\Controllers\AiChatController::class, 'recommendations']);
     });
     // Room Booking Creation (shared for students and librarians/admins)
@@ -129,9 +137,24 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/books', [BookController::class, 'store']);
             Route::post('/books/import', [BookController::class, 'import']);
             Route::put('/books/{book}', [BookController::class, 'update']);
+            Route::get('/books/{book}/copies', [BookController::class, 'getCopies']);
+            Route::post('/books/{book}/copies', [BookController::class, 'addCopy']);
+            Route::put('/books/{book}/copies/{copy}', [BookController::class, 'updateCopy']);
+            Route::delete('/books/{book}/copies/{copy}', [BookController::class, 'deleteCopy']);
             Route::post('/books/{book}/digital-file', [BookController::class, 'uploadDigitalFile']);
             Route::delete('/books/{book}', [BookController::class, 'destroy']);
             Route::post('/books/{bookId}/complete-repair', [BookController::class, 'completeRepair']);
+        });
+
+        Route::middleware('permission:manage_blog')->group(function () {
+            Route::get('/admin/blog/posts', [BlogPostController::class, 'adminIndex']);
+            Route::post('/admin/blog/posts', [BlogPostController::class, 'store']);
+            Route::put('/admin/blog/posts/{blogPost}', [BlogPostController::class, 'update']);
+            Route::post('/admin/blog/posts/{blogPost}', [BlogPostController::class, 'update']);
+            Route::delete('/admin/blog/posts/{blogPost}', [BlogPostController::class, 'destroy']);
+            Route::post('/admin/blog/posts/{blogPost}/publish', [BlogPostController::class, 'publish']);
+            Route::post('/admin/blog/posts/{blogPost}/pin', [BlogPostController::class, 'pin']);
+            Route::post('/admin/blog/posts/{blogPost}/generate-excerpt', [BlogPostController::class, 'generateExcerpt']);
         });
 
         // Borrow Requests, Returns & cash payments

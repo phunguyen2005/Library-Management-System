@@ -57,6 +57,18 @@ const updateBorrowableBookMock = vi.fn(async (_bookId: unknown, _payload: unknow
 const updateDigitalResourceMock = vi.fn(async (_bookId: unknown, _payload: unknown) => uploadedBook);
 const deleteBookMock = vi.fn(async (_bookId: unknown) => ({ message: 'Deleted' }));
 const uploadDigitalFileMock = vi.fn(async (_bookId: unknown, _file: unknown) => uploadedBook);
+const fetchBookCopiesMock = vi.fn(async (_bookId: unknown) => [
+  {
+    id: 1,
+    book_id: 12,
+    barcode: 'BC-SACH-12-01',
+    status: 'available',
+    condition: 'good',
+    added_at: '2026-05-28T00:00:00.000Z',
+    last_checked_out_at: null,
+    last_checked_in_at: null,
+  },
+]);
 
 vi.mock('../api/bookApi', () => ({
   fetchBooks: (page?: number, query?: string, limit?: number) =>
@@ -75,6 +87,10 @@ vi.mock('../api/bookApi', () => ({
     updateDigitalResourceMock(bookId, payload),
   deleteBook: (bookId: unknown) => deleteBookMock(bookId),
   uploadDigitalFile: (bookId: unknown, file: unknown) => uploadDigitalFileMock(bookId, file),
+  fetchBookCopies: (bookId: unknown) => fetchBookCopiesMock(bookId),
+  addBookCopy: vi.fn(),
+  updateBookCopy: vi.fn(),
+  deleteBookCopy: vi.fn(),
 }));
 
 vi.mock('../api/aiApi', () => ({
@@ -103,6 +119,18 @@ describe('AdminInventory digital upload', () => {
     updateDigitalResourceMock.mockResolvedValue(uploadedBook);
     deleteBookMock.mockResolvedValue({ message: 'Deleted' });
     uploadDigitalFileMock.mockResolvedValue(uploadedBook);
+    fetchBookCopiesMock.mockResolvedValue([
+      {
+        id: 1,
+        book_id: 12,
+        barcode: 'BC-SACH-12-01',
+        status: 'available',
+        condition: 'good',
+        added_at: '2026-05-28T00:00:00.000Z',
+        last_checked_out_at: null,
+        last_checked_in_at: null,
+      },
+    ]);
   });
 
   it('renders separate tabs for borrow books and digital resources', async () => {
@@ -150,7 +178,7 @@ describe('AdminInventory digital upload', () => {
 
     const categorySelect = screen.getByRole('combobox', { name: 'Danh mục' });
     expect(categorySelect).toHaveDisplayValue('G - Giáo trình Đại học');
-    expect(screen.getByRole('option', { name: 'C - Công nghệ - Kỹ thuật' })).toBeInTheDocument();
+    expect(screen.getAllByRole('option', { name: 'C - Công nghệ - Kỹ thuật' }).length).toBeGreaterThan(0);
 
     await user.selectOptions(categorySelect, 'Công nghệ - Kỹ thuật');
 
@@ -158,6 +186,21 @@ describe('AdminInventory digital upload', () => {
     expect(shelfSelect).toHaveDisplayValue('Kệ C1 (CN-KT - Công nghệ - Kỹ thuật)');
     expect(screen.getByRole('option', { name: 'Kệ C1 (CN-KT - Công nghệ - Kỹ thuật)' })).toBeInTheDocument();
     expect(screen.queryByRole('option', { name: /Kệ B1/ })).not.toBeInTheDocument();
+  });
+
+  it('opens a copy drawer for a physical book', async () => {
+    const user = userEvent.setup();
+
+    renderAdminInventory();
+
+    await screen.findByText('Physical Algorithms');
+    await user.click(screen.getByRole('button', { name: 'Xem bản sao Physical Algorithms' }));
+
+    await waitFor(() => {
+      expect(fetchBookCopiesMock).toHaveBeenCalledWith(12);
+      expect(screen.getByDisplayValue('BC-SACH-12-01')).toBeInTheDocument();
+      expect(screen.getByText('available')).toBeInTheDocument();
+    });
   });
 
   it('uploads a selected digital file after creating a digital resource', async () => {

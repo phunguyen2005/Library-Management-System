@@ -1,6 +1,9 @@
 import { apiRequest } from './client';
 import type {
   BookApiRecord,
+  BookCopy,
+  BookCopyCondition,
+  BookCopyStatus,
   DigitalDocument as DigitalDocumentType,
   FormattedBook,
 } from '../types/book';
@@ -286,4 +289,39 @@ export async function importBooks(file: File, options?: { dry_run?: boolean; all
 export async function fetchBookDetail(bookId: number): Promise<FormattedBook> {
   const book = await apiRequest<BookApiRecord>(`/books/${bookId}`);
   return normalizeBook(book);
+}
+
+type BookCopyCollection = {
+  data: BookCopy[];
+};
+
+export type BookCopyPayload = {
+  barcode?: string;
+  status?: BookCopyStatus;
+  condition?: BookCopyCondition;
+};
+
+export async function fetchBookCopies(bookId: number) {
+  const response = await apiRequest<BookCopyCollection | BookCopy[]>(`/books/${bookId}/copies`);
+  return unwrapCollection(response);
+}
+
+export async function addBookCopy(bookId: number, payload: BookCopyPayload = {}) {
+  return apiRequest<BookCopy>(`/books/${bookId}/copies`, {
+    method: 'POST',
+    body: payload,
+  });
+}
+
+export async function updateBookCopy(bookId: number, copyId: number, payload: BookCopyPayload) {
+  return apiRequest<BookCopy>(`/books/${bookId}/copies/${copyId}`, {
+    method: 'PUT',
+    body: payload,
+  });
+}
+
+export async function deleteBookCopy(bookId: number, copyId: number) {
+  return apiRequest<{ message: string }>(`/books/${bookId}/copies/${copyId}`, {
+    method: 'DELETE',
+  });
 }

@@ -196,20 +196,20 @@ export default function Home() {
         </section>
       ) : null}
 
-      <section className="grid grid-cols-2 gap-4 md:grid-cols-4">
+      <section className="grid grid-cols-2 gap-2.5 sm:gap-4 md:grid-cols-4">
         {statCards.map((card) => (
           <button
             key={card.label}
             type="button"
-            className={`group flex cursor-pointer items-center justify-between rounded-xl p-4 md:p-6 text-left scholar-shadow transition-transform hover:-translate-y-1 ${card.accent}`}
+            className={`group flex cursor-pointer items-center justify-between rounded-xl p-3 md:p-6 text-left scholar-shadow transition-transform hover:-translate-y-1 ${card.accent}`}
             onClick={card.onClick}
           >
             <div className="min-w-0 flex-1">
-              <p className="mb-1 text-xs md:text-sm font-medium opacity-80 truncate">{card.label}</p>
-              <h3 className="text-2xl md:text-4xl font-bold truncate">{card.value}</h3>
+              <p className="mb-1 text-[10px] sm:text-xs md:text-sm font-medium opacity-80 truncate">{card.label}</p>
+              <h3 className="text-lg sm:text-2xl md:text-4xl font-bold truncate leading-none">{card.value}</h3>
             </div>
-            <div className="flex h-10 w-10 md:h-14 md:w-14 shrink-0 items-center justify-center rounded-lg bg-white/20 ml-2">
-              <span className="material-symbols-outlined text-2xl md:text-3xl">{card.icon}</span>
+            <div className="flex h-8 w-8 sm:h-10 sm:w-10 md:h-14 md:w-14 shrink-0 items-center justify-center rounded-lg bg-white/20 ml-1.5 sm:ml-2">
+              <span className="material-symbols-outlined text-xl sm:text-2xl md:text-3xl">{card.icon}</span>
             </div>
           </button>
         ))}
@@ -221,14 +221,14 @@ export default function Home() {
         onMouseLeave={() => setIsHovered(false)}
       >
         {isLoadingStats ? (
-          <div className="scholar-shadow relative min-h-[250px] md:min-h-[360px] w-full overflow-hidden rounded-2xl bg-surface-container animate-pulse" />
+          <div className="scholar-shadow relative min-h-[480px] md:min-h-[360px] w-full overflow-hidden rounded-2xl bg-surface-container animate-pulse" />
         ) : bannerBooks.length === 0 ? (
-          <div className="scholar-shadow flex min-h-[250px] md:min-h-[360px] w-full flex-col items-center justify-center overflow-hidden rounded-2xl bg-surface-container text-on-surface-variant">
+          <div className="scholar-shadow flex min-h-[480px] md:min-h-[360px] w-full flex-col items-center justify-center overflow-hidden rounded-2xl bg-surface-container text-on-surface-variant">
             <span className="material-symbols-outlined mb-2 text-4xl">auto_stories</span>
             <p>Chưa có sách nổi bật</p>
           </div>
         ) : (
-          <div className="relative w-full min-h-[260px] md:min-h-[360px] overflow-hidden rounded-2xl border border-surface-container-high/60 bg-gradient-to-br from-surface-bright/50 via-surface-container-low/40 to-primary-container/15 backdrop-blur-md scholar-shadow">
+          <div className="relative w-full min-h-[480px] md:min-h-[360px] overflow-hidden rounded-2xl border border-surface-container-high/60 bg-gradient-to-br from-surface-bright/50 via-surface-container-low/40 to-primary-container/15 backdrop-blur-md scholar-shadow">
             {/* Top glowing line */}
             <div className="absolute left-0 right-0 top-0 h-1 bg-gradient-to-r from-primary via-tertiary to-transparent z-20" />
 
@@ -248,7 +248,7 @@ export default function Home() {
                       animate={{ opacity: 1, x: 0 }}
                       exit={{ opacity: 0, x: -25 }}
                       transition={{ duration: 0.35, ease: 'easeInOut' }}
-                      className="relative w-full grid grid-cols-1 md:grid-cols-[1fr_230px] lg:grid-cols-[1fr_280px] items-center gap-6 p-6 md:p-10 lg:p-12 z-10 flex-none snap-center min-h-[260px] md:min-h-[360px]"
+                      className="relative w-full grid grid-cols-1 md:grid-cols-[1fr_230px] lg:grid-cols-[1fr_280px] items-center gap-6 p-6 md:p-10 lg:p-12 z-10 flex-none snap-center min-h-[480px] md:min-h-[360px]"
                     >
                       {/* Ambient glows inside */}
                       <div className="absolute right-[-10%] top-[-20%] w-72 h-72 rounded-full bg-primary/8 blur-3xl pointer-events-none -z-10" />
@@ -336,7 +336,7 @@ export default function Home() {
             <button
               type="button"
               onClick={() => scrollBanner('left')}
-              className="absolute left-4 top-1/2 z-30 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-full bg-black/20 hover:bg-black/40 text-white backdrop-blur-md opacity-0 group-hover:opacity-100 transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer"
+              className="absolute left-4 top-1/2 z-30 -translate-y-1/2 hidden md:flex h-10 w-10 items-center justify-center rounded-full bg-black/20 hover:bg-black/40 text-white backdrop-blur-md opacity-0 group-hover:opacity-100 transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer"
               aria-label="Sach truoc"
             >
               <span className="material-symbols-outlined text-2xl">chevron_left</span>
@@ -344,7 +344,7 @@ export default function Home() {
             <button
               type="button"
               onClick={() => scrollBanner('right')}
-              className="absolute right-4 top-1/2 z-30 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-full bg-black/20 hover:bg-black/40 text-white backdrop-blur-md opacity-0 group-hover:opacity-100 transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer"
+              className="absolute right-4 top-1/2 z-30 -translate-y-1/2 hidden md:flex h-10 w-10 items-center justify-center rounded-full bg-black/20 hover:bg-black/40 text-white backdrop-blur-md opacity-0 group-hover:opacity-100 transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer"
               aria-label="Sach tiep theo"
             >
               <span className="material-symbols-outlined text-2xl">chevron_right</span>
