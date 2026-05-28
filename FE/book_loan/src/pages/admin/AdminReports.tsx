@@ -413,6 +413,126 @@ export default function AdminReports() {
     }
   };
 
+  const handleExportDetailCSV = () => {
+    if (!detailType || !filteredDetailData.length) return;
+
+    let headers: string[] = [];
+    let rows: string[][] = [];
+    let filename = '';
+
+    const METHOD_LABEL_MAP: Record<string, string> = {
+      cash: 'Tiền mặt',
+      momo: 'MoMo',
+      vnpay: 'VNPay',
+      transfer: 'Chuyển khoản',
+    };
+
+    const REASON_LABEL_MAP: Record<string, string> = {
+      overdue: 'Quá hạn trả',
+      damaged: 'Hư hỏng sách',
+      lost: 'Mất sách',
+    };
+
+    if (detailType === 'collected') {
+      filename = `chi-tiet-thuc-thu-nop-phat-${new Date().toISOString().slice(0, 10)}.csv`;
+      headers = [
+        'Mã',
+        'Tên độc giả',
+        'Email độc giả',
+        'Sách vi phạm',
+        'Lý do',
+        'Số tiền (VND)',
+        'Cổng thanh toán',
+        'Mã giao dịch',
+        'Ngày thu',
+        'Người xác nhận'
+      ];
+      rows = filteredDetailData.map((item) => [
+        `#${item.id}`,
+        item.student_name || 'Sinh viên ẩn danh',
+        item.student_email || '',
+        item.book_title || 'Sách đã xóa',
+        REASON_LABEL_MAP[item.reason] || item.reason || 'Khác',
+        String(item.amount),
+        METHOD_LABEL_MAP[item.method] ?? item.method,
+        item.transaction_ref || '—',
+        item.created_at || '',
+        item.processor_name || ''
+      ]);
+    } else if (detailType === 'unpaid') {
+      filename = `chi-tiet-no-phat-ton-dong-${new Date().toISOString().slice(0, 10)}.csv`;
+      headers = [
+        'Mã',
+        'Tên độc giả',
+        'Email độc giả',
+        'Sách vi phạm',
+        'Lý do',
+        'Số tiền (VND)',
+        'Ngày tạo',
+        'Ghi chú'
+      ];
+      rows = filteredDetailData.map((item) => [
+        `#${item.id}`,
+        item.student_name || 'Sinh viên ẩn danh',
+        item.student_email || '',
+        item.book_title || 'Sách đã xóa',
+        REASON_LABEL_MAP[item.reason] || item.reason || 'Khác',
+        String(item.amount),
+        item.created_at || '',
+        item.notes || '—'
+      ]);
+    } else if (detailType === 'waived') {
+      filename = `chi-tiet-phat-da-mien-giam-${new Date().toISOString().slice(0, 10)}.csv`;
+      headers = [
+        'Mã',
+        'Tên độc giả',
+        'Email độc giả',
+        'Sách vi phạm',
+        'Lý do',
+        'Số tiền (VND)',
+        'Lý do miễn giảm',
+        'Ngày duyệt',
+        'Thủ thư duyệt'
+      ];
+      rows = filteredDetailData.map((item) => [
+        `#${item.id}`,
+        item.student_name || 'Sinh viên ẩn danh',
+        item.student_email || '',
+        item.book_title || 'Sách đã xóa',
+        REASON_LABEL_MAP[item.reason] || item.reason || 'Khác',
+        String(item.amount),
+        item.waived_reason || '—',
+        item.created_at || '',
+        item.processor_name || 'Hệ thống'
+      ]);
+    }
+
+    const escapeCSVCell = (val: string) => {
+      let cleanVal = val.replace(/"/g, '""');
+      if (cleanVal.includes(',') || cleanVal.includes('\n') || cleanVal.includes('\r') || cleanVal.includes('"')) {
+        cleanVal = `"${cleanVal}"`;
+      }
+      if (cleanVal.startsWith('=') || cleanVal.startsWith('+') || cleanVal.startsWith('-') || cleanVal.startsWith('@')) {
+        cleanVal = `'${cleanVal}`;
+      }
+      return cleanVal;
+    };
+
+    const csvContent = '\uFEFF' + 
+      [headers.map(escapeCSVCell).join(','), ...rows.map(row => row.map(escapeCSVCell).join(','))].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    emitToast({ tone: 'success', title: 'Thành công', message: 'Tải xuống tệp CSV chi tiết thành công.' });
+  };
+
   // ─── render ─────────────────────────────────────────────────────────────────
 
   return (
@@ -926,6 +1046,16 @@ export default function AdminReports() {
                       <span>Xóa lọc</span>
                     </button>
                   )}
+                  <button
+                    type="button"
+                    onClick={handleExportDetailCSV}
+                    disabled={isDetailLoading || filteredDetailData.length === 0}
+                    className="flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 px-3.5 py-1.5 font-bold text-white shadow-sm transition-all hover:-translate-y-0.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 shrink-0"
+                    title="Xuất dữ liệu chi tiết ra file CSV"
+                  >
+                    <span className="material-symbols-outlined text-[15px] font-bold">download</span>
+                    <span>Xuất báo cáo</span>
+                  </button>
                 </div>
               </div>
 

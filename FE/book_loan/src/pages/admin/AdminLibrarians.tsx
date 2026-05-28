@@ -414,14 +414,14 @@ export default function AdminLibrarians() {
                     </td>
                     <td className="px-6 py-4">
                       <span
-                        className={`rounded-md border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${lib.roleColor}`}
+                        className={`rounded-md border px-2.5 py-1 text-xs font-semibold ${lib.roleColor}`}
                       >
                         {lib.role}
                       </span>
                     </td>
                     <td className="px-6 py-4">
                       {lib.role === 'Quản trị viên' ? (
-                        <span className="rounded bg-rose-50 border border-rose-200 px-2 py-0.5 text-[10px] font-bold text-rose-700 uppercase tracking-wider dark:bg-rose-950/20 dark:text-rose-400 dark:border-rose-900/30">
+                        <span className="rounded bg-rose-50 border border-rose-200 px-2 py-0.5 text-xs font-semibold text-rose-700 dark:bg-rose-950/20 dark:text-rose-400 dark:border-rose-900/30">
                           Toàn Quyền
                         </span>
                       ) : lib.permissions.length === 0 ? (

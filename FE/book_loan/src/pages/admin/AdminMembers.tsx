@@ -22,7 +22,7 @@ const EXPECTED_FIELDS = [
   { key: 'join_date', label: 'Ngày tham gia', required: false, fallbacks: ['join_date', 'ngay_tham_gia', 'ngay tham gia'] },
 ];
 
-const SAMPLE_CSV = "\uFEFFho_ten,email,so_dien_thoai,mat_khau,ngay_tham_gia\nNguyễn Văn A,vana@gmail.com,0987654321,Student123,2026-05-23\nTrần Thị B,thib@gmail.com,0912345678,Student123,2026-05-23";
+const SAMPLE_CSV = "ho_ten,email,so_dien_thoai,mat_khau,ngay_tham_gia\nNguyễn Văn A,vana@gmail.com,0987654321,Student123,2026-05-23\nTrần Thị B,thib@gmail.com,0912345678,Student123,2026-05-23";
 
 const AVAILABLE_EXPORT_COLUMNS = [
   { key: 'member_id', label: 'Mã sinh viên' },
@@ -504,7 +504,7 @@ export default function AdminMembers() {
                     </td>
                     <td className="px-6 py-4">
                       <span
-                        className={`rounded-md border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${member.statusColor}`}
+                        className={`rounded-md border px-2.5 py-1 text-xs font-semibold ${member.statusColor}`}
                       >
                         {member.status}
                       </span>

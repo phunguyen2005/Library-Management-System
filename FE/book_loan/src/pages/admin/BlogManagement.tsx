@@ -244,7 +244,7 @@ export default function BlogManagement() {
                         </span>
                       </td>
                       <td className="px-6 py-4">
-                        <span className={`rounded-md px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${
+                        <span className={`rounded-md px-2.5 py-1 text-xs font-semibold ${
                           post.status === 'published'
                             ? 'bg-green-500/10 text-green-700 dark:text-green-300'
                             : post.status === 'archived'
@@ -254,7 +254,7 @@ export default function BlogManagement() {
                           {STATUS_LABELS[post.status]}
                         </span>
                         {post.is_pinned ? (
-                          <span className="ml-2 rounded-md bg-primary/10 px-2 py-1 text-[10px] font-bold uppercase text-primary">
+                          <span className="ml-2 rounded-md bg-primary/10 px-2 py-1 text-xs font-semibold text-primary">
                             Ghim
                           </span>
                         ) : null}

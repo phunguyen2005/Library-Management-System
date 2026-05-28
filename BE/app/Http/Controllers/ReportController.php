@@ -739,37 +739,72 @@ class ReportController extends Controller
             $columns = array_keys($headerMap);
         }
 
-        $headers = [
-            'Content-Type' => 'text/csv; charset=UTF-16LE',
-            'Content-Disposition' => 'attachment; filename="danh-sach-sinh-vien-' . now()->format('Ymd') . '.csv"',
-            'Pragma' => 'no-cache',
-            'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
-            'Expires' => '0',
+        // Use UTF-8 BOM + comma-delimited CSV (proper RFC 4180)
+        // This is universally recognized by Excel and spreadsheet apps without needing Text Import Wizard
+        $filename = 'danh-sach-sinh-vien-' . now()->format('Ymd') . '.csv';
+        $httpHeaders = [
+            'Content-Type'        => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            'Pragma'              => 'no-cache',
+            'Cache-Control'       => 'must-revalidate, post-check=0, pre-check=0',
+            'Expires'             => '0',
+            'X-Content-Type-Options' => 'nosniff',
         ];
 
         $callback = function () use ($members, $columns, $headerMap) {
             $file = fopen('php://output', 'w');
-            fwrite($file, chr(0xFF) . chr(0xFE));
 
-            // Write Headers
+            // UTF-8 BOM — makes Excel auto-detect UTF-8 and render Vietnamese correctly
+            fwrite($file, "\xEF\xBB\xBF");
+
+            // Write header row (Vietnamese column names)
             $csvHeaders = array_map(fn($col) => $headerMap[$col], $columns);
-            $this->writeCsvRow($file, $csvHeaders);
+            $this->writeCsvRowUtf8($file, $csvHeaders);
 
-            // Write Rows
+            // Write data rows
             foreach ($members as $member) {
                 $row = [];
                 foreach ($columns as $col) {
                     $row[] = match ($col) {
-                        'member_id' => '#' . $member->member_id,
-                        default => $member->$col ?? '',
+                        // Plain numeric ID — no '#' prefix to prevent Excel formula warnings
+                        'member_id'  => (string) $member->member_id,
+                        'join_date'  => $member->join_date ? date('d/m/Y', strtotime($member->join_date)) : '',
+                        'level'      => 'Cấp ' . ($member->level ?? 1),
+                        'xp'         => (int) ($member->xp ?? 0),
+                        'points'     => (int) ($member->points ?? 0),
+                        default      => (string) ($member->$col ?? ''),
                     };
                 }
-                $this->writeCsvRow($file, $row);
+                $this->writeCsvRowUtf8($file, $row);
             }
             fclose($file);
         };
 
-        return response()->stream($callback, 200, $headers);
+        return response()->stream($callback, 200, $httpHeaders);
+    }
+
+    /**
+     * Write a single row to a file handle using proper RFC 4180 CSV format.
+     * Delimiter: comma. Encoding: UTF-8 (file must have been opened after writing the BOM).
+     * Fields containing commas, double-quotes, or newlines are wrapped in double-quotes.
+     * Existing double-quotes are escaped by doubling them ("").
+     */
+    private function writeCsvRowUtf8($file, array $fields): void
+    {
+        $escapedFields = array_map(function ($field) {
+            $value = $this->sanitizeCsvField($field);
+            if ($value === null) {
+                return '';
+            }
+            $str = str_replace(["\r\n", "\r"], "\n", (string) $value);
+            // RFC 4180: wrap in double-quotes if contains comma, double-quote, or newline
+            if (str_contains($str, ',') || str_contains($str, '"') || str_contains($str, "\n")) {
+                $str = '"' . str_replace('"', '""', $str) . '"';
+            }
+            return $str;
+        }, $fields);
+
+        fwrite($file, implode(',', $escapedFields) . "\r\n");
     }
 
     public function exportFines(Request $request)

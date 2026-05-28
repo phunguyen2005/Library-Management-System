@@ -143,7 +143,7 @@ export default function CSVImportWizard({
       });
       setColumnMapping(initialMapping);
     };
-    reader.readAsText(selectedFile);
+    reader.readAsText(selectedFile, 'UTF-8');
   };
 
   const handleNextToStep2 = () => {
@@ -229,14 +229,17 @@ export default function CSVImportWizard({
   };
 
   const downloadSampleFile = () => {
-    const blob = new Blob([sampleCSV], { type: 'text/csv;charset=utf-8;' });
+    // Include UTF-8 BOM (\xEF\xBB\xBF) so Excel auto-detects encoding and renders Vietnamese correctly
+    const BOM = '\uFEFF';
+    const blob = new Blob([BOM + sampleCSV], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", sampleFileName);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', sampleFileName);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   return (
