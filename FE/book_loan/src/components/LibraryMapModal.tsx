@@ -862,7 +862,7 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
                   
                   {/* Self-study Area */}
                   <div
-                    className={`rounded-xl border-2 p-3 transition-all duration-300 h-[23rem] flex flex-col justify-between ${
+                    className={`rounded-xl border-2 p-3 transition-all duration-300 h-[21rem] flex flex-col justify-between ${
                       isZoneHighlighted('study_area')
                         ? 'border-primary bg-primary/5'
                         : 'border-slate-300 dark:border-slate-700'
@@ -944,31 +944,33 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
                     </div>
 
                     {/* Group Tables (G-01 to G-03) */}
-                    <div className="mt-1.5 space-y-1">
-                      <p className="text-[9px] text-outline font-bold uppercase">Bàn nhóm lớn</p>
-                      {['G1', 'G2', 'G3'].map((code, idx) => {
-                        const isHigh = parsed.shelf === code;
-                        return (
-                          <div
-                            key={code}
-                            className={`rounded-lg border px-2 py-0.5 text-xs cursor-pointer flex justify-between items-center transition-all duration-200 ${
-                              isHigh
-                                ? 'animate-pulse-glow border-amber-500 bg-amber-500/25 text-amber-900 dark:text-amber-300'
-                                : 'border-dashed border-sky-300/40 bg-sky-500/5 hover:bg-sky-500/10 text-sky-700 dark:text-sky-300'
-                            }`}
-                            {...getInteractiveZoneProps({
-                              id: code,
-                              name: `Bàn Nhóm G-0${idx + 1}`,
-                              description: 'Bàn họp nhóm lớn, có cổng cắm điện và cáp mạng.',
-                              icon: 'table_restaurant',
-                              details: 'Sức chứa tối đa 6 người, thích hợp thảo luận nhóm vừa và làm việc nhóm.',
-                            })}
-                          >
-                            <span className="font-bold">G-0{idx + 1}</span>
-                            <span className="text-[9px] font-sans opacity-80">6 chỗ 🪑🪑🪑</span>
-                          </div>
-                        );
-                      })}
+                    <div className="mt-1.5">
+                      <p className="text-[9px] text-outline font-bold uppercase mb-1">Bàn nhóm lớn</p>
+                      <div className="grid grid-cols-3 gap-1.5">
+                        {['G1', 'G2', 'G3'].map((code, idx) => {
+                          const isHigh = parsed.shelf === code;
+                          return (
+                            <div
+                              key={code}
+                              className={`rounded-lg border py-1 text-center cursor-pointer transition-all duration-200 ${
+                                isHigh
+                                  ? 'animate-pulse-glow border-amber-500 bg-amber-500/25 text-amber-900 dark:text-amber-300'
+                                  : 'border-dashed border-sky-300/40 bg-sky-500/5 hover:bg-sky-500/10 text-sky-700 dark:text-sky-300'
+                              }`}
+                              {...getInteractiveZoneProps({
+                                id: code,
+                                name: `Bàn Nhóm G-0${idx + 1}`,
+                                description: 'Bàn họp nhóm lớn, có cổng cắm điện và cáp mạng.',
+                                icon: 'table_restaurant',
+                                details: 'Sức chứa tối đa 6 người, thích hợp thảo luận nhóm vừa và làm việc nhóm.',
+                              })}
+                            >
+                              <span className="block text-[10px] font-bold">G-0{idx + 1}</span>
+                              <span className="text-[8px] opacity-80">6 chỗ 🪑</span>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
 
                     {/* Desks Grid (S-13 to S-28) */}
@@ -1002,7 +1004,7 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
 
                   {/* Internal Staff / Storage */}
                   <div
-                    className={`rounded-xl border-2 p-3 transition-all duration-300 cursor-pointer h-[5rem] flex flex-col justify-between ${
+                    className={`rounded-xl border-2 p-3 transition-all duration-300 cursor-pointer h-[7rem] flex flex-col justify-between ${
                       isZoneHighlighted('internal_staff')
                         ? 'animate-pulse-glow border-amber-500 bg-amber-500/10'
                         : 'border-slate-350 bg-slate-50/20 dark:border-slate-700 hover:border-primary hover:bg-primary/5'
