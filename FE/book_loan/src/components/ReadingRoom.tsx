@@ -388,9 +388,12 @@ export default function ReadingRoom({ document, onClose, onProgressSaved }: Read
               {isPdf ? (
                 <div className="relative h-full w-full flex items-center justify-center bg-stone-950 animate-fade-in">
                   {isIframeLoading && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-stone-950 space-y-4">
+                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-stone-950 space-y-4 p-6">
                       <span className="material-symbols-outlined text-4xl text-primary animate-spin">sync</span>
                       <p className="text-xs text-stone-400 font-medium">Đang tải tài liệu PDF...</p>
+                      <p className="text-[11px] text-stone-500 max-w-xs text-center leading-normal">
+                        Nếu tài liệu không tự động hiển thị, vui lòng bấm nút <span className="text-stone-300 font-bold">"Mở tab mới"</span> hoặc <span className="text-stone-300 font-bold">"Tải tệp"</span> ở góc trên bên phải để xem.
+                      </p>
                     </div>
                   )}
                   <iframe

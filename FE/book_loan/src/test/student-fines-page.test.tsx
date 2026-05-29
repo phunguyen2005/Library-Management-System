@@ -5,12 +5,23 @@ import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import StudentFines from '../pages/student/Fines';
 
-const { getMyFinesMock } = vi.hoisted(() => ({
+const { getMyFinesMock, fetchGamifyProfileMock } = vi.hoisted(() => ({
   getMyFinesMock: vi.fn(),
+  fetchGamifyProfileMock: vi.fn(),
 }));
 
 vi.mock('../api/fineApi', () => ({
   getMyFines: () => getMyFinesMock(),
+  applyFineWaiver: vi.fn(),
+  initiateMomoPayment: vi.fn(),
+  initiateVnpayPayment: vi.fn(),
+  getMomoPaymentStatus: vi.fn(),
+  simulateMomoPayment: vi.fn(),
+  simulateVnpayPayment: vi.fn(),
+}));
+
+vi.mock('../api/gamifyApi', () => ({
+  fetchGamifyProfile: () => fetchGamifyProfileMock(),
 }));
 
 function renderStudentFines() {
@@ -43,6 +54,16 @@ describe('StudentFines', () => {
           payments: [],
         },
       ],
+    });
+
+    fetchGamifyProfileMock.mockResolvedValueOnce({
+      xp: 120,
+      points: 400,
+      level: 2,
+      daily_streak: 1,
+      last_check_in_at: null,
+      active_tickets: [],
+      history: [],
     });
 
     renderStudentFines();

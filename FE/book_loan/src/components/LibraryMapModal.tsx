@@ -488,7 +488,7 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
                 className="absolute left-0 top-0 border-4 border-slate-700 bg-surface-bright rounded-2xl p-4 shadow-inner"
                 style={{
                   width: MAP_BASE_WIDTH,
-                  minHeight: MAP_BASE_HEIGHT,
+                  height: MAP_BASE_HEIGHT,
                   transform: `scale(${zoom})`,
                   transformOrigin: 'top left',
                 }}
@@ -1023,10 +1023,10 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
                       </div>
                     </div>
 
-                    {/* Desks Grid (S-13 to S-28) */}
+                    {/* Desks Grid (S-13 to S-20) */}
                     <div className="mt-1.5">
                       <div className="grid grid-cols-4 gap-1">
-                        {Array.from({ length: 16 }, (_, i) => {
+                        {Array.from({ length: 8 }, (_, i) => {
                           const code = `S${i + 13}`;
                           const isHigh = parsed.shelf === code;
                           return (

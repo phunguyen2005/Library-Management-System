@@ -938,52 +938,56 @@ export default function Catalog() {
                 </div>
               ) : null}
 
-              <div className="mt-12 flex items-center justify-between gap-6 border-t border-surface-container-high pt-6">
-                <div className="flex flex-col">
-                  <span className="text-[10px] font-bold uppercase text-outline">
-                    Trạng thái tại kho
-                  </span>
-                  <span
-                    className={`mt-1 flex items-center gap-1 font-bold ${
-                      selectedIsAvailable ? 'text-green-600' : 'text-error'
-                    }`}
-                  >
-                    <span
-                      className={`h-2 w-2 rounded-full ${
-                        selectedIsAvailable ? 'bg-green-600' : 'bg-error'
-                      }`}
-                    />
-                    {selectedIsAvailable
-                      ? `${selectedBook.available_quantity} bản sẵn sàng cho mượn`
-                      : 'Hiện chưa có bản sẵn sàng cho mượn'}
-                  </span>
-                </div>
-                {(() => {
-                  const isOutlookStudent = user?.email && (
-                    user.email.toLowerCase().endsWith('@student.hcmue.edu.vn') || 
-                    user.email.toLowerCase().endsWith('@hcmue.edu.vn')
-                  );
+              {(() => {
+                const isOutlookStudent = !!(user?.email && (
+                  user.email.toLowerCase().endsWith('@student.hcmue.edu.vn') || 
+                  user.email.toLowerCase().endsWith('@hcmue.edu.vn')
+                ));
+                const isGuest = role === 'student' && !isOutlookStudent;
 
-                  if (role === 'student' && !isOutlookStudent) {
-                    return (
-                      <div className="rounded-xl bg-amber-500/10 border border-amber-500/25 p-3.5 text-xs text-amber-700 flex items-start gap-2 max-w-md text-left">
-                        <span className="material-symbols-outlined text-amber-600 shrink-0 select-none">info</span>
-                        <div>
-                          <p className="font-bold">Quyền mượn bị giới hạn</p>
-                          <p className="mt-0.5 text-[11px] leading-relaxed text-amber-600">
+                if (isGuest) {
+                  return (
+                    <div className="mt-12 border-t border-surface-container-high pt-6">
+                      <div className="rounded-xl bg-amber-500/10 border border-amber-500/25 p-4 text-xs text-amber-700 flex items-start gap-3 w-full text-left">
+                        <span className="material-symbols-outlined text-amber-600 shrink-0 select-none text-lg">info</span>
+                        <div className="flex-1">
+                          <p className="font-bold text-sm text-amber-800">Quyền mượn bị giới hạn</p>
+                          <p className="mt-1 text-xs leading-relaxed text-amber-700/90">
                             Quyền mượn sách vật lý và đặt chỗ chỉ áp dụng cho sinh viên sử dụng email trường (@student.hcmue.edu.vn hoặc @hcmue.edu.vn). Giao dịch của bạn được ghi nhận dưới danh nghĩa khách vãng lai (chỉ được xem tài liệu).
                           </p>
                         </div>
                       </div>
-                    );
-                  }
-
-                  const activeRes = reservations.find(
-                    (r) => r.book_id === selectedBook.id && r.status === 'waiting'
+                    </div>
                   );
-                  
-                  if (selectedIsAvailable) {
-                    return (
+                }
+
+                const activeRes = reservations.find(
+                  (r) => r.book_id === selectedBook.id && r.status === 'waiting'
+                );
+
+                return (
+                  <div className="mt-12 flex items-center justify-between gap-6 border-t border-surface-container-high pt-6">
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-bold uppercase text-outline">
+                        Trạng thái tại kho
+                      </span>
+                      <span
+                        className={`mt-1 flex items-center gap-1 font-bold ${
+                          selectedIsAvailable ? 'text-green-600' : 'text-error'
+                        }`}
+                      >
+                        <span
+                          className={`h-2 w-2 rounded-full ${
+                            selectedIsAvailable ? 'bg-green-600' : 'bg-error'
+                          }`}
+                        />
+                        {selectedIsAvailable
+                          ? `${selectedBook.available_quantity} bản sẵn sàng cho mượn`
+                          : 'Hiện chưa có bản sẵn sàng cho mượn'}
+                      </span>
+                    </div>
+
+                    {selectedIsAvailable ? (
                       <button
                         type="button"
                         onClick={handleBorrow}
@@ -992,11 +996,7 @@ export default function Catalog() {
                       >
                         {isBorrowing ? 'Đang gửi...' : 'Mượn ngay'}
                       </button>
-                    );
-                  }
-
-                  if (activeRes) {
-                    return (
+                    ) : activeRes ? (
                       <div className="flex flex-col items-end gap-1">
                         <span className="text-[10px] font-bold text-primary uppercase">
                           Bạn đang xếp vị trí thứ #{activeRes.position} hàng chờ
@@ -1010,21 +1010,19 @@ export default function Catalog() {
                           {isReserving ? 'Đang hủy...' : 'Hủy đặt chỗ'}
                         </button>
                       </div>
-                    );
-                  }
-
-                  return (
-                    <button
-                      type="button"
-                      onClick={handleReserve}
-                      disabled={isReserving}
-                      className="rounded-xl bg-primary px-8 py-3 font-bold text-white shadow-lg shadow-primary/20 transition-transform hover:scale-[1.02] active:scale-95 disabled:cursor-wait disabled:opacity-60 cursor-pointer"
-                    >
-                      {isReserving ? 'Đang gửi...' : 'Đặt chỗ trước'}
-                    </button>
-                  );
-                })()}
-              </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleReserve}
+                        disabled={isReserving}
+                        className="rounded-xl bg-primary px-8 py-3 font-bold text-white shadow-lg shadow-primary/20 transition-transform hover:scale-[1.02] active:scale-95 disabled:cursor-wait disabled:opacity-60 cursor-pointer"
+                      >
+                        {isReserving ? 'Đang gửi...' : 'Đặt chỗ trước'}
+                      </button>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* Reviews and Ratings Section */}
               <div className="mt-8 border-t border-surface-container-high pt-6 space-y-6">

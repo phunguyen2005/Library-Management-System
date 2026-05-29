@@ -375,9 +375,13 @@ class BookController extends Controller
                 try {
                     $response = \Illuminate\Support\Facades\Http::withOptions([
                         'stream' => true,
+                        'verify' => false, // Bypass local SSL issues on dev environments (XAMPP/Windows)
                     ])->get($book->file_url);
 
                     if ($response->successful()) {
+                        // Clear X-Frame-Options to allow framing from React frontend origins
+                        header_remove('X-Frame-Options');
+
                         return response()->stream(function () use ($response) {
                             $body = $response->toPsrResponse()->getBody();
                             if ($body->isSeekable()) {
@@ -397,6 +401,7 @@ class BookController extends Controller
                         }, 200, [
                             'Content-Type' => 'application/pdf',
                             'Content-Disposition' => 'inline; filename="'.$filename.'"',
+                            'Content-Security-Policy' => "frame-ancestors 'self' http://localhost:5173 http://localhost:3000 http://127.0.0.1:5173 http://127.0.0.1:3000 http://localhost:8000 http://127.0.0.1:8000",
                         ]);
                     }
                 } catch (\Exception $e) {
