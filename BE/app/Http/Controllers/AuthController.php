@@ -139,6 +139,7 @@ class AuthController extends Controller
         try {
             \Illuminate\Support\Facades\Mail::to($user->email)->send(new \App\Mail\VerifyEmailOTP($otp));
         } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('register mail error: ' . $e->getMessage());
             // Log error or ignore, let the user resend
         }
 
@@ -173,19 +174,18 @@ class AuthController extends Controller
         $otp = (string) random_int(100000, 999999);
         \Illuminate\Support\Facades\Cache::put('change_password_otp_'.$user->email, $otp, now()->addMinutes(5));
 
-        $mailSent = true;
         try {
             \Illuminate\Support\Facades\Mail::to($user->email)->send(new \App\Mail\ChangePasswordOTP($otp));
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error('sendPasswordOtp mail error: ' . $e->getMessage());
-            $mailSent = false;
+            return response()->json([
+                'message' => 'Không thể gửi email OTP: ' . $e->getMessage(),
+            ], 500);
         }
 
         return response()->json([
-            'message' => $mailSent
-                ? __('messages.auth.change_password_otp_sent')
-                : 'Mã OTP đã được tạo. Nếu email không đến, hãy liên hệ quản trị viên.',
-            'mail_sent' => $mailSent,
+            'message' => __('messages.auth.change_password_otp_sent'),
+            'mail_sent' => true,
         ]);
     }
 
@@ -445,19 +445,18 @@ class AuthController extends Controller
         $otp = (string) random_int(100000, 999999);
         \Illuminate\Support\Facades\Cache::put('forgot_otp_'.$email, $otp, now()->addMinutes(5));
 
-        $mailSent = true;
         try {
             \Illuminate\Support\Facades\Mail::to($email)->send(new \App\Mail\ForgotPasswordOTP($otp));
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error('forgotPassword mail error: ' . $e->getMessage());
-            $mailSent = false;
+            return response()->json([
+                'message' => 'Không thể gửi email OTP: ' . $e->getMessage(),
+            ], 500);
         }
 
         return response()->json([
-            'message' => $mailSent
-                ? __('messages.auth.password_reset_otp_sent')
-                : 'Mã OTP đã được tạo. Nếu email không đến, hãy liên hệ quản trị viên.',
-            'mail_sent' => $mailSent,
+            'message' => __('messages.auth.password_reset_otp_sent'),
+            'mail_sent' => true,
         ]);
     }
 

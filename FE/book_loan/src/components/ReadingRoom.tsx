@@ -24,6 +24,7 @@ export default function ReadingRoom({ document, onClose, onProgressSaved }: Read
   const [currentPage, setCurrentPage] = useState(document.readingProgress?.current_page ?? 1);
   const [totalPages, setTotalPages] = useState(document.readingProgress?.total_pages ?? 1);
   const [isSavingProgress, setIsSavingProgress] = useState(false);
+  const [isIframeLoading, setIsIframeLoading] = useState(true);
   const autoSavePendingRef = useRef(false);
   const saveTimeoutRef = useRef<number | null>(null);
   const progressPercent = totalPages > 0 ? Math.min(100, Math.round((currentPage / totalPages) * 100)) : 0;
@@ -133,6 +134,11 @@ export default function ReadingRoom({ document, onClose, onProgressSaved }: Read
       chatMessagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [aiMessages, isAiOpen]);
+
+  // Reset iframe loading when document changes
+  useEffect(() => {
+    setIsIframeLoading(true);
+  }, [document.id]);
 
   // Audio helper handlers
   const formatTime = (timeInSeconds: number) => {
@@ -280,6 +286,19 @@ export default function ReadingRoom({ document, onClose, onProgressSaved }: Read
               <span>Tải tệp</span>
             </button>
           )}
+
+          {isPdf && document.openUrl && (
+            <a
+              href={document.openUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex h-10 gap-2 items-center rounded-lg bg-stone-800 px-4 text-sm font-semibold transition-colors hover:bg-stone-750 text-stone-300 hover:text-white cursor-pointer"
+              title="Mở tài liệu trong tab mới"
+            >
+              <span className="material-symbols-outlined text-lg">open_in_new</span>
+              <span>Mở tab mới</span>
+            </a>
+          )}
  
           {/* AI Helper Toggle Button */}
           {!isAudio && (
@@ -367,12 +386,23 @@ export default function ReadingRoom({ document, onClose, onProgressSaved }: Read
           {document.openUrl ? (
             <div className="h-full w-full overflow-hidden rounded-xl border border-stone-850 bg-stone-950 shadow-2xl flex flex-col items-center justify-center">
               {isPdf ? (
-                <iframe
-                  src={`${document.openUrl}#toolbar=1`}
-                  title={document.title}
-                  className="h-full w-full border-none"
-                  allow="autoplay"
-                />
+                <div className="relative h-full w-full flex items-center justify-center bg-stone-950 animate-fade-in">
+                  {isIframeLoading && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-stone-950 space-y-4">
+                      <span className="material-symbols-outlined text-4xl text-primary animate-spin">sync</span>
+                      <p className="text-xs text-stone-400 font-medium">Đang tải tài liệu PDF...</p>
+                    </div>
+                  )}
+                  <iframe
+                    src={`${document.openUrl}#toolbar=1`}
+                    title={document.title}
+                    onLoad={() => setIsIframeLoading(false)}
+                    className={`h-full w-full border-none transition-opacity duration-300 ${
+                      isIframeLoading ? 'opacity-0' : 'opacity-100'
+                    }`}
+                    allow="autoplay"
+                  />
+                </div>
               ) : isAudio ? (
                 <div className="flex flex-col items-center justify-center space-y-6 p-6 w-full max-w-lg">
                   <audio

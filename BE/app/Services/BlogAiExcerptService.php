@@ -30,7 +30,7 @@ class BlogAiExcerptService
 
     private function apiKey(): ?string
     {
-        $key = (string) (config('services.gemini.api_key') ?: env('GEMINI_API_KEY'));
+        $key = (string) config('services.gemini.api_key');
 
         if ($key === '' || $key === 'MY_GEMINI_API_KEY') {
             return null;
@@ -49,7 +49,7 @@ class BlogAiExcerptService
             'Content: '.Str::limit($plainText, 5000, ''),
         ]);
 
-        $model = env('GEMINI_MODEL', 'gemini-1.5-flash');
+        $model = config('services.gemini.model', 'gemini-1.5-flash');
         $response = Http::timeout(12)->post(
             "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}",
             [

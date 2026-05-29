@@ -14,9 +14,9 @@ class CloudinaryService
 
     public function __construct()
     {
-        $this->cloudName = config('services.cloudinary.cloud_name') ?: env('CLOUDINARY_CLOUD_NAME');
-        $this->apiKey = config('services.cloudinary.api_key') ?: env('CLOUDINARY_API_KEY');
-        $this->apiSecret = config('services.cloudinary.api_secret') ?: env('CLOUDINARY_API_SECRET');
+        $this->cloudName = config('services.cloudinary.cloud_name');
+        $this->apiKey = config('services.cloudinary.api_key');
+        $this->apiSecret = config('services.cloudinary.api_secret');
 
         if (empty($this->cloudName) || empty($this->apiKey) || empty($this->apiSecret)) {
             throw new \Exception('Chưa cấu hình thông tin kết nối Cloudinary (CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET) trong file .env của máy chủ.');

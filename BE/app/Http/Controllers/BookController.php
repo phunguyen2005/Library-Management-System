@@ -371,6 +371,38 @@ class BookController extends Controller
 
         // Chỉ redirect nếu file được lưu trên Cloudinary (có public_id)
         if ($book->cloudinary_public_id && $book->file_url) {
+            if ($disposition === 'inline' && strtoupper((string) $book->file_format) === 'PDF') {
+                try {
+                    $response = \Illuminate\Support\Facades\Http::withOptions([
+                        'stream' => true,
+                    ])->get($book->file_url);
+
+                    if ($response->successful()) {
+                        return response()->stream(function () use ($response) {
+                            $body = $response->toPsrResponse()->getBody();
+                            if ($body->isSeekable()) {
+                                $body->rewind();
+                            }
+                            $chunkRead = false;
+                            while (!$body->eof()) {
+                                $chunk = $body->read(8192);
+                                if ($chunk !== '') {
+                                    echo $chunk;
+                                    $chunkRead = true;
+                                }
+                            }
+                            if (!$chunkRead) {
+                                echo $response->body();
+                            }
+                        }, 200, [
+                            'Content-Type' => 'application/pdf',
+                            'Content-Disposition' => 'inline; filename="'.$filename.'"',
+                        ]);
+                    }
+                } catch (\Exception $e) {
+                    \Log::error("Failed to stream Cloudinary PDF file for book ID {$book->book_id}: " . $e->getMessage());
+                }
+            }
             return redirect()->away($book->file_url);
         }
 

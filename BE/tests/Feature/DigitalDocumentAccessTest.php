@@ -327,12 +327,16 @@ class DigitalDocumentAccessTest extends TestCase
 
     public function test_signed_digital_document_route_serves_uploaded_storage_file(): void
     {
-        // Cấu hình Mock cho Cloudinary upload trong test
+        // Cấu hình Mock cho Cloudinary upload và stream download trong test
         \Illuminate\Support\Facades\Http::fake([
             'https://api.cloudinary.com/*' => \Illuminate\Support\Facades\Http::response([
                 'secure_url' => 'https://res.cloudinary.com/dxohf6ubp/raw/upload/v12345/library_digital_files/lecture.pdf',
                 'public_id' => 'library_digital_files/lecture',
-            ], 200)
+            ], 200),
+            'https://res.cloudinary.com/*' => \Illuminate\Support\Facades\Http::response(
+                '%PDF-1.4 streamed library file',
+                200
+            ),
         ]);
 
         $librarian = Librarian::query()->findOrFail(1);
@@ -354,9 +358,11 @@ class DigitalDocumentAccessTest extends TestCase
             ['book' => $book->book_id, 'disposition' => 'inline'],
         );
 
-        // Mong đợi redirect (302) sang URL của Cloudinary thay vì đọc local 200
-        $this->get($url)
-            ->assertRedirect($book->file_url);
+        // Mong đợi content được streamed (200 OK) thay vì redirect (302)
+        $response = $this->get($url)
+            ->assertOk();
+        
+        $this->assertStringContainsString('%PDF-1.4 streamed library file', $response->streamedContent());
     }
 
     private function createAudioDocumentWithAiMetadata(): Book
