@@ -29,7 +29,7 @@ class CloudinaryService
     public function getResourceType(string $extension): string
     {
         $extension = strtolower($extension);
-        if (in_array($extension, ['jpg', 'jpeg', 'png', 'webp', 'gif', 'avif'])) {
+        if (in_array($extension, ['jpg', 'jpeg', 'png', 'webp', 'gif', 'avif', 'pdf'])) {
             return 'image';
         }
         if (in_array($extension, ['mp3', 'wav', 'm4a'])) {

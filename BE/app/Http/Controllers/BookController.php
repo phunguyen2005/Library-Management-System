@@ -371,7 +371,11 @@ class BookController extends Controller
 
         // Chỉ redirect nếu file được lưu trên Cloudinary (có public_id)
         if ($book->cloudinary_public_id && $book->file_url) {
-            if ($disposition === 'inline' && strtoupper((string) $book->file_format) === 'PDF') {
+            $isPdf = strtoupper((string) $book->file_format) === 'PDF'
+                || str_ends_with(strtolower((string) $book->file_url), '.pdf')
+                || str_ends_with(strtolower((string) $book->file_path), '.pdf');
+
+            if ($disposition === 'inline' && $isPdf) {
                 try {
                     $response = \Illuminate\Support\Facades\Http::withOptions([
                         'stream' => true,
