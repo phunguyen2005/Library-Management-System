@@ -136,6 +136,18 @@ export default function StudentRequests() {
       });
     });
 
+    channel.listen('.borrow.request.updated', (event: any) => {
+      // Background reload of the requests list to get the latest status (return, reject, etc)
+      loadRequestsData();
+
+      // Screen Toast notification
+      emitToast({
+        tone: 'info',
+        title: 'Cập nhật yêu cầu',
+        message: event.message || 'Một yêu cầu mượn sách của bạn vừa được cập nhật.',
+      });
+    });
+
     return () => {
       echoClient.leave(channelName);
     };

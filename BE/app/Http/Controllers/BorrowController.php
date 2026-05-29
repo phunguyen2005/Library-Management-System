@@ -175,6 +175,7 @@ class BorrowController extends Controller
 
         try {
             broadcast(new \App\Events\BorrowRequestApproved($loan))->toOthers();
+            broadcast(new \App\Events\BorrowRequestUpdated($loan))->toOthers();
         } catch (\Exception $e) {
             // Ignore broadcast failures on production if pusher is not configured
         }
@@ -254,6 +255,12 @@ class BorrowController extends Controller
             return $loan->fresh(['book', 'bookCopy', 'member', 'librarian']);
         });
 
+        try {
+            broadcast(new \App\Events\BorrowRequestUpdated($loan))->toOthers();
+        } catch (\Exception $e) {
+            // Ignore broadcast failures
+        }
+
         return response()->json([
             'message' => __('messages.borrow.pickup_confirmed'),
             'loan' => BorrowingResource::make($loan),
@@ -293,6 +300,12 @@ class BorrowController extends Controller
 
             return $loan->fresh(['book', 'member', 'librarian']);
         });
+
+        try {
+            broadcast(new \App\Events\BorrowRequestUpdated($loan))->toOthers();
+        } catch (\Exception $e) {
+            // Ignore broadcast failures
+        }
 
         return response()->json([
             'message' => __('messages.borrow.rejected'),
@@ -470,6 +483,12 @@ class BorrowController extends Controller
             return $loan->fresh(['book', 'bookCopy', 'member', 'librarian', 'fine']);
         });
 
+        try {
+            broadcast(new \App\Events\BorrowRequestUpdated($loan))->toOthers();
+        } catch (\Exception $e) {
+            // Ignore broadcast failures
+        }
+
         return response()->json([
             'message' => __('messages.borrow.returned'),
             'loan' => BorrowingResource::make($loan),
@@ -511,6 +530,12 @@ class BorrowController extends Controller
 
             return $loan->fresh(['book', 'member']);
         });
+
+        try {
+            broadcast(new \App\Events\BorrowRequestUpdated($loan))->toOthers();
+        } catch (\Exception $e) {
+            // Ignore broadcast failures
+        }
 
         return response()->json([
             'message' => __('messages.borrow.cancelled'),
@@ -576,6 +601,12 @@ class BorrowController extends Controller
 
             return $loan->fresh(['book', 'member', 'librarian', 'fine']);
         });
+
+        try {
+            broadcast(new \App\Events\BorrowRequestUpdated($loan))->toOthers();
+        } catch (\Exception $e) {
+            // Ignore broadcast failures
+        }
 
         return response()->json([
             'message' => __('messages.borrow.extended'),

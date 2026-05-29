@@ -173,6 +173,13 @@ export default function AdminRequests() {
       });
     });
 
+    channel.listen('.borrow.request.updated', (event: any) => {
+      // Background reload of the requests list to get the latest status
+      void fetchRequests(false);
+      
+      // Optionally play a soft chime or UI cue here if needed
+    });
+
     return () => {
       echoClient.leave('librarians');
     };
