@@ -138,7 +138,7 @@ class AuthController extends Controller
 
         try {
             \Illuminate\Support\Facades\Mail::to($user->email)->send(new \App\Mail\VerifyEmailOTP($otp));
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::error('register mail error: ' . $e->getMessage());
             // Log error or ignore, let the user resend
         }
@@ -176,7 +176,7 @@ class AuthController extends Controller
 
         try {
             \Illuminate\Support\Facades\Mail::to($user->email)->send(new \App\Mail\ChangePasswordOTP($otp));
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::error('sendPasswordOtp mail error: ' . $e->getMessage());
             return response()->json([
                 'message' => 'Không thể gửi email OTP: ' . $e->getMessage(),
@@ -421,7 +421,8 @@ class AuthController extends Controller
 
         try {
             \Illuminate\Support\Facades\Mail::to($user->email)->send(new \App\Mail\VerifyEmailOTP($otp));
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('resendOtp mail error: ' . $e->getMessage());
             return response()->json(['message' => __('messages.auth.email_send_failed')], 500);
         }
 
@@ -447,7 +448,7 @@ class AuthController extends Controller
 
         try {
             \Illuminate\Support\Facades\Mail::to($email)->send(new \App\Mail\ForgotPasswordOTP($otp));
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::error('forgotPassword mail error: ' . $e->getMessage());
             return response()->json([
                 'message' => 'Không thể gửi email OTP: ' . $e->getMessage(),

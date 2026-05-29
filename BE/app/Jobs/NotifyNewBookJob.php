@@ -4,13 +4,11 @@ namespace App\Jobs;
 
 use App\Models\Book;
 use App\Models\Member;
-use App\Mail\NewBookNotification;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Mail;
 
 class NotifyNewBookJob implements ShouldQueue
 {
@@ -33,8 +31,6 @@ class NotifyNewBookJob implements ShouldQueue
     {
         Member::where('notify_new_books', true)->chunk(100, function ($members) {
             foreach ($members as $member) {
-                // Gửi qua Email
-                Mail::to($member->email)->send(new NewBookNotification($this->book, $member));
                 // Lưu vào Database
                 $member->notify(new \App\Notifications\AppNewBookNotification($this->book));
             }
