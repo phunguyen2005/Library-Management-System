@@ -431,11 +431,7 @@ class BookController extends Controller
                             if (!$chunkRead) {
                                 echo $response->body();
                             }
-                        }, 200, [
-                            'Content-Type' => 'application/pdf',
-                            'Content-Disposition' => 'inline; filename="'.$filename.'"',
-                            'Content-Security-Policy' => "frame-ancestors 'self' http://localhost:5173 http://localhost:3000 http://127.0.0.1:5173 http://127.0.0.1:3000 http://localhost:8000 http://127.0.0.1:8000",
-                        ]);
+                        }, 200, $this->previewHeaders($request, $filename, 'application/pdf'));
                     }
                 } catch (\Exception $e) {
                     \Log::error("Failed to stream Cloudinary PDF file for book ID {$book->book_id}: " . $e->getMessage());
@@ -453,31 +449,19 @@ class BookController extends Controller
 
             if (Storage::disk('local')->exists($book->file_path)) {
                 header_remove('X-Frame-Options');
-                return response(Storage::disk('local')->get($book->file_path), 200, [
-                    'Content-Type' => $mimeType ?: (Storage::disk('local')->mimeType($book->file_path) ?: 'application/octet-stream'),
-                    'Content-Disposition' => $disposition.'; filename="'.$filename.'"',
-                    'Content-Security-Policy' => "frame-ancestors 'self' http://localhost:5173 http://localhost:3000 http://127.0.0.1:5173 http://127.0.0.1:3000 http://localhost:8000 http://127.0.0.1:8000",
-                ]);
+                return response(Storage::disk('local')->get($book->file_path), 200, $this->previewHeaders($request, $filename, $mimeType ?: (Storage::disk('local')->mimeType($book->file_path) ?: 'application/octet-stream')));
             }
 
             $publicDisk = Storage::disk('public');
 
             if ($publicDisk->exists($book->file_path)) {
                 header_remove('X-Frame-Options');
-                return response($publicDisk->get($book->file_path), 200, [
-                    'Content-Type' => $mimeType ?: ($publicDisk->mimeType($book->file_path) ?: 'application/octet-stream'),
-                    'Content-Disposition' => $disposition.'; filename="'.$filename.'"',
-                    'Content-Security-Policy' => "frame-ancestors 'self' http://localhost:5173 http://localhost:3000 http://127.0.0.1:5173 http://127.0.0.1:3000 http://localhost:8000 http://127.0.0.1:8000",
-                ]);
+                return response($publicDisk->get($book->file_path), 200, $this->previewHeaders($request, $filename, $mimeType ?: ($publicDisk->mimeType($book->file_path) ?: 'application/octet-stream')));
             }
 
             if (Storage::exists($book->file_path)) {
                 header_remove('X-Frame-Options');
-                return response(Storage::get($book->file_path), 200, [
-                    'Content-Type' => $mimeType ?: (Storage::mimeType($book->file_path) ?: 'application/octet-stream'),
-                    'Content-Disposition' => $disposition.'; filename="'.$filename.'"',
-                    'Content-Security-Policy' => "frame-ancestors 'self' http://localhost:5173 http://localhost:3000 http://127.0.0.1:5173 http://127.0.0.1:3000 http://localhost:8000 http://127.0.0.1:8000",
-                ]);
+                return response(Storage::get($book->file_path), 200, $this->previewHeaders($request, $filename, $mimeType ?: (Storage::mimeType($book->file_path) ?: 'application/octet-stream')));
             }
         }
 
@@ -1110,5 +1094,49 @@ class BookController extends Controller
             'message' => 'Đã hoàn tất sửa chữa sách và đưa trở lại kệ.',
             'book' => new BookResource($book),
         ]);
+    }
+
+    private function previewHeaders(Request $request, string $filename, string $contentType): array
+    {
+        $allowedOrigins = [
+            'self',
+            'http://localhost:5173',
+            'http://localhost:3000',
+            'http://127.0.0.1:5173',
+            'http://127.0.0.1:3000',
+            'http://localhost:8000',
+            'http://127.0.0.1:8000',
+        ];
+
+        // Add referer host dynamically (e.g. Production URL or custom frontend domain)
+        $referer = $request->headers->get('referer');
+        if ($referer) {
+            $parsed = parse_url($referer);
+            if (isset($parsed['scheme'], $parsed['host'])) {
+                $port = isset($parsed['port']) ? ':' . $parsed['port'] : '';
+                $allowedOrigins[] = $parsed['scheme'] . '://' . $parsed['host'] . $port;
+            }
+        }
+
+        // Add origin host dynamically
+        $origin = $request->headers->get('origin');
+        if ($origin) {
+            $allowedOrigins[] = $origin;
+        }
+
+        $allowedOrigins = array_unique(array_filter($allowedOrigins));
+        
+        $cspParts = array_map(function ($o) {
+            return $o === 'self' ? "'self'" : $o;
+        }, $allowedOrigins);
+
+        $cspString = "frame-ancestors " . implode(' ', $cspParts);
+
+        return [
+            'Content-Type' => $contentType,
+            'Content-Disposition' => 'inline; filename="'.$filename.'"',
+            'Content-Security-Policy' => $cspString,
+            'X-Frame-Options' => 'ALLOW-FROM *',
+        ];
     }
 }
