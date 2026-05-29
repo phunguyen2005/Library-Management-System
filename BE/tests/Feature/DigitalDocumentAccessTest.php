@@ -235,23 +235,23 @@ class DigitalDocumentAccessTest extends TestCase
         $this->withoutExceptionHandling();
         \Illuminate\Support\Facades\Http::fake([
             'https://api.cloudinary.com/*' => \Illuminate\Support\Facades\Http::response([
-                'secure_url' => 'https://res.cloudinary.com/dxohf6ubp/raw/upload/v12345/library_digital_files/lecture.pdf',
+                'secure_url' => 'https://res.cloudinary.com/dxohf6ubp/raw/upload/v12345/library_digital_files/lecture.epub',
                 'public_id' => 'library_digital_files/lecture',
             ], 200)
         ]);
 
         $librarian = Librarian::query()->findOrFail(1);
         $token = $librarian->createToken('digital-upload-access', ['role:admin']);
-        $file = UploadedFile::fake()->create('lecture.pdf', 128, 'application/pdf');
+        $file = UploadedFile::fake()->create('lecture.epub', 128, 'application/epub+zip');
 
         $this->withToken($token->plainTextToken)
             ->withHeader('Accept', 'application/json')
             ->post('/api/books/7/digital-file', ['file' => $file])
             ->assertOk()
             ->assertJsonPath('is_digital', true)
-            ->assertJsonPath('file_format', 'PDF')
+            ->assertJsonPath('file_format', 'EPUB')
             ->assertJsonPath('has_digital_file', true)
-            ->assertJsonPath('digital_file_name', 'lecture.pdf');
+            ->assertJsonPath('digital_file_name', 'lecture.epub');
 
         $book = Book::query()->findOrFail(7);
 
@@ -358,11 +358,11 @@ class DigitalDocumentAccessTest extends TestCase
             ['book' => $book->book_id, 'disposition' => 'inline'],
         );
 
-        // Mong đợi content được streamed (200 OK) thay vì redirect (302)
+        // Mong đợi content được phục vụ từ local storage (200 OK)
         $response = $this->get($url)
             ->assertOk();
         
-        $this->assertStringContainsString('%PDF-1.4 streamed library file', $response->streamedContent());
+        $this->assertStringContainsString('%PDF-1.4 uploaded library file', $response->getContent());
     }
 
     private function createAudioDocumentWithAiMetadata(): Book

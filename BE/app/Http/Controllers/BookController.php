@@ -266,13 +266,14 @@ class BookController extends Controller
 
         $uploadedToCloudinary = false;
         $uploadResult = [];
+        $isPdf = $format === 'PDF';
 
-        // Check if Cloudinary credentials are configured
+        // Check if Cloudinary credentials are configured and format is not PDF (PDFs are saved locally)
         $cloudName = config('services.cloudinary.cloud_name') ?: env('CLOUDINARY_CLOUD_NAME');
         $apiKey = config('services.cloudinary.api_key') ?: env('CLOUDINARY_API_KEY');
         $apiSecret = config('services.cloudinary.api_secret') ?: env('CLOUDINARY_API_SECRET');
 
-        if (!empty($cloudName) && !empty($apiKey) && !empty($apiSecret)) {
+        if (!$isPdf && !empty($cloudName) && !empty($apiKey) && !empty($apiSecret)) {
             try {
                 $cloudinaryService = new \App\Services\CloudinaryService();
                 
