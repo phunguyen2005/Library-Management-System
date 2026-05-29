@@ -9,6 +9,8 @@ import { ThemeProvider } from './theme/ThemeContext';
 import './i18n';
 import './assets/index.css';
 
+import { Analytics } from '@vercel/analytics/react';
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ThemeProvider>
@@ -17,6 +19,7 @@ createRoot(document.getElementById('root')!).render(
           <BrowserRouter>
             <App />
             <ToastViewport />
+            <Analytics />
           </BrowserRouter>
         </AuthProvider>
       </ErrorBoundary>
