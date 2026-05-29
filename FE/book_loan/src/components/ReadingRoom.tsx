@@ -287,7 +287,7 @@ export default function ReadingRoom({ document, onClose, onProgressSaved }: Read
             </button>
           )}
 
-          {isPdf && document.openUrl && (
+          {isPdf && document.openUrl && canDownload && (
             <a
               href={document.openUrl}
               target="_blank"
@@ -392,12 +392,24 @@ export default function ReadingRoom({ document, onClose, onProgressSaved }: Read
                       <span className="material-symbols-outlined text-4xl text-primary animate-spin">sync</span>
                       <p className="text-xs text-stone-400 font-medium">Đang tải tài liệu PDF...</p>
                       <p className="text-[11px] text-stone-500 max-w-xs text-center leading-normal">
-                        Nếu tài liệu không tự động hiển thị, vui lòng bấm nút <span className="text-stone-300 font-bold">"Mở tab mới"</span> hoặc <span className="text-stone-300 font-bold">"Tải tệp"</span> ở góc trên bên phải để xem.
+                        {canDownload ? (
+                          <>
+                            Nếu tài liệu không tự động hiển thị, vui lòng bấm nút <span className="text-stone-300 font-bold">"Mở tab mới"</span> hoặc <span className="text-stone-300 font-bold">"Tải tệp"</span> ở góc trên bên phải để xem.
+                          </>
+                        ) : (
+                          <>
+                            Đang tải chế độ đọc an toàn trực tuyến. Vui lòng đợi trong giây lát tài liệu hiển thị.
+                          </>
+                        )}
                       </p>
                     </div>
                   )}
                   <iframe
-                    src={`${document.openUrl}#toolbar=1`}
+                    src={
+                      /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+                        ? `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(document.openUrl)}`
+                        : `${document.openUrl}#toolbar=1`
+                    }
                     title={document.title}
                     onLoad={() => setIsIframeLoading(false)}
                     className={`h-full w-full border-none transition-opacity duration-300 ${
