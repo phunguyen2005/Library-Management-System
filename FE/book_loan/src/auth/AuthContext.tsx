@@ -3,6 +3,7 @@ import { logoutUser } from '../api/authApi';
 import { getMyProfile } from '../api/userApi';
 import { ApiError } from '../lib/errors';
 import { AUTH_EXPIRED_EVENT, AUTH_REFRESHED_EVENT } from '../notifications/events';
+import { updateEchoAuth } from '../lib/echo';
 import {
   type AuthSession,
   type AuthUser,
@@ -54,9 +55,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    import('../lib/echo').then(({ updateEchoAuth }) => {
-      updateEchoAuth(session?.token || null);
-    });
+    updateEchoAuth(session?.token || null);
   }, [session?.token]);
 
   useEffect(() => {

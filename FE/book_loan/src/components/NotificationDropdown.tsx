@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { getNotifications, markAllNotificationsAsRead, markNotificationAsRead, type AppNotification } from '../api/notificationApi';
 import { useAuth } from '../auth/AuthContext';
 import { emitToast } from '../notifications/events';
+import { echoClient } from '../lib/echo';
 
 export default function NotificationDropdown() {
   const { user } = useAuth();
@@ -30,41 +31,36 @@ export default function NotificationDropdown() {
       ? `App.Models.Member.${user.member_id}`
       : `App.Models.Librarian.${user.librarian_id}`;
 
-    // Import echo client dynamically or use standard import
-    import('../lib/echo').then(({ echoClient }) => {
-      const channel = echoClient.private(channelName);
+    const channel = echoClient.private(channelName);
 
-      channel.notification((notification: any) => {
-        const newNotification: AppNotification = {
-          id: notification.id || Math.random().toString(),
-          read_at: null,
-          created_at: new Date().toISOString(),
-          data: {
-            message: notification.message || notification.data?.message || 'Thông báo mới',
-            ...notification
-          }
-        };
+    channel.notification((notification: any) => {
+      const newNotification: AppNotification = {
+        id: notification.id || Math.random().toString(),
+        read_at: null,
+        created_at: new Date().toISOString(),
+        data: {
+          message: notification.message || notification.data?.message || 'Thông báo mới',
+          ...notification
+        }
+      };
 
-        setNotifications((prev) => [newNotification, ...prev]);
-        setUnreadCount((count) => count + 1);
+      setNotifications((prev) => [newNotification, ...prev]);
+      setUnreadCount((count) => count + 1);
 
-        // Sound chime for premium UX
-        const audio = new Audio('/sounds/notification.mp3');
-        audio.play().catch(() => {});
+      // Sound chime for premium UX
+      const audio = new Audio('/sounds/notification.mp3');
+      audio.play().catch(() => {});
 
-        // Screen Toast notification
-        emitToast({
-          tone: 'info',
-          title: 'Thông báo mới',
-          message: newNotification.data.message
-        });
+      // Screen Toast notification
+      emitToast({
+        tone: 'info',
+        title: 'Thông báo mới',
+        message: newNotification.data.message
       });
     });
 
     return () => {
-      import('../lib/echo').then(({ echoClient }) => {
-        echoClient.leave(channelName);
-      });
+      echoClient.leave(channelName);
     };
   }, [user]);
 
