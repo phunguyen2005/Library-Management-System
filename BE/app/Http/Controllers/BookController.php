@@ -261,36 +261,63 @@ class BookController extends Controller
     {
         $file = $request->file('file');
         $extension = strtolower($file->getClientOriginalExtension());
-
-        // Khởi tạo CloudinaryService
-        $cloudinaryService = new \App\Services\CloudinaryService();
-
-        // Nếu đã có file cũ trên Cloudinary, tiến hành xóa
-        if ($book->cloudinary_public_id) {
-            $cloudinaryService->delete($book->cloudinary_public_id, $book->file_format ?: $extension);
-        }
-
-        // Upload file mới lên Cloudinary
-        try {
-            $uploadResult = $cloudinaryService->upload($file, 'library_digital_files');
-        } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Tải file lên Cloudinary thất bại: ' . $e->getMessage(),
-            ], 500);
-        }
-
         $format = $this->digitalFormatFromExtension($extension);
         $isAudio = $format === 'AUDIO';
 
-        $book->fill([
-            'is_digital' => true,
-            'resource_type' => $book->resource_type ?: ($isAudio ? 'Audio Book' : 'Tài liệu số'),
-            'file_format' => $format,
-            'file_size' => $this->formatFileSize((int) $file->getSize()),
-            'file_path' => null, // Đặt null vì không lưu local nữa
-            'file_url' => $uploadResult['secure_url'],
-            'cloudinary_public_id' => $uploadResult['public_id'],
-        ]);
+        $uploadedToCloudinary = false;
+        $uploadResult = [];
+
+        // Check if Cloudinary credentials are configured
+        $cloudName = config('services.cloudinary.cloud_name') ?: env('CLOUDINARY_CLOUD_NAME');
+        $apiKey = config('services.cloudinary.api_key') ?: env('CLOUDINARY_API_KEY');
+        $apiSecret = config('services.cloudinary.api_secret') ?: env('CLOUDINARY_API_SECRET');
+
+        if (!empty($cloudName) && !empty($apiKey) && !empty($apiSecret)) {
+            try {
+                $cloudinaryService = new \App\Services\CloudinaryService();
+                
+                // Nếu đã có file cũ trên Cloudinary, tiến hành xóa
+                if ($book->cloudinary_public_id) {
+                    $cloudinaryService->delete($book->cloudinary_public_id, $book->file_format ?: $extension);
+                }
+
+                // Upload file mới lên Cloudinary
+                $uploadResult = $cloudinaryService->upload($file, 'library_digital_files');
+                $uploadedToCloudinary = true;
+            } catch (\Exception $e) {
+                \Log::warning('Cloudinary upload failed, falling back to local storage: ' . $e->getMessage());
+            }
+        }
+
+        if ($uploadedToCloudinary) {
+            $book->fill([
+                'is_digital' => true,
+                'resource_type' => $book->resource_type ?: ($isAudio ? 'Audio Book' : 'Tài liệu số'),
+                'file_format' => $format,
+                'file_size' => $this->formatFileSize((int) $file->getSize()),
+                'file_path' => null, // Đặt null vì không lưu local nữa
+                'file_url' => $uploadResult['secure_url'],
+                'cloudinary_public_id' => $uploadResult['public_id'],
+            ]);
+        } else {
+            // Lưu local file
+            if ($book->file_path) {
+                \Illuminate\Support\Facades\Storage::disk('local')->delete($book->file_path);
+            }
+
+            $fileName = time() . '_' . \Illuminate\Support\Str::slug(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME)) . '.' . $extension;
+            $path = $file->storeAs('digital-documents', $fileName, 'local');
+
+            $book->fill([
+                'is_digital' => true,
+                'resource_type' => $book->resource_type ?: ($isAudio ? 'Audio Book' : 'Tài liệu số'),
+                'file_format' => $format,
+                'file_size' => $this->formatFileSize((int) $file->getSize()),
+                'file_path' => $path,
+                'file_url' => null,
+                'cloudinary_public_id' => null,
+            ]);
+        }
 
         if ($isAudio) {
             $book->forceFill([
@@ -312,7 +339,8 @@ class BookController extends Controller
 
         $this->bookCache->bump();
 
-        \App\Services\AuditLoggerService::log('digital_file_upload', 'Đã tải lên tệp tài liệu số (Cloudinary) cho sách: ' . $book->title . ' (ID: ' . $book->book_id . ')');
+        $storageType = $uploadedToCloudinary ? 'Cloudinary' : 'Local Disk';
+        \App\Services\AuditLoggerService::log('digital_file_upload', "Đã tải lên tệp tài liệu số ({$storageType}) cho sách: " . $book->title . ' (ID: ' . $book->book_id . ')');
 
         $book->loadCount([
             'favoritedBy as favorite_count',
@@ -417,26 +445,37 @@ class BookController extends Controller
 
         // Còn lại đọc từ Local Disk
         if ($book->file_path) {
+            $isPdf = strtoupper((string) $book->file_format) === 'PDF'
+                || str_ends_with(strtolower((string) $book->file_path), '.pdf');
+
+            $mimeType = $isPdf ? 'application/pdf' : null;
+
             if (Storage::disk('local')->exists($book->file_path)) {
+                header_remove('X-Frame-Options');
                 return response(Storage::disk('local')->get($book->file_path), 200, [
-                    'Content-Type' => Storage::disk('local')->mimeType($book->file_path) ?: 'application/octet-stream',
+                    'Content-Type' => $mimeType ?: (Storage::disk('local')->mimeType($book->file_path) ?: 'application/octet-stream'),
                     'Content-Disposition' => $disposition.'; filename="'.$filename.'"',
+                    'Content-Security-Policy' => "frame-ancestors 'self' http://localhost:5173 http://localhost:3000 http://127.0.0.1:5173 http://127.0.0.1:3000 http://localhost:8000 http://127.0.0.1:8000",
                 ]);
             }
 
             $publicDisk = Storage::disk('public');
 
             if ($publicDisk->exists($book->file_path)) {
+                header_remove('X-Frame-Options');
                 return response($publicDisk->get($book->file_path), 200, [
-                    'Content-Type' => $publicDisk->mimeType($book->file_path) ?: 'application/octet-stream',
+                    'Content-Type' => $mimeType ?: ($publicDisk->mimeType($book->file_path) ?: 'application/octet-stream'),
                     'Content-Disposition' => $disposition.'; filename="'.$filename.'"',
+                    'Content-Security-Policy' => "frame-ancestors 'self' http://localhost:5173 http://localhost:3000 http://127.0.0.1:5173 http://127.0.0.1:3000 http://localhost:8000 http://127.0.0.1:8000",
                 ]);
             }
 
             if (Storage::exists($book->file_path)) {
+                header_remove('X-Frame-Options');
                 return response(Storage::get($book->file_path), 200, [
-                    'Content-Type' => Storage::mimeType($book->file_path) ?: 'application/octet-stream',
+                    'Content-Type' => $mimeType ?: (Storage::mimeType($book->file_path) ?: 'application/octet-stream'),
                     'Content-Disposition' => $disposition.'; filename="'.$filename.'"',
+                    'Content-Security-Policy' => "frame-ancestors 'self' http://localhost:5173 http://localhost:3000 http://127.0.0.1:5173 http://127.0.0.1:3000 http://localhost:8000 http://127.0.0.1:8000",
                 ]);
             }
         }
