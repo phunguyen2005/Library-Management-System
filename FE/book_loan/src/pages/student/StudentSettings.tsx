@@ -569,8 +569,8 @@ export default function StudentSettings() {
     </form>
 
     {showPasswordModal && (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
-        <div className="w-full max-w-md overflow-hidden rounded-2xl border border-white/20 bg-white/95 p-8 shadow-2xl shadow-slate-900/30">
+      <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-slate-900/60 p-0 md:p-4 backdrop-blur-sm">
+        <div className="w-full max-w-md overflow-hidden rounded-t-3xl rounded-b-none md:rounded-2xl border border-white/20 bg-white/95 p-5 md:p-8 shadow-2xl shadow-slate-900/30 animate-in slide-in-from-bottom duration-300 md:animate-none">
           {!isOtpVerified ? (
             <>
               <div className="flex flex-col items-center text-center">

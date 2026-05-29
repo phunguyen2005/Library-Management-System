@@ -366,8 +366,8 @@ export default function Digital() {
 
       {/* AI Summary Modal */}
       {activeSummaryDoc && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 animate-fade-in">
-          <div className="w-full max-w-lg rounded-2xl bg-surface-bright p-6 scholar-shadow border border-surface-container-high animate-scale-up">
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/60 p-0 md:p-4 animate-fade-in">
+          <div className="w-full max-w-lg rounded-t-3xl rounded-b-none md:rounded-2xl bg-surface-bright p-6 scholar-shadow border border-surface-container-high animate-in slide-in-from-bottom duration-300 md:animate-none">
             <div className="flex items-center justify-between border-b border-surface-container-high pb-3">
               <div className="flex items-center gap-2 text-primary">
                 <span className="material-symbols-outlined text-2xl">smart_toy</span>

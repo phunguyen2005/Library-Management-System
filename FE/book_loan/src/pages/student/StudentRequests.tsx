@@ -350,11 +350,11 @@ export default function StudentRequests() {
 
       {zoomQrCode && (
         <div 
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/40 p-0 md:p-4 backdrop-blur-sm"
           onClick={() => setZoomQrCode(null)}
         >
           <div 
-            className="w-full max-w-sm overflow-hidden rounded-2xl bg-white p-6 shadow-2xl text-center space-y-4 transition-all duration-300 transform scale-100"
+            className="w-full max-w-sm overflow-hidden rounded-t-3xl rounded-b-none md:rounded-2xl bg-white p-6 shadow-2xl text-center space-y-4 transition-all duration-300 transform scale-100 animate-in slide-in-from-bottom"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">

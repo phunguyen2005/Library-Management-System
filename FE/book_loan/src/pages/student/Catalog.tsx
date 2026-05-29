@@ -808,9 +808,9 @@ export default function Catalog() {
       </section>
 
       {selectedBook && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-on-surface/40 p-4 backdrop-blur-sm">
-          <div className="flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-surface-bright shadow-2xl md:flex-row">
-            <div className="relative bg-surface-container w-full h-60 md:h-auto md:w-2/5 shrink-0">
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-on-surface/40 p-0 md:p-4 backdrop-blur-sm">
+          <div className="flex max-h-[85vh] md:max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-t-3xl rounded-b-none md:rounded-2xl bg-surface-bright shadow-2xl md:flex-row animate-in slide-in-from-bottom duration-300 md:animate-none">
+            <div className="relative bg-surface-container w-full h-52 md:h-auto md:w-2/5 shrink-0">
               <img
                 src={selectedBook.cover}
                 alt={selectedBook.title}
@@ -821,24 +821,24 @@ export default function Catalog() {
               <button
                 type="button"
                 onClick={closeBook}
-                className="absolute left-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-black/20 text-white backdrop-blur-md transition-colors hover:bg-black/40"
+                className="absolute left-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-black/20 text-white backdrop-blur-md transition-colors hover:bg-black/40 cursor-pointer"
               >
                 <span className="material-symbols-outlined">arrow_back</span>
               </button>
             </div>
-            <div className="custom-scrollbar flex-1 flex flex-col overflow-y-auto p-6 md:p-12">
+            <div className="custom-scrollbar flex-1 flex flex-col overflow-y-auto p-5 md:p-12">
               <div className="mb-6 flex items-start justify-between">
                 <div>
                   <span className="rounded-full bg-primary-container px-3 py-1 text-xs font-bold uppercase tracking-widest text-primary">
                     {selectedBook.category}
                   </span>
-                  <h2 className="mt-4 text-3xl font-bold text-on-surface">{selectedBook.title}</h2>
-                  <p className="mt-2 text-lg text-on-surface-variant">{selectedBook.author}</p>
+                  <h2 className="mt-4 text-2xl md:text-3xl font-bold text-on-surface">{selectedBook.title}</h2>
+                  <p className="mt-2 text-base md:text-lg text-on-surface-variant">{selectedBook.author}</p>
                 </div>
                 <button
                   type="button"
                   onClick={closeBook}
-                  className="text-on-surface-variant hover:text-on-surface"
+                  className="text-on-surface-variant hover:text-on-surface cursor-pointer"
                 >
                   <span className="material-symbols-outlined text-3xl">close</span>
                 </button>
@@ -966,7 +966,7 @@ export default function Catalog() {
                 );
 
                 return (
-                  <div className="mt-12 flex items-center justify-between gap-6 border-t border-surface-container-high pt-6">
+                  <div className="mt-8 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 border-t border-surface-container-high pt-6">
                     <div className="flex flex-col">
                       <span className="text-[10px] font-bold uppercase text-outline">
                         Trạng thái tại kho
@@ -992,20 +992,20 @@ export default function Catalog() {
                         type="button"
                         onClick={handleBorrow}
                         disabled={isBorrowing}
-                        className="rounded-xl bg-tertiary px-8 py-3 font-bold text-white shadow-lg shadow-tertiary/20 transition-transform hover:scale-[1.02] active:scale-95 disabled:cursor-wait disabled:opacity-60 cursor-pointer"
+                        className="rounded-xl bg-tertiary px-8 py-3 font-bold text-white shadow-lg shadow-tertiary/20 transition-all active:scale-95 disabled:cursor-wait disabled:opacity-60 cursor-pointer text-center"
                       >
                         {isBorrowing ? 'Đang gửi...' : 'Mượn ngay'}
                       </button>
                     ) : activeRes ? (
-                      <div className="flex flex-col items-end gap-1">
-                        <span className="text-[10px] font-bold text-primary uppercase">
+                      <div className="flex flex-col items-stretch sm:items-end gap-1">
+                        <span className="text-[10px] font-bold text-primary uppercase text-center sm:text-right">
                           Bạn đang xếp vị trí thứ #{activeRes.position} hàng chờ
                         </span>
                         <button
                           type="button"
                           onClick={() => handleCancelReservation(activeRes.reservation_id)}
                           disabled={isReserving}
-                          className="rounded-lg bg-error px-5 py-2 text-xs font-bold text-white shadow-md shadow-error/15 transition-transform hover:scale-[1.02] active:scale-95 disabled:cursor-wait cursor-pointer"
+                          className="rounded-lg bg-error px-5 py-2 text-xs font-bold text-white shadow-md shadow-error/15 transition-all active:scale-95 disabled:cursor-wait cursor-pointer text-center"
                         >
                           {isReserving ? 'Đang hủy...' : 'Hủy đặt chỗ'}
                         </button>
@@ -1015,7 +1015,7 @@ export default function Catalog() {
                         type="button"
                         onClick={handleReserve}
                         disabled={isReserving}
-                        className="rounded-xl bg-primary px-8 py-3 font-bold text-white shadow-lg shadow-primary/20 transition-transform hover:scale-[1.02] active:scale-95 disabled:cursor-wait disabled:opacity-60 cursor-pointer"
+                        className="rounded-xl bg-primary px-8 py-3 font-bold text-white shadow-lg shadow-primary/20 transition-all active:scale-95 disabled:cursor-wait disabled:opacity-60 cursor-pointer text-center"
                       >
                         {isReserving ? 'Đang gửi...' : 'Đặt chỗ trước'}
                       </button>

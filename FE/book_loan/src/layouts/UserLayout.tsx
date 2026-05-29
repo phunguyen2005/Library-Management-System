@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, NavLink } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
 import AiChatbot from '../components/AiChatbot';
@@ -10,7 +11,16 @@ import { submitDailyCheckIn } from '../api/gamifyApi';
 import { emitToast } from '../notifications/events';
 import { getErrorMessage } from '../lib/errors';
 
+const bottomNavItems = [
+  { path: '/home', icon: 'home', labelKey: 'nav.home' },
+  { path: '/catalog', icon: 'search', labelKey: 'nav.catalog' },
+  { path: '/digital', icon: 'menu_book', labelKey: 'nav.digital' },
+  { path: '/my-books', icon: 'library_books', labelKey: 'nav.myBooks' },
+  { path: '/gamify', icon: 'emoji_events', labelKey: 'nav.gamify' },
+];
+
 export default function UserLayout() {
+  const { t } = useTranslation();
   const { user, role, updateUser } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isMapOpen, setIsMapOpen] = useState(false);
@@ -127,9 +137,34 @@ export default function UserLayout() {
           onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} 
           onOpenMap={() => setIsMapOpen(true)} 
         />
-        <main className="flex-1 overflow-y-auto custom-scrollbar">
+        <main className="flex-1 overflow-y-auto custom-scrollbar pb-16 md:pb-0">
           <Outlet />
         </main>
+
+        {/* Mobile Bottom Navigation */}
+        <nav className="fixed bottom-0 left-0 right-0 z-30 flex h-16 border-t border-surface-container-high bg-surface-bright shadow-lg md:hidden">
+          {bottomNavItems.map((item) => (
+            <NavLink
+              key={item.path}
+              to={item.path}
+              className={({ isActive }) =>
+                `flex flex-1 flex-col items-center justify-center gap-0.5 transition-colors cursor-pointer ${
+                  isActive ? 'text-primary font-bold' : 'text-on-surface-variant hover:text-on-surface'
+                }`
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  <span className={`material-symbols-outlined text-[22px] ${isActive ? 'filled' : ''}`}>
+                    {item.icon}
+                  </span>
+                  <span className="text-[10px]">{t(item.labelKey)}</span>
+                </>
+              )}
+            </NavLink>
+          ))}
+        </nav>
+
         <AiChatbot />
       </div>
 

@@ -518,9 +518,9 @@ export default function StudentFines() {
           role="dialog"
           aria-modal="true"
           aria-labelledby="fine-payment-guide-title"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"
+          className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-slate-900/40 p-0 md:p-4"
         >
-          <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-6 shadow-xl relative">
+          <div className="w-full max-w-lg max-h-[85vh] md:max-h-[90vh] overflow-y-auto rounded-t-3xl rounded-b-none md:rounded-2xl border border-slate-200 bg-white p-5 md:p-6 shadow-xl relative animate-in slide-in-from-bottom duration-300 md:animate-none">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h3 id="fine-payment-guide-title" className="text-lg font-bold text-slate-900">
@@ -661,10 +661,10 @@ export default function StudentFines() {
       {isQrZoomed && guideFine && (
         <div
           onClick={() => setIsQrZoomed(false)}
-          className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-slate-950/80 p-4 backdrop-blur-md cursor-zoom-out select-none"
+          className="fixed inset-0 z-[100] flex items-end md:items-center justify-center bg-slate-950/80 p-0 md:p-4 backdrop-blur-md cursor-zoom-out select-none"
         >
           <div 
-            className="relative flex flex-col items-center justify-center rounded-3xl border border-slate-700/50 bg-slate-900/90 p-8 shadow-2xl text-center space-y-4 max-w-sm w-full mx-auto" 
+            className="relative flex flex-col items-center justify-center rounded-t-3xl rounded-b-none md:rounded-3xl border border-slate-700/50 bg-slate-900/90 p-5 md:p-8 shadow-2xl text-center space-y-4 max-w-sm w-full mx-auto animate-in slide-in-from-bottom duration-300 md:animate-none" 
             onClick={(e) => e.stopPropagation()}
           >
             <button

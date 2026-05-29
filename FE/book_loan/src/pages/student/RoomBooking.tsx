@@ -197,7 +197,7 @@ export default function RoomBookingPage() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-8 p-8">
+    <div className="mx-auto w-full max-w-5xl space-y-6 md:space-y-8 p-4 md:p-8">
       {/* Page Header */}
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
         <div>
@@ -435,8 +435,8 @@ export default function RoomBookingPage() {
 
       {/* MODAL 1: BOOKING MODAL */}
       {selectedRoom && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-2xl bg-white rounded-3xl scholar-shadow p-8 space-y-6 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/50 p-0 md:p-4 backdrop-blur-xs">
+          <div className="w-full max-w-2xl bg-white rounded-t-3xl rounded-b-none md:rounded-3xl scholar-shadow p-5 md:p-8 space-y-6 max-h-[85vh] md:max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom duration-300 md:animate-none">
             <div className="flex justify-between items-start">
               <div>
                 <h3 className="text-xl font-bold text-slate-800">
@@ -647,8 +647,8 @@ export default function RoomBookingPage() {
 
       {/* MODAL 2: DETAIL & CHECK-IN QR MODAL */}
       {activeDetail && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-md bg-white rounded-3xl scholar-shadow p-8 space-y-6">
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/50 p-0 md:p-4 backdrop-blur-xs">
+          <div className="w-full max-w-md bg-white rounded-t-3xl rounded-b-none md:rounded-3xl scholar-shadow p-5 md:p-8 space-y-6 max-h-[85vh] md:max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom duration-300 md:animate-none">
             <div className="flex justify-between items-start">
               <div>
                 <h3 className="text-xl font-bold text-slate-800">Chi tiết đặt phòng</h3>

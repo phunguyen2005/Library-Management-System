@@ -406,11 +406,11 @@ export default function Home() {
             <p className="text-xs mt-1 text-on-surface-variant">Hãy mượn thêm sách hoặc đưa sách vào danh mục Yêu thích để AI hiểu gu đọc của bạn nhé!</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
+          <div className="flex overflow-x-auto gap-4 scrollbar-none snap-x snap-mandatory pb-4 md:grid md:grid-cols-3 md:gap-5">
             {aiRecs.slice(0, 3).map((item, idx) => (
               <div
                 key={item.book.id}
-                className="group flex flex-col rounded-2xl border border-surface-container-high bg-surface-bright scholar-shadow transition-all duration-300 hover:-translate-y-1 hover:border-primary/30 hover:shadow-lg overflow-hidden"
+                className="group flex flex-col rounded-2xl border border-surface-container-high bg-surface-bright scholar-shadow transition-all duration-300 hover:-translate-y-1 hover:border-primary/30 hover:shadow-lg overflow-hidden shrink-0 w-[280px] snap-center md:shrink md:w-auto"
               >
                 {/* Card Header: Cover + Metadata */}
                 <div className="flex gap-4 p-4 pb-3">
@@ -505,11 +505,11 @@ export default function Home() {
             message="Danh mục sẽ xuất hiện khi kết nối được với API thư viện."
           />
         ) : (
-          <div className="grid grid-cols-2 gap-4 md:gap-8 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+          <div className="flex overflow-x-auto gap-4 scrollbar-none snap-x snap-mandatory pb-4 md:grid md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 md:gap-8">
             {newBooks.map((book) => (
             <div
               key={book.id}
-              className="group flex cursor-pointer flex-col"
+              className="group flex cursor-pointer flex-col shrink-0 w-[140px] snap-center md:shrink md:w-auto"
               onClick={() => navigate('/catalog')}
             >
               <div className="scholar-shadow relative aspect-[3/4] overflow-hidden rounded-lg transition-transform duration-300 group-hover:-translate-y-2">

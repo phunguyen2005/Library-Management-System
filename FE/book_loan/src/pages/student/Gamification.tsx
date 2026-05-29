@@ -485,7 +485,7 @@ export default function Gamification() {
       {/* Check-in Success Modal Popup */}
       <AnimatePresence>
         {showSuccessModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+          <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/60 p-0 md:p-4">
             <motion.div 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -497,7 +497,7 @@ export default function Gamification() {
               initial={{ scale: 0.9, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="relative w-full max-w-sm rounded-2xl border border-surface-container-high bg-surface-bright shadow-2xl p-6 flex flex-col items-center text-center overflow-hidden z-10"
+              className="relative w-full max-w-sm rounded-t-3xl rounded-b-none md:rounded-2xl border border-surface-container-high bg-surface-bright shadow-2xl p-5 md:p-6 flex flex-col items-center text-center overflow-hidden z-10 animate-in slide-in-from-bottom duration-300 md:animate-none"
             >
               <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-primary via-tertiary to-primary" />
               <button

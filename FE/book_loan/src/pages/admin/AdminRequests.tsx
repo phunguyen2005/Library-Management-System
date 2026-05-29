@@ -388,30 +388,30 @@ export default function AdminRequests() {
   const tabKeys = Object.keys(TAB_LABELS) as RequestTab[];
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-6 p-8">
+    <div className="mx-auto w-full max-w-7xl space-y-4 sm:space-y-6 p-4 sm:p-8">
       {/* Header */}
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
         <div>
-          <h2 className="text-3xl font-bold text-on-surface">Duyệt mượn trả</h2>
-          <p className="mt-1 text-sm text-on-surface-variant">Xử lý các yêu cầu mượn mới và theo dõi sách đang luân chuyển.</p>
+          <h2 className="text-2xl sm:text-3xl font-bold text-on-surface">Duyệt mượn trả</h2>
+          <p className="mt-1 text-xs sm:text-sm text-on-surface-variant">Xử lý các yêu cầu mượn mới và theo dõi sách đang luân chuyển.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {bookFilter ? (
             <button
               type="button"
               onClick={() => { const p = new URLSearchParams(searchParams); p.delete('book'); setSearchParams(p, { replace: true }); }}
-              className="rounded-full bg-primary-container px-4 py-2 text-xs font-semibold text-primary hover:bg-primary-container/80"
+              className="rounded-full bg-primary-container px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary-container/80"
             >
               Mã sách {bookFilter} ×
             </button>
           ) : null}
-          <div className="rounded-full bg-surface-container px-4 py-2 text-xs font-semibold text-outline">
+          <div className="rounded-full bg-surface-container px-3 py-1.5 text-xs font-semibold text-outline">
             {filteredRequests.length} mục
           </div>
           <button
             type="button"
             onClick={() => setShowScanner(true)}
-            className="flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-indigo-600/20 transition-all hover:-translate-y-0.5 hover:shadow-lg"
+            className="flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3.5 py-2 text-xs font-bold text-white shadow-md shadow-indigo-600/20 transition-all active:scale-95 sm:hover:-translate-y-0.5"
           >
             <span className="material-symbols-outlined text-[16px]">qr_code_scanner</span>
             Quét mã QR
@@ -419,7 +419,7 @@ export default function AdminRequests() {
           <button
             type="button"
             onClick={handleExportRequests}
-            className="flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-white shadow-md shadow-primary/20 transition-all hover:-translate-y-0.5 hover:shadow-lg"
+            className="flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-2 text-xs font-bold text-white shadow-md shadow-primary/20 transition-all active:scale-95 sm:hover:-translate-y-0.5"
           >
             <span className="material-symbols-outlined text-[16px]">file_download</span>
             Xuất CSV
@@ -434,7 +434,7 @@ export default function AdminRequests() {
           type="search"
           value={searchQuery}
           onChange={(e) => handleSearchChange(e.target.value)}
-          placeholder="Tìm theo tên sinh viên, email, tên sách, tác giả..."
+          placeholder="Tìm sinh viên, sách, tác giả..."
           className="flex-1 bg-transparent text-sm text-on-surface outline-none placeholder:text-outline"
           id="admin-requests-search"
         />
@@ -445,17 +445,18 @@ export default function AdminRequests() {
         )}
       </div>
 
-      {/* Tabs + Table */}
+      {/* Tabs + Table / Mobile Cards */}
       <section className="overflow-hidden rounded-2xl border border-surface-container-low bg-surface-bright scholar-shadow">
-        <div className="flex flex-wrap border-b border-surface-container bg-slate-50/50">
+        {/* Responsive Tabs with smooth touch scroll */}
+        <div className="flex overflow-x-auto scrollbar-none border-b border-surface-container bg-slate-50/50 -mb-px">
           {tabKeys.map((tabKey) => (
             <button
               key={tabKey}
               onClick={() => setTab(tabKey)}
-              className={`flex-1 min-w-[100px] py-3.5 text-xs font-bold transition-all ${
+              className={`flex-1 min-w-[120px] shrink-0 py-3.5 text-xs font-bold transition-all text-center border-b-2 ${
                 tab === tabKey
-                  ? 'border-b-2 border-primary bg-white text-primary'
-                  : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
+                  ? 'border-primary bg-white text-primary'
+                  : 'border-transparent text-slate-500 hover:bg-slate-100 hover:text-slate-700'
               }`}
             >
               {TAB_LABELS[tabKey]}
@@ -463,7 +464,8 @@ export default function AdminRequests() {
           ))}
         </div>
 
-        <div className="overflow-x-auto">
+        {/* 1. DESKTOP VIEW (TABLE): Hidden on small screens */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full min-w-[900px] text-left">
             <thead>
               <tr className="border-b border-surface-container bg-white text-xs font-bold uppercase tracking-widest text-slate-500">
@@ -471,7 +473,6 @@ export default function AdminRequests() {
                 <th className="px-6 py-4">Thông tin độc giả</th>
                 <th className="px-6 py-4">Tài liệu</th>
                 <th className="px-6 py-4">Thời gian</th>
-                {/* Feature 1 – Due date column, only visible on BORROWED tab */}
                 {tab === 'BORROWED' && <th className="px-6 py-4">Hạn trả</th>}
                 <th className="px-6 py-4">Trạng thái</th>
                 <th className="px-6 py-4 text-right">Hành động</th>
@@ -519,7 +520,6 @@ export default function AdminRequests() {
                           <span className="text-xs font-medium">{request.date}</span>
                         </div>
                       </td>
-                      {/* Feature 1 – Due date + overdue badge */}
                       {tab === 'BORROWED' && (
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex flex-col gap-1">
@@ -581,19 +581,128 @@ export default function AdminRequests() {
             </tbody>
           </table>
         </div>
+
+        {/* 2. MOBILE VIEW (CARDS): Visible only on small screens */}
+        <div className="block md:hidden divide-y divide-slate-100 bg-white">
+          {isLoading ? (
+            <div className="py-8 text-center text-slate-500 text-sm">Đang tải dữ liệu...</div>
+          ) : loadError ? (
+            <div className="py-8 px-4"><EmptyState icon="error" title="Không thể tải yêu cầu" message={loadError} /></div>
+          ) : filteredRequests.length === 0 ? (
+            <div className="py-8 px-4"><EmptyState icon="assignment" title="Không có bản ghi phù hợp" message="Các phiếu mượn sẽ xuất hiện khi sinh viên gửi yêu cầu hoặc thủ thư xử lý." /></div>
+          ) : (
+            filteredRequests.map((request) => {
+              const isBusy = activeRequestId === request.id;
+              const dueBadge = getDueBadge(request);
+
+              return (
+                <div key={request.id} className={`p-4 space-y-3 transition-colors ${request.is_overdue ? 'bg-red-50/40' : 'active:bg-slate-50/50'}`}>
+                  {/* Top line ID & Status */}
+                  <div className="flex items-center justify-between">
+                    <span className="rounded bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-700">#{request.id}</span>
+                    <span className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-700">
+                      {request.status}
+                    </span>
+                  </div>
+
+                  {/* Student Info */}
+                  <div className="flex items-center gap-3">
+                    <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${request.roleColor}`}>
+                      {request.role}
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-slate-800 leading-tight">{request.name}</p>
+                      <p className="text-[10px] text-slate-500 mt-0.5">MSSV: {request.code}</p>
+                    </div>
+                  </div>
+
+                  {/* Book Card */}
+                  <div className="rounded-xl bg-slate-50/70 p-3 space-y-1.5 border border-slate-100">
+                    <p className="text-xs font-bold text-slate-800 leading-snug">{request.book}</p>
+                    <p className="text-[10px] text-slate-500">Mã kho: {request.bookCode}</p>
+                    {request.barcode && (
+                      <p className="font-mono text-[10px] font-bold text-indigo-600">Bản sao: {request.barcode}</p>
+                    )}
+                    {request.raw_status === 'rejected' && request.rejection_reason && (
+                      <p className="text-[11px] text-red-600 font-medium">Lý do từ chối: {request.rejection_reason}</p>
+                    )}
+                  </div>
+
+                  {/* Dates & Badges */}
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-xs pt-1">
+                    <div className="flex items-center gap-1 text-slate-600">
+                      <span className="material-symbols-outlined text-[13px]">calendar_today</span>
+                      <span className="text-[11px]">Yêu cầu: {request.date}</span>
+                    </div>
+                    {tab === 'BORROWED' && request.due_date && (
+                      <div className="flex flex-col items-end gap-1">
+                        <span className="text-[11px] font-bold text-slate-700">Hạn: {request.due_date}</span>
+                        {dueBadge}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Action Buttons: 100% Tactile width, easy to tap */}
+                  <div className="flex justify-end gap-2 pt-2.5 border-t border-slate-100/80">
+                    {request.raw_status === 'pending' ? (
+                      <>
+                        <button onClick={() => openRejectDialog(request)} disabled={isBusy}
+                          className="flex-1 rounded-xl border border-red-200 py-2.5 text-xs font-bold text-red-600 transition-colors active:bg-red-50 disabled:opacity-60">
+                          Từ chối
+                        </button>
+                        <button onClick={() => handleApprove(request.id)} disabled={isBusy}
+                          className="flex-1 rounded-xl bg-primary py-2.5 text-xs font-bold text-white shadow-sm shadow-primary/30 transition-opacity active:opacity-90 disabled:opacity-60">
+                          {isBusy ? 'Đang duyệt...' : 'Phê duyệt'}
+                        </button>
+                      </>
+                    ) : request.raw_status === 'approved' ? (
+                      <>
+                        <button onClick={() => handleAdminCancel(request.id)} disabled={isBusy}
+                          className="flex-1 rounded-xl border border-slate-200 py-2.5 text-xs font-bold text-slate-600 transition-colors active:bg-slate-50 disabled:opacity-60">
+                          Hủy phiếu
+                        </button>
+                        <button onClick={() => openPickupDialog(request)} disabled={isBusy}
+                          className="flex-2 rounded-xl bg-indigo-600 py-2.5 px-4 text-xs font-bold text-white shadow-sm shadow-indigo-600/30 transition-opacity active:opacity-90 disabled:opacity-60">
+                          {isBusy ? 'Đang xử lý...' : 'Giao sách'}
+                        </button>
+                      </>
+                    ) : request.raw_status === 'borrowed' ? (
+                      <>
+                        <button onClick={() => openExtendDialog(request)} disabled={isBusy}
+                          className="flex-1 rounded-xl border border-indigo-200 py-2.5 text-xs font-bold text-indigo-600 transition-colors active:bg-indigo-50 disabled:opacity-60">
+                          Gia hạn
+                        </button>
+                        <button onClick={() => openReturnDialog(request)} disabled={isBusy}
+                          className="flex-2 rounded-xl bg-tertiary py-2.5 px-4 text-xs font-bold text-white shadow-sm shadow-tertiary/30 transition-opacity active:opacity-90 disabled:opacity-60">
+                          {isBusy ? 'Đang xử lý...' : 'Nhận trả'}
+                        </button>
+                      </>
+                    ) : (
+                      <button type="button" onClick={() => setDetailTarget(request)}
+                        className="w-full rounded-xl border border-slate-200 py-2.5 text-xs font-semibold text-primary active:bg-slate-50 transition-colors">
+                        Xem chi tiết
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
       </section>
 
+      {/* Pickup Dialog (Bottom Sheet on Mobile) */}
       {pickupTarget ? (
         <div role="dialog" aria-modal="true" aria-labelledby="pickup-dialog-title"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
-          <div className="w-full max-w-md rounded-xl border border-surface-container bg-white p-6 shadow-xl">
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/40 p-0 sm:p-4 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-t-2xl sm:rounded-xl border border-surface-container bg-white p-6 shadow-xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h3 id="pickup-dialog-title" className="text-lg font-bold text-slate-900">Xác nhận giao sách #{pickupTarget.id}</h3>
                 <p className="mt-1 text-sm text-slate-600">{pickupTarget.book} — {pickupTarget.name}</p>
               </div>
               <button type="button" onClick={closePickupDialog}
-                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+                className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 active:scale-95">
                 <span className="material-symbols-outlined">close</span>
               </button>
             </div>
@@ -607,11 +716,11 @@ export default function AdminRequests() {
                   value={pickupBarcode}
                   onChange={(event) => { setPickupBarcode(event.target.value); setPickupError(null); }}
                   autoFocus
-                  className="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2 font-mono text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                  className="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2.5 font-mono text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
                   placeholder="BC-SACH-104-01"
                 />
                 <button type="button" onClick={() => setShowPickupScanner((value) => !value)}
-                  className="rounded-lg border border-indigo-200 px-3 py-2 text-indigo-600 hover:bg-indigo-50"
+                  className="rounded-lg border border-indigo-200 px-3 py-2 text-indigo-600 hover:bg-indigo-50 active:bg-indigo-100"
                   title="Quét camera">
                   <span className="material-symbols-outlined text-[18px]">qr_code_scanner</span>
                 </button>
@@ -620,7 +729,7 @@ export default function AdminRequests() {
             </div>
 
             {showPickupScanner ? (
-              <div className="mt-4 overflow-hidden rounded-xl bg-black">
+              <div className="mt-4 overflow-hidden rounded-xl bg-black aspect-square">
                 <Scanner
                   onScan={(result) => {
                     const scannedValue = result?.[0]?.rawValue?.trim();
@@ -634,54 +743,54 @@ export default function AdminRequests() {
               </div>
             ) : null}
 
-            <div className="mt-6 flex justify-end gap-2">
+            <div className="mt-6 flex justify-end gap-2 pb-2">
               <button type="button" onClick={closePickupDialog} disabled={activeRequestId === pickupTarget.id}
-                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-60">
+                className="flex-1 rounded-xl border border-slate-200 py-3 text-sm font-semibold text-slate-600 hover:bg-slate-50 active:bg-slate-100 disabled:opacity-60">
                 Hủy
               </button>
               <button type="button" onClick={handleConfirmPickup} disabled={activeRequestId === pickupTarget.id}
-                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700 disabled:cursor-wait disabled:opacity-60">
-                {activeRequestId === pickupTarget.id ? 'Đang xử lý...' : 'Xác nhận giao sách'}
+                className="flex-1 rounded-xl bg-indigo-600 py-3 text-sm font-bold text-white hover:bg-indigo-700 active:opacity-90 disabled:cursor-wait disabled:opacity-60">
+                {activeRequestId === pickupTarget.id ? 'Đang xử lý...' : 'Xác nhận'}
               </button>
             </div>
           </div>
         </div>
       ) : null}
 
-      {/* Reject dialog */}
+      {/* Reject dialog (Bottom Sheet on Mobile) */}
       {rejectTarget ? (
         <div role="dialog" aria-modal="true" aria-labelledby="reject-request-title"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/40 p-0 sm:p-4 backdrop-blur-xs">
           <form onSubmit={handleRejectSubmit}
-            className="w-full max-w-md rounded-lg border border-surface-container bg-white p-6 shadow-xl">
+            className="w-full max-w-md rounded-t-2xl sm:rounded-xl border border-surface-container bg-white p-6 shadow-xl max-h-[90vh] overflow-y-auto">
             <h3 id="reject-request-title" className="text-lg font-bold text-slate-900">Từ chối yêu cầu #{rejectTarget.id}</h3>
             <p className="mt-1 text-sm text-slate-600">Nhập lý do để sinh viên có thể xem lại trong lịch sử yêu cầu.</p>
             <label className="mt-5 block space-y-2">
               <span className="text-xs font-bold uppercase tracking-widest text-slate-500">Lý do từ chối</span>
               <textarea value={rejectReason} onChange={(e) => { setRejectReason(e.target.value); setRejectError(null); }} rows={4}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
                 placeholder="Ví dụ: Sách đang được kiểm kê hoặc thông tin yêu cầu chưa hợp lệ." />
             </label>
             {rejectError ? <p role="alert" className="mt-2 text-sm text-red-600">{rejectError}</p> : null}
-            <div className="mt-6 flex justify-end gap-2">
+            <div className="mt-6 flex justify-end gap-2 pb-2">
               <button type="button" onClick={closeRejectDialog} disabled={activeRequestId === rejectTarget.id}
-                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:cursor-wait disabled:opacity-60">
+                className="flex-1 rounded-xl border border-slate-200 py-3 text-sm font-semibold text-slate-600 hover:bg-slate-50 active:bg-slate-100 disabled:cursor-wait disabled:opacity-60">
                 Hủy
               </button>
               <button type="submit" disabled={activeRequestId === rejectTarget.id}
-                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white hover:bg-red-700 disabled:cursor-wait disabled:opacity-60">
-                {activeRequestId === rejectTarget.id ? 'Đang xử lý...' : 'Xác nhận từ chối'}
+                className="flex-1 rounded-xl bg-red-600 py-3 text-sm font-bold text-white hover:bg-red-700 active:opacity-90 disabled:cursor-wait disabled:opacity-60">
+                {activeRequestId === rejectTarget.id ? 'Đang từ chối...' : 'Từ chối'}
               </button>
             </div>
           </form>
         </div>
       ) : null}
 
-      {/* Feature 6 – Return condition dialog */}
+      {/* Feature 6 – Return condition dialog (Bottom Sheet on Mobile) */}
       {returnTarget ? (
         <div role="dialog" aria-modal="true" aria-labelledby="return-dialog-title"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
-          <div className="w-full max-w-md rounded-xl border border-surface-container bg-white p-6 shadow-xl">
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/40 p-0 sm:p-4 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-t-2xl sm:rounded-xl border border-surface-container bg-white p-6 shadow-xl max-h-[90vh] overflow-y-auto">
             <h3 id="return-dialog-title" className="text-lg font-bold text-slate-900">Nhận trả sách #{returnTarget.id}</h3>
             <p className="mt-1 text-sm text-slate-600">{returnTarget.book} — {returnTarget.name}</p>
 
@@ -692,7 +801,7 @@ export default function AdminRequests() {
                 aria-label="Mã vạch bản sao"
                 value={returnBarcode}
                 onChange={(event) => setReturnBarcode(event.target.value)}
-                className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 font-mono text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2.5 font-mono text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
                 placeholder="Quét hoặc nhập mã trên cuốn sách"
               />
             </div>
@@ -724,25 +833,25 @@ export default function AdminRequests() {
               </div>
             )}
 
-            <div className="mt-6 flex justify-end gap-2">
+            <div className="mt-6 flex justify-end gap-2 pb-2">
               <button type="button" onClick={() => setReturnTarget(null)} disabled={activeRequestId === returnTarget.id}
-                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-60">
+                className="flex-1 rounded-xl border border-slate-200 py-3 text-sm font-semibold text-slate-600 hover:bg-slate-50 active:bg-slate-100 disabled:opacity-60">
                 Hủy
               </button>
               <button type="button" onClick={handleReturnSubmit} disabled={activeRequestId === returnTarget.id}
-                className={`rounded-lg px-4 py-2 text-sm font-bold text-white disabled:cursor-wait disabled:opacity-60 ${returnCondition === 'lost' ? 'bg-red-600 hover:bg-red-700' : returnCondition === 'damaged' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-tertiary hover:bg-tertiary/90'}`}>
-                {activeRequestId === returnTarget.id ? 'Đang xử lý...' : 'Xác nhận trả sách'}
+                className={`flex-1 rounded-xl py-3 text-sm font-bold text-white active:opacity-90 disabled:cursor-wait disabled:opacity-60 ${returnCondition === 'lost' ? 'bg-red-600 hover:bg-red-700' : returnCondition === 'damaged' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-tertiary hover:bg-tertiary/90'}`}>
+                {activeRequestId === returnTarget.id ? 'Đang xử lý...' : 'Xác nhận'}
               </button>
             </div>
           </div>
         </div>
       ) : null}
 
-      {/* Feature 7 – Extend loan dialog */}
+      {/* Feature 7 – Extend loan dialog (Bottom Sheet on Mobile) */}
       {extendTarget ? (
         <div role="dialog" aria-modal="true" aria-labelledby="extend-dialog-title"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
-          <div className="w-full max-w-sm rounded-xl border border-surface-container bg-white p-6 shadow-xl">
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/40 p-0 sm:p-4 backdrop-blur-xs">
+          <div className="w-full max-w-sm rounded-t-2xl sm:rounded-xl border border-surface-container bg-white p-6 shadow-xl max-h-[90vh] overflow-y-auto">
             <h3 id="extend-dialog-title" className="text-lg font-bold text-slate-900">Gia hạn phiếu #{extendTarget.id}</h3>
             <p className="mt-1 text-sm text-slate-600">{extendTarget.book} — {extendTarget.name}</p>
             {extendTarget.due_date && (
@@ -750,48 +859,48 @@ export default function AdminRequests() {
             )}
             <div className="mt-5">
               <label className="text-xs font-bold uppercase tracking-widest text-slate-500">Số ngày gia hạn thêm (tối đa 30)</label>
-              <div className="mt-2 flex items-center gap-3">
+              <div className="mt-2 flex items-center justify-center gap-3">
                 <button type="button" onClick={() => setExtendDays((d) => Math.max(1, d - 1))}
-                  className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50">−</button>
+                  className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 active:bg-slate-100 font-bold">−</button>
                 <input type="number" min={1} max={30} value={extendDays}
                   onChange={(e) => setExtendDays(Math.min(30, Math.max(1, Number(e.target.value))))}
                   className="w-20 rounded-lg border border-slate-200 px-3 py-2 text-center text-sm font-bold outline-none focus:border-primary" />
                 <button type="button" onClick={() => setExtendDays((d) => Math.min(30, d + 1))}
-                  className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50">+</button>
+                  className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 active:bg-slate-100 font-bold">+</button>
                 <span className="text-sm text-slate-500">ngày</span>
               </div>
               {extendTarget.due_date && (
-                <p className="mt-2 text-xs text-primary font-medium">
+                <p className="mt-3 text-xs text-primary font-medium text-center bg-primary/5 rounded-lg py-1.5">
                   Hạn mới: {new Date(new Date(extendTarget.due_date).getTime() + extendDays * 86400000).toISOString().slice(0, 10)}
                 </p>
               )}
             </div>
-            <div className="mt-6 flex justify-end gap-2">
+            <div className="mt-6 flex justify-end gap-2 pb-2">
               <button type="button" onClick={() => setExtendTarget(null)} disabled={activeRequestId === extendTarget.id}
-                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-60">
+                className="flex-1 rounded-xl border border-slate-200 py-3 text-sm font-semibold text-slate-600 hover:bg-slate-50 active:bg-slate-100 disabled:opacity-60">
                 Hủy
               </button>
               <button type="button" onClick={handleExtendSubmit} disabled={activeRequestId === extendTarget.id}
-                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700 disabled:cursor-wait disabled:opacity-60">
-                {activeRequestId === extendTarget.id ? 'Đang xử lý...' : 'Xác nhận gia hạn'}
+                className="flex-1 rounded-xl bg-indigo-600 py-3 text-sm font-bold text-white hover:bg-indigo-700 active:opacity-90 disabled:cursor-wait disabled:opacity-60">
+                {activeRequestId === extendTarget.id ? 'Gia hạn...' : 'Gia hạn'}
               </button>
             </div>
           </div>
         </div>
       ) : null}
 
-      {/* Detail modal */}
+      {/* Detail modal (Bottom Sheet on Mobile) */}
       {detailTarget ? (
         <div role="dialog" aria-modal="true" aria-labelledby="request-detail-title"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
-          <div className="w-full max-w-lg rounded-lg border border-surface-container bg-white p-6 shadow-xl">
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/40 p-0 sm:p-4 backdrop-blur-xs">
+          <div className="w-full max-w-lg rounded-t-2xl sm:rounded-xl border border-surface-container bg-white p-6 shadow-xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h3 id="request-detail-title" className="text-lg font-bold text-slate-900">Chi tiết phiếu #{detailTarget.id}</h3>
                 <p className="mt-1 text-sm text-slate-600">{detailTarget.status} | Cập nhật: {detailTarget.date || 'N/A'}</p>
               </div>
               <button type="button" onClick={() => setDetailTarget(null)}
-                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+                className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 active:scale-95">
                 <span className="material-symbols-outlined">close</span>
               </button>
             </div>
@@ -829,29 +938,29 @@ export default function AdminRequests() {
               </div>
             ) : null}
 
-            <div className="mt-6 flex flex-wrap justify-end gap-2">
+            <div className="mt-6 flex flex-wrap justify-end gap-2 pb-2">
               {detailTarget.fine && detailTarget.fine.status === 'unpaid' && (
                 <button type="button" onClick={() => handlePayFine(detailTarget.fine!.fine_id)} disabled={activeRequestId === detailTarget.id}
-                  className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700 disabled:cursor-wait disabled:opacity-60">
+                  className="flex-1 min-w-[120px] rounded-xl bg-emerald-600 py-3 text-sm font-bold text-white hover:bg-emerald-700 disabled:cursor-wait disabled:opacity-60 active:opacity-90">
                   {activeRequestId === detailTarget.id ? 'Đang xử lý...' : 'Thu phí phạt'}
                 </button>
               )}
               {detailTarget.raw_status === 'pending' ? (
                 <>
                   <button onClick={() => { setDetailTarget(null); openRejectDialog(detailTarget); }}
-                    className="rounded-lg border border-red-200 px-4 py-2 text-sm font-bold text-red-600 hover:bg-red-50">Từ chối</button>
+                    className="flex-1 min-w-[100px] rounded-xl border border-red-200 py-3 text-sm font-bold text-red-600 hover:bg-red-50 active:bg-red-100">Từ chối</button>
                   <button onClick={() => { setDetailTarget(null); handleApprove(detailTarget.id); }}
-                    className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white hover:opacity-90">Duyệt</button>
+                    className="flex-1 min-w-[100px] rounded-xl bg-primary py-3 text-sm font-bold text-white hover:opacity-90 active:opacity-80">Duyệt</button>
                 </>
               ) : detailTarget.raw_status === 'approved' ? (
                 <button onClick={() => openPickupDialog(detailTarget)}
-                  className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:opacity-90">Xác nhận giao sách</button>
+                  className="w-full rounded-xl bg-indigo-600 py-3 text-sm font-bold text-white hover:opacity-90 active:opacity-80">Xác nhận giao sách</button>
               ) : detailTarget.raw_status === 'borrowed' ? (
                 <>
                   <button onClick={() => openExtendDialog(detailTarget)}
-                    className="rounded-lg border border-indigo-200 px-4 py-2 text-sm font-bold text-indigo-600 hover:bg-indigo-50">Gia hạn</button>
+                    className="flex-1 min-w-[100px] rounded-xl border border-indigo-200 py-3 text-sm font-bold text-indigo-600 hover:bg-indigo-50 active:bg-indigo-100">Gia hạn</button>
                   <button onClick={() => openReturnDialog(detailTarget)}
-                    className="rounded-lg bg-tertiary px-4 py-2 text-sm font-bold text-white hover:opacity-90">Nhận trả sách</button>
+                    className="flex-1 min-w-[100px] rounded-xl bg-tertiary py-3 text-sm font-bold text-white hover:opacity-90 active:opacity-80">Nhận trả sách</button>
                 </>
               ) : null}
             </div>
@@ -859,13 +968,13 @@ export default function AdminRequests() {
         </div>
       ) : null}
 
-      {/* QR Scanner */}
+      {/* QR Scanner (Bottom Sheet on Mobile, Backdrop Blur) */}
       {showScanner && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/80 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl">
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-slate-900/80 p-0 sm:p-4 backdrop-blur-xs">
+          <div className="w-full max-w-md overflow-hidden rounded-t-2xl sm:rounded-2xl bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
               <h3 className="text-lg font-bold text-slate-900">Quét mã QR Phiếu mượn</h3>
-              <button onClick={() => setShowScanner(false)} className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+              <button onClick={() => setShowScanner(false)} className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 active:scale-95">
                 <span className="material-symbols-outlined text-[20px]">close</span>
               </button>
             </div>
@@ -958,7 +1067,7 @@ export default function AdminRequests() {
                 components={{ finder: true }}
               />
             </div>
-            <div className="bg-slate-50 p-4 text-center text-sm text-slate-500">Đưa mã QR của sinh viên hoặc mã vạch của sách (SACH-XXXXX) vào khung camera để tự động xử lý.</div>
+            <div className="bg-slate-50 p-4 text-center text-xs text-slate-500 pb-6 sm:pb-4">Đưa mã QR của sinh viên hoặc mã vạch của sách (SACH-XXXXX) vào khung camera để tự động xử lý.</div>
           </div>
         </div>
       )}
