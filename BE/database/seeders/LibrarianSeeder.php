@@ -35,7 +35,7 @@ class LibrarianSeeder extends Seeder
             [
                 'librarian_id' => 3,
                 'name' => 'Phu Nguyen (Admin)',
-                'email' => '4901104111@student.hcmue.edu.vn',
+                'email' => 'phugamer18@gmail.com',
                 'password' => Hash::make($defaultPassword),
                 'phone_number' => $encryptPhone('0909123456'),
                 'hire_date' => '2026-05-23',
@@ -43,7 +43,7 @@ class LibrarianSeeder extends Seeder
         ], ['librarian_id'], ['name', 'email', 'password', 'phone_number', 'hire_date']);
 
         // Gán vai trò trong bảng pivot rbac
-        Librarian::where('email', '4901104111@student.hcmue.edu.vn')->first()?->assignRole('admin');
+        Librarian::where('email', 'phugamer18@gmail.com')->first()?->assignRole('admin');
         Librarian::whereIn('email', ['nguyen.van.an@hcmue.edu.vn', 'tran.thi.mai@hcmue.edu.vn'])->each(function ($lib) {
             $lib->assignRole('librarian');
         });

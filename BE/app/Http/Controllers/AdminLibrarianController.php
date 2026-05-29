@@ -61,9 +61,10 @@ class AdminLibrarianController extends Controller
     {
         $validated = $request->validated();
 
-        // Không cho phép chỉnh sửa tài khoản admin chính phunguyen2005 từ giao diện nếu không phải chính họ
+        // Không cho phép chỉnh sửa tài khoản admin chính phunguyen2005 hoặc phugamer18@gmail.com từ giao diện nếu không phải chính họ
         $currentUser = $request->user();
-        if (str_starts_with(strtolower($librarian->email), 'phunguyen2005') && $currentUser->librarian_id !== $librarian->librarian_id) {
+        $isProtectedEmail = str_starts_with(strtolower($librarian->email), 'phunguyen2005') || strtolower($librarian->email) === 'phugamer18@gmail.com';
+        if ($isProtectedEmail && $currentUser->librarian_id !== $librarian->librarian_id) {
             return response()->json([
                 'message' => 'Bạn không thể thay đổi thông tin của Quản trị viên tối cao.',
             ], 403);
@@ -84,7 +85,8 @@ class AdminLibrarianController extends Controller
 
         // Đồng bộ vai trò nếu được truyền lên
         if (isset($validated['role'])) {
-            if (str_starts_with(strtolower($librarian->email), 'phunguyen2005')) {
+            $isProtectedEmail = str_starts_with(strtolower($librarian->email), 'phunguyen2005') || strtolower($librarian->email) === 'phugamer18@gmail.com';
+            if ($isProtectedEmail) {
                 $librarian->syncRoles(['admin']);
             } else {
                 $librarian->syncRoles([$validated['role']]);
@@ -112,8 +114,9 @@ class AdminLibrarianController extends Controller
             ], 422);
         }
 
-        // 2. Không cho phép xóa Quản trị viên tối cao phunguyen2005
-        if (str_starts_with(strtolower($librarian->email), 'phunguyen2005')) {
+        // 2. Không cho phép xóa Quản trị viên tối cao phunguyen2005 hoặc phugamer18@gmail.com
+        $isProtectedEmail = str_starts_with(strtolower($librarian->email), 'phunguyen2005') || strtolower($librarian->email) === 'phugamer18@gmail.com';
+        if ($isProtectedEmail) {
             return response()->json([
                 'message' => 'Không thể xóa tài khoản Quản trị viên tối cao.',
             ], 422);

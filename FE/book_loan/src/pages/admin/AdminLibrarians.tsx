@@ -69,9 +69,14 @@ const PERMISSION_DETAILS: Record<string, { label: string; color: string }> = {
   manage_blog: { label: 'Blog', color: 'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/20 dark:text-sky-400 dark:border-sky-900/30' },
 };
 
+const isProtectedAdminEmail = (email: string) => {
+  const el = email.toLowerCase();
+  return el.startsWith('phunguyen2005') || el === 'phugamer18@gmail.com';
+};
+
 function mapLibrarian(lib: LibrarianApiRecord): LibrarianListItem {
   const roleName = lib.role || 'librarian';
-  const isSuper = roleName === 'admin' || lib.email.toLowerCase().startsWith('phunguyen2005');
+  const isSuper = roleName === 'admin' || isProtectedAdminEmail(lib.email);
   return {
     id: lib.librarian_id,
     name: lib.name,
@@ -234,8 +239,8 @@ export default function AdminLibrarians() {
       emitToast({ tone: 'error', title: 'Không thể thực hiện', message: 'Bạn không thể tự xóa tài khoản của chính mình.' });
       return;
     }
-    // Không cho phép xóa Quản trị viên phunguyen2005
-    if (lib.email.toLowerCase().startsWith('phunguyen2005')) {
+    // Không cho phép xóa Quản trị viên phunguyen2005 hoặc phugamer18@gmail.com
+    if (isProtectedAdminEmail(lib.email)) {
       emitToast({ tone: 'error', title: 'Không thể thực hiện', message: 'Không thể xóa tài khoản Quản trị viên tối cao.' });
       return;
     }
@@ -458,7 +463,7 @@ export default function AdminLibrarians() {
                         <button
                           type="button"
                           onClick={() => promptDelete(lib)}
-                          disabled={currentUser?.librarian_id === lib.id || lib.email.toLowerCase().startsWith('phunguyen2005')}
+                          disabled={currentUser?.librarian_id === lib.id || isProtectedAdminEmail(lib.email)}
                           className="rounded-lg p-2 text-red-500 transition-all hover:bg-red-50 disabled:opacity-30 disabled:hover:bg-transparent"
                           title="Xóa"
                           aria-label={`Xóa ${lib.name}`}
@@ -532,7 +537,7 @@ export default function AdminLibrarians() {
                     id="lib-email"
                     required
                     type="email"
-                    disabled={modalMode === 'edit' && formData.email.toLowerCase().startsWith('phunguyen2005')}
+                    disabled={modalMode === 'edit' && isProtectedAdminEmail(formData.email)}
                     value={formData.email}
                     onChange={(event) => setFormData({ ...formData, email: event.target.value })}
                     className="w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20 disabled:bg-slate-100 disabled:text-slate-500"
@@ -573,7 +578,7 @@ export default function AdminLibrarians() {
                   <select
                     id="lib-role"
                     required
-                    disabled={modalMode === 'edit' && formData.email.toLowerCase().startsWith('phunguyen2005')}
+                    disabled={modalMode === 'edit' && isProtectedAdminEmail(formData.email)}
                     value={formData.role}
                     onChange={(event) => {
                       const selectedRole = event.target.value;
