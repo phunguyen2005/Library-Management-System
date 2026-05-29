@@ -2,6 +2,7 @@ import Echo from 'laravel-echo';
 import Pusher from 'pusher-js';
 
 (window as any).Pusher = Pusher;
+Pusher.logToConsole = true;
 
 const token = localStorage.getItem('auth_token');
 const broadcaster = import.meta.env.VITE_BROADCASTER || 'pusher';
