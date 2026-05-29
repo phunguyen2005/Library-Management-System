@@ -6,7 +6,10 @@ use App\Models\Book;
 use App\Models\Borrowing;
 use App\Models\Reservation;
 use App\Models\Fine;
+use App\Models\Room;
 use App\Models\RoomBooking;
+use App\Models\Member;
+use App\Models\LibrarySetting;
 use App\Services\Ai\AiManager;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -196,15 +199,25 @@ class AiChatController extends Controller
             . "Nhiệm vụ của bạn là tư vấn, tìm kiếm sách, giải đáp các thắc mắc của sinh viên và hướng dẫn quy trình một cách lịch sự, chuyên nghiệp bằng tiếng Việt.\n\n"
             . "Dưới đây là một số cuốn sách nổi bật/phù hợp với nội dung câu hỏi trong hệ thống thư viện:\n"
             . $catalogText . "\n\n"
-            . "HƯỚNG DẪN TRẢ LỜI:\n"
+            . "HƯỚNG DẪN TRẢ LỜI & SỬ DỤNG CÔNG CỤ (TOOLS):\n"
             . "1. Trả lời câu hỏi ngắn gọn, rõ ràng, sử dụng định dạng Markdown (in đậm, danh sách gạch đầu dòng).\n"
             . "2. Hãy luôn nhiệt tình tìm kiếm và gợi ý các cuốn sách phù hợp từ danh sách ở trên khi người dùng hỏi về bất kỳ chủ đề gì liên quan.\n"
             . "3. QUAN TRỌNG: Khi gợi ý sách, bạn PHẢI viết kèm mã ID sách chính xác dưới dạng '[ID: X]' (ví dụ: 'Tôi gợi ý cuốn Clean Code [ID: 5]...'). Giao diện người dùng sẽ dùng mã này để tạo liên kết cho phép click xem trực tiếp. Đừng quên định dạng [ID: X] này!\n"
             . "4. Nếu người dùng hỏi về quy trình mượn sách, hãy giải thích: Sinh viên gửi yêu cầu trực tuyến trên web -> Thủ thư duyệt -> Sinh viên nhận mã QR trên mail/in-app -> Sinh viên đến thư viện đưa thủ thư quét QR để nhận sách. Thời hạn nhận sách là 24 giờ.\n"
             . "5. Nếu sách họ muốn mượn đã hết (available_quantity = 0), hãy nhắc họ có thể click vào chi tiết sách để sử dụng tính năng 'Đặt chỗ trước' (Reservation Queue) để xếp hàng chờ tự động.\n"
+            . "6. CHƠI ĐỐ VUI (Trivia Quiz): Nếu sinh viên muốn chơi đố vui (Daily Trivia Quiz) hoặc thử thách nhận xu, bạn hãy tự động đưa ra một câu hỏi trắc nghiệm/tự luận ngắn thú vị liên quan đến thế giới sách hoặc quy tắc thư viện. Khi sinh viên trả lời ĐÚNG, bạn bắt buộc phải gọi công cụ `rewardStudentPoints` để thưởng xu (thường là 10 xu) và XP cho họ!\n"
             . ($member
-                ? "6. Bạn được cung cấp các công cụ (Tools) để xem sách đang mượn (getMyBorrowings), xem tiền phạt (getMyFines), và xem lịch đặt phòng tự học (getMyRoomBookings) của sinh viên này. Hãy gọi công cụ khi họ hỏi về thông tin cá nhân của họ."
-                : "6. Người dùng hiện chưa đăng nhập. Nếu họ hỏi về thông tin cá nhân (lịch sử mượn, tiền phạt, phòng tự học), hãy nhắc họ đăng nhập để xem thông tin đó."
+                ? "7. GIAO DỊCH QUA CHAT: Sinh viên đã đăng nhập hệ thống. Bạn được cung cấp toàn quyền các công cụ để:\n"
+                    . "   - Xem sách đang mượn (getMyBorrowings)\n"
+                    . "   - Tra cứu nợ phạt (getMyFines)\n"
+                    . "   - Xem danh sách phòng khả dụng (getRooms) và kiểm tra lịch đặt phòng cá nhân (getMyRoomBookings)\n"
+                    . "   - Thực hiện ĐẶT PHÒNG TỰ HỌC trực tiếp (bookStudyRoom) khi họ yêu cầu đặt phòng cụ thể\n"
+                    . "   - Thực hiện GIA HẠN SÁCH trực tiếp (renewMyBook) khi họ yêu cầu gia hạn một cuốn sách đang giữ\n"
+                    . "   - Thực hiện XẾP HÀNG ĐẶT CHỖ trước (joinReservationQueue) khi sách họ cần đã hết\n"
+                    . "   - Xem thành tích, level, xu, streak và huy hiệu cá nhân (getMyGamificationStatus)\n"
+                    . "   - Xem bảng xếp hạng thư viện (getLeaderboard)\n"
+                    . "Hãy chủ động gọi các công cụ tương ứng khi họ yêu cầu thực hiện hành động!"
+                : "7. Người dùng hiện chưa đăng nhập. Nếu họ hỏi về thông tin cá nhân hoặc yêu cầu các giao dịch (đặt phòng, gia hạn, đặt chỗ, xem điểm, chơi game đố vui nhận thưởng), hãy lịch sự nhắc họ đăng nhập tài khoản để thực hiện các thao tác này."
             );
 
         // Declare tools schema for Gemini native function calling
@@ -228,8 +241,112 @@ class AiChatController extends Controller
                         ]
                     ],
                     [
+                        'name' => 'getRooms',
+                        'description' => 'Lấy danh sách các phòng tự học hoặc phòng học nhóm đang hoạt động trong thư viện.',
+                        'parameters' => [
+                            'type' => 'OBJECT',
+                            'properties' => (object)[]
+                        ]
+                    ],
+                    [
                         'name' => 'getMyRoomBookings',
-                        'description' => 'Lấy danh sách các phòng tự học được đặt (room bookings) của sinh viên hiện tại.',
+                        'description' => 'Lấy danh sách các lượt đặt phòng tự học/học nhóm (đã đặt hoặc lịch sử) của sinh viên hiện tại.',
+                        'parameters' => [
+                            'type' => 'OBJECT',
+                            'properties' => (object)[]
+                        ]
+                    ],
+                    [
+                        'name' => 'renewMyBook',
+                        'description' => 'Gia hạn thêm thời gian mượn cho một cuốn sách đang giữ của sinh viên hiện tại.',
+                        'parameters' => [
+                            'type' => 'OBJECT',
+                            'properties' => [
+                                'book_id' => [
+                                    'type' => 'INTEGER',
+                                    'description' => 'Mã số ID của cuốn sách muốn gia hạn (Ví dụ: 5).'
+                                ]
+                            ],
+                            'required' => ['book_id']
+                        ]
+                    ],
+                    [
+                        'name' => 'bookStudyRoom',
+                        'description' => 'Đăng ký đặt trước phòng học nhóm hoặc phòng tự học cho sinh viên hiện tại.',
+                        'parameters' => [
+                            'type' => 'OBJECT',
+                            'properties' => [
+                                'room_id' => [
+                                    'type' => 'INTEGER',
+                                    'description' => 'Mã ID của phòng muốn đặt.'
+                                ],
+                                'date' => [
+                                    'type' => 'STRING',
+                                    'description' => 'Ngày đặt phòng định dạng YYYY-MM-DD (Ví dụ: 2026-06-01).'
+                                ],
+                                'start_time' => [
+                                    'type' => 'STRING',
+                                    'description' => 'Giờ bắt đầu định dạng HH:MM (Ví dụ: 09:00).'
+                                ],
+                                'end_time' => [
+                                    'type' => 'STRING',
+                                    'description' => 'Giờ kết thúc định dạng HH:MM (Ví dụ: 11:00).'
+                                ],
+                                'group_size' => [
+                                    'type' => 'INTEGER',
+                                    'description' => 'Số lượng thành viên tham gia sử dụng phòng.'
+                                ],
+                                'purpose' => [
+                                    'type' => 'STRING',
+                                    'description' => 'Mục đích sử dụng phòng.'
+                                ]
+                            ],
+                            'required' => ['room_id', 'date', 'start_time', 'end_time', 'group_size']
+                        ]
+                    ],
+                    [
+                        'name' => 'joinReservationQueue',
+                        'description' => 'Đăng ký đặt chỗ trước (xếp hàng chờ) cho một cuốn sách hiện đã hết bản sẵn có.',
+                        'parameters' => [
+                            'type' => 'OBJECT',
+                            'properties' => [
+                                'book_id' => [
+                                    'type' => 'INTEGER',
+                                    'description' => 'Mã số ID của cuốn sách muốn xếp hàng đặt chỗ.'
+                                ]
+                            ],
+                            'required' => ['book_id']
+                        ]
+                    ],
+                    [
+                        'name' => 'rewardStudentPoints',
+                        'description' => 'Thưởng điểm xu tích lũy và kinh nghiệm XP cho sinh viên khi họ chơi và trả lời ĐÚNG câu đố vui hàng ngày.',
+                        'parameters' => [
+                            'type' => 'OBJECT',
+                            'properties' => [
+                                'points' => [
+                                    'type' => 'INTEGER',
+                                    'description' => 'Số xu thưởng cho sinh viên (Mặc định: 10).'
+                                ],
+                                'reason' => [
+                                    'type' => 'STRING',
+                                    'description' => 'Lý do thưởng điểm cụ thể (Ví dụ: Trả lời đúng câu hỏi về sách giáo khoa Giải tích).'
+                                ]
+                            ],
+                            'required' => ['points', 'reason']
+                        ]
+                    ],
+                    [
+                        'name' => 'getMyGamificationStatus',
+                        'description' => 'Xem cấp độ level, kinh nghiệm XP, xu tích lũy, streak đọc sách và danh sách huy hiệu đã đạt được.',
+                        'parameters' => [
+                            'type' => 'OBJECT',
+                            'properties' => (object)[]
+                        ]
+                    ],
+                    [
+                        'name' => 'getLeaderboard',
+                        'description' => 'Xem bảng xếp hạng top 5 sinh viên có thành tích xuất sắc nhất thư viện dựa trên điểm XP.',
                         'parameters' => [
                             'type' => 'OBJECT',
                             'properties' => (object)[]
@@ -241,11 +358,13 @@ class AiChatController extends Controller
 
         // Check if user is asking about personal details that require tools
         $normalizedMsg = mb_strtolower($message, 'UTF-8');
-        $needsTools = $member && Str::contains($normalizedMsg, [
+        $needsTools = $member && (Str::contains($normalizedMsg, [
             'của tôi', 'cá nhân', 'tôi mượn', 'đang mượn', 'lịch sử mượn',
             'tiền phạt', 'phạt', 'đóng phạt', 'nợ phạt',
-            'đặt phòng', 'phòng tự học', 'phòng nhóm', 'lịch đặt phòng', 'phòng của tôi'
-        ]);
+            'đặt phòng', 'phòng tự học', 'phòng nhóm', 'lịch đặt phòng', 'phòng của tôi',
+            'gia hạn', 'thêm hạn', 'đặt chỗ', 'hàng đợi', 'reservation', 'đố vui',
+            'xu', 'points', 'xp', 'level', 'thành tích', 'huy hiệu', 'bảng xếp hạng', 'top', 'hạng'
+        ]) || preg_match('/chơi|game|quiz|trivia|thử thách/i', $normalizedMsg));
 
         return response()->stream(function () use ($message, $history, $systemPrompt, $tools, $member, $needsTools) {
             $activeTools = $needsTools ? $tools : [];
@@ -359,6 +478,10 @@ class AiChatController extends Controller
                 ])->toArray();
             }
 
+            if ($name === 'getRooms') {
+                return Room::bookable()->get(['room_id', 'name', 'capacity', 'location'])->toArray();
+            }
+
             if ($name === 'getMyRoomBookings') {
                 $bookings = RoomBooking::where('member_id', $member->member_id)
                     ->with('room')
@@ -374,6 +497,174 @@ class AiChatController extends Controller
                     'status' => $b->status
                 ])->toArray();
             }
+
+            if ($name === 'renewMyBook') {
+                $bookId = (int) $args['book_id'];
+                $loan = Borrowing::where('member_id', $member->member_id)
+                    ->where('book_id', $bookId)
+                    ->where('status', Borrowing::STATUS_BORROWED)
+                    ->first();
+
+                if (!$loan) {
+                    return ['error' => 'Bạn không có phiếu mượn đang giữ hoạt động cho sách này. Hãy kiểm tra lại mã ID sách.'];
+                }
+
+                $settings = LibrarySetting::singleton();
+                $extraDays = (int) ($settings->loan_period_days ?? 14);
+
+                $oldDue = $loan->due_date ? $loan->due_date->toDateString() : now()->toDateString();
+                $loan->due_date = $loan->due_date ? $loan->due_date->addDays($extraDays) : now()->addDays($extraDays);
+                $loan->save();
+
+                \App\Services\AuditLoggerService::log(
+                    'borrow_extend',
+                    'Sinh viên tự gia hạn qua Chatbot: ' . $loan->book?->title . ' (Hạn mới: ' . $loan->due_date->toDateString() . ')',
+                    $member
+                );
+
+                return [
+                    'success' => true,
+                    'message' => "Đã gia hạn thành công cuốn sách \"{$loan->book?->title}\"! Hạn cũ: {$oldDue} -> Hạn trả mới: " . $loan->due_date->toDateString()
+                ];
+            }
+
+            if ($name === 'bookStudyRoom') {
+                $roomId = (int) $args['room_id'];
+                $date = $args['date'];
+                $startTime = $args['start_time'];
+                $endTime = $args['end_time'];
+                $groupSize = (int) ($args['group_size'] ?? 2);
+                $purpose = $args['purpose'] ?? 'Học nhóm học tập';
+
+                $room = Room::bookable()->find($roomId);
+                if (!$room) {
+                    return ['error' => 'Không tìm thấy phòng tương ứng hoặc phòng hiện đang đóng cửa/bảo trì.'];
+                }
+
+                if ($groupSize > $room->capacity) {
+                    return ['error' => "Sức chứa tối đa của phòng {$room->name} chỉ là {$room->capacity} người."];
+                }
+
+                $hasConflict = RoomBooking::hasConflict($roomId, $date, $startTime, $endTime);
+                if ($hasConflict) {
+                    return ['error' => 'Khung giờ bạn chọn đã bị trùng lịch đặt phòng. Vui lòng chọn khung giờ hoặc phòng khác.'];
+                }
+
+                $booking = RoomBooking::create([
+                    'room_id' => $roomId,
+                    'member_id' => $member->member_id,
+                    'date' => $date,
+                    'start_time' => $startTime,
+                    'end_time' => $endTime,
+                    'purpose' => $purpose,
+                    'group_size' => $groupSize,
+                    'status' => RoomBooking::STATUS_APPROVED, // Tự động duyệt thông minh trên chatbot
+                    'booking_code' => RoomBooking::generateBookingCode(),
+                ]);
+
+                \App\Services\AuditLoggerService::log(
+                    'room_booking_create',
+                    'Đăng ký đặt phòng học nhóm ' . $room->name . ' qua Chatbot (Mã: ' . $booking->booking_code . ')',
+                    $member
+                );
+
+                return [
+                    'success' => true,
+                    'message' => "Đặt phòng học nhóm {$room->name} thành công! Ngày: {$date}, Khung giờ: {$startTime} - {$endTime}. Mã đặt phòng: **{$booking->booking_code}**."
+                ];
+            }
+
+            if ($name === 'joinReservationQueue') {
+                $bookId = (int) $args['book_id'];
+                $book = Book::find($bookId);
+                if (!$book) {
+                    return ['error' => 'Không tìm thấy cuốn sách tương ứng trong hệ thống.'];
+                }
+
+                if ($book->available_quantity > 0) {
+                    return ['error' => 'Sách hiện vẫn còn bản sẵn có trên kệ để mượn trực tiếp, bạn không cần phải xếp hàng đặt chỗ.'];
+                }
+
+                $activeLoan = Borrowing::where('member_id', $member->member_id)
+                    ->where('book_id', $bookId)
+                    ->whereIn('status', [Borrowing::STATUS_PENDING, Borrowing::STATUS_APPROVED, Borrowing::STATUS_BORROWED])
+                    ->exists();
+
+                if ($activeLoan) {
+                    return ['error' => 'Bạn đã có một phiếu mượn hoặc yêu cầu đang hoạt động cho cuốn sách này rồi.'];
+                }
+
+                $activeReservation = Reservation::where('member_id', $member->member_id)
+                    ->where('book_id', $bookId)
+                    ->where('status', Reservation::STATUS_WAITING)
+                    ->exists();
+
+                if ($activeReservation) {
+                    return ['error' => 'Bạn đã có tên trong hàng đợi đặt chỗ của cuốn sách này rồi.'];
+                }
+
+                $position = Reservation::where('book_id', $bookId)
+                    ->where('status', Reservation::STATUS_WAITING)
+                    ->count() + 1;
+
+                $res = Reservation::create([
+                    'member_id' => $member->member_id,
+                    'book_id' => $bookId,
+                    'position' => $position,
+                    'status' => Reservation::STATUS_WAITING,
+                ]);
+
+                return [
+                    'success' => true,
+                    'message' => "Xếp hàng đặt chỗ thành công! Bạn đang ở vị trí thứ **{$position}** trong hàng đợi của cuốn sách \"{$book->title}\"."
+                ];
+            }
+
+            if ($name === 'rewardStudentPoints') {
+                $points = (int) ($args['points'] ?? 10);
+                $reason = $args['reason'] ?? 'Trả lời đúng câu đố vui học thuật hàng ngày của Chatbot';
+
+                app(\App\Services\GamifyService::class)->awardXpAndPoints(
+                    $member,
+                    $points * 2,
+                    $points,
+                    'daily_trivia',
+                    $reason
+                );
+
+                return [
+                    'success' => true,
+                    'message' => "Chúc mừng bạn đã xuất sắc trả lời đúng! Đã cộng thành công **{$points} xu** và **" . ($points * 2) . " XP** vào tài khoản."
+                ];
+            }
+
+            if ($name === 'getMyGamificationStatus') {
+                $memberFresh = Member::find($member->member_id);
+                $badges = $memberFresh->badges()->get(['badges.id', 'name', 'description'])->map(fn($b) => [
+                    'name' => $b->name,
+                    'description' => $b->description
+                ])->toArray();
+
+                return [
+                    'name' => $memberFresh->name,
+                    'level' => $memberFresh->level,
+                    'xp' => $memberFresh->xp,
+                    'points' => $memberFresh->points,
+                    'daily_streak' => $memberFresh->daily_streak ?? 0,
+                    'badges' => $badges
+                ];
+            }
+
+            if ($name === 'getLeaderboard') {
+                $top = Member::orderBy('xp', 'desc')->limit(5)->get(['name', 'level', 'xp']);
+                return $top->map(fn($m, $idx) => [
+                    'rank' => $idx + 1,
+                    'name' => $m->name,
+                    'level' => $m->level,
+                    'xp' => $m->xp
+                ])->toArray();
+            }
+
         } catch (\Exception $e) {
             Log::error("Error executing function $name in Controller: " . $e->getMessage());
             return ['error' => 'Không thể thực thi hàm: ' . $e->getMessage()];
