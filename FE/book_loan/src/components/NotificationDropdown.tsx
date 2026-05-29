@@ -78,7 +78,7 @@ export default function NotificationDropdown() {
   };
 
   return (
-    <div className="relative" ref={wrapperRef}>
+    <div className="md:relative" ref={wrapperRef}>
       <button
         onClick={handleToggle}
         className="relative rounded-full p-2 text-on-surface-variant transition-colors hover:bg-surface-container-low"
@@ -92,7 +92,7 @@ export default function NotificationDropdown() {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 top-full z-50 mt-2 w-80 overflow-hidden rounded-xl border border-surface-container-low bg-surface-bright shadow-2xl">
+        <div className="absolute left-4 right-4 top-14 md:absolute md:left-auto md:right-0 md:top-full z-50 mt-2 w-auto md:w-80 overflow-hidden rounded-xl border border-surface-container-low bg-surface-bright shadow-2xl animate-in fade-in slide-in-from-top-2 duration-200 md:animate-none">
           <div className="flex items-center justify-between border-b border-surface-container-low px-4 py-3">
             <h3 className="text-sm font-bold text-on-surface">Thông báo</h3>
             {unreadCount > 0 && (

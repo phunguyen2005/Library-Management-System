@@ -15,7 +15,7 @@ export default function AdminHeader({ onOpenPolicy, onToggleSidebar }: AdminHead
   const { user } = useAuth();
 
   return (
-    <header className="z-20 flex h-16 shrink-0 items-center justify-between border-b border-surface-container/40 bg-surface/80 px-4 md:px-8 backdrop-blur-md">
+    <header className="relative z-20 flex h-16 shrink-0 items-center justify-between border-b border-surface-container/40 bg-surface/80 px-4 md:px-8 backdrop-blur-md">
       <div className="flex flex-1 items-center gap-4">
         {onToggleSidebar && (
           <button
