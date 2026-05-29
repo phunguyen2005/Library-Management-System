@@ -233,12 +233,7 @@ class DigitalDocumentAccessTest extends TestCase
     public function test_admin_can_upload_digital_file_for_book(): void
     {
         $this->withoutExceptionHandling();
-        \Illuminate\Support\Facades\Http::fake([
-            'https://api.cloudinary.com/*' => \Illuminate\Support\Facades\Http::response([
-                'secure_url' => 'https://res.cloudinary.com/dxohf6ubp/raw/upload/v12345/library_digital_files/lecture.epub',
-                'public_id' => 'library_digital_files/lecture',
-            ], 200)
-        ]);
+        Storage::fake('supabase');
 
         $librarian = Librarian::query()->findOrFail(1);
         $token = $librarian->createToken('digital-upload-access', ['role:admin']);
@@ -255,8 +250,10 @@ class DigitalDocumentAccessTest extends TestCase
 
         $book = Book::query()->findOrFail(7);
 
-        $this->assertNotNull($book->file_url);
-        $this->assertSame('library_digital_files/lecture', $book->cloudinary_public_id);
+        // EPUB now stored in Supabase Storage (not Cloudinary)
+        $this->assertStringStartsWith('supabase:', (string) $book->file_path);
+        $this->assertNull($book->cloudinary_public_id);
+        $this->assertNull($book->file_url);
     }
 
     public function test_admin_can_upload_audio_file_for_book(): void
@@ -327,6 +324,9 @@ class DigitalDocumentAccessTest extends TestCase
 
     public function test_signed_digital_document_route_serves_uploaded_storage_file(): void
     {
+        // Force TiDB BLOB fallback by clearing Supabase key so test is independent of .env
+        config(['filesystems.disks.supabase.key' => null]);
+
         // Cấu hình Mock cho Cloudinary upload và stream download trong test
         \Illuminate\Support\Facades\Http::fake([
             'https://api.cloudinary.com/*' => \Illuminate\Support\Facades\Http::response([

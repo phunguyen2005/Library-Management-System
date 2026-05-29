@@ -241,7 +241,16 @@ class BookController extends Controller
             ], 422);
         }
 
-        // Xóa file Cloudinary liên quan nếu có
+        // Xóa file Supabase Storage nếu có (PDF/EPUB)
+        if ($book->file_path && str_starts_with($book->file_path, 'supabase:')) {
+            $supabaseService = new \App\Services\DocumentStorageService();
+            $supabaseService->delete(substr($book->file_path, 9));
+        } elseif ($book->file_path && str_starts_with($book->file_path, 'r2:')) {
+            $supabaseService = new \App\Services\DocumentStorageService();
+            $supabaseService->delete(substr($book->file_path, 3));
+        }
+
+        // Xóa file Cloudinary liên quan nếu có (Audio/EPUB cũ)
         if ($book->cloudinary_public_id) {
             $cloudinaryService = new \App\Services\CloudinaryService();
             $cloudinaryService->delete($book->cloudinary_public_id, $book->file_format ?: 'pdf');
@@ -259,78 +268,128 @@ class BookController extends Controller
 
     public function uploadDigitalFile(DigitalFileUploadRequest $request, Book $book)
     {
-        $file = $request->file('file');
+        $file      = $request->file('file');
         $extension = strtolower($file->getClientOriginalExtension());
-        $format = $this->digitalFormatFromExtension($extension);
-        $isAudio = $format === 'AUDIO';
+        $format    = $this->digitalFormatFromExtension($extension);
+        $isAudio   = $format === 'AUDIO';
 
-        $uploadedToCloudinary = false;
-        $uploadResult = [];
-        $isPdf = $format === 'PDF';
+        // ── Storage routing ──────────────────────────────────────────────────
+        // Audio (MP3/WAV/M4A) → Cloudinary (video resource type, CDN optimized)
+        // PDF + EPUB          → Cloudflare R2 (S3-compatible, zero egress fee)
+        // Fallback            → TiDB LONGBLOB (nếu cả R2 lẫn Cloudinary đều fail)
+        // ─────────────────────────────────────────────────────────────────────
 
-        // Check if Cloudinary credentials are configured and format is not PDF (PDFs are saved locally)
-        $cloudName = config('services.cloudinary.cloud_name') ?: env('CLOUDINARY_CLOUD_NAME');
-        $apiKey = config('services.cloudinary.api_key') ?: env('CLOUDINARY_API_KEY');
-        $apiSecret = config('services.cloudinary.api_secret') ?: env('CLOUDINARY_API_SECRET');
+        $storageType = 'TiDB (BLOB)';
 
-        if (!$isPdf && !empty($cloudName) && !empty($apiKey) && !empty($apiSecret)) {
-            try {
-                $cloudinaryService = new \App\Services\CloudinaryService();
-                
-                // Nếu đã có file cũ trên Cloudinary, tiến hành xóa
-                if ($book->cloudinary_public_id) {
-                    $cloudinaryService->delete($book->cloudinary_public_id, $book->file_format ?: $extension);
+        if ($isAudio) {
+            // ── Path 1: Audio → Cloudinary ───────────────────────────────────
+            $cloudName = config('services.cloudinary.cloud_name');
+            $apiKey    = config('services.cloudinary.api_key');
+            $apiSecret = config('services.cloudinary.api_secret');
+
+            if (!empty($cloudName) && !empty($apiKey) && !empty($apiSecret)) {
+                try {
+                    $cloudinaryService = new \App\Services\CloudinaryService();
+
+                    // Xóa file Cloudinary cũ nếu có
+                    if ($book->cloudinary_public_id) {
+                        $cloudinaryService->delete($book->cloudinary_public_id, $book->file_format ?: $extension);
+                    }
+
+                    // Xóa Supabase/R2 file cũ nếu có (edge case: book đã từng có PDF trước)
+                    if ($book->file_path && str_starts_with($book->file_path, 'supabase:')) {
+                        (new \App\Services\DocumentStorageService())->delete(substr($book->file_path, 9));
+                    } elseif ($book->file_path && str_starts_with($book->file_path, 'r2:')) {
+                        (new \App\Services\DocumentStorageService())->delete(substr($book->file_path, 3));
+                    }
+
+                    $uploadResult = $cloudinaryService->upload($file, 'library_digital_files');
+
+                    $book->fill([
+                        'is_digital'           => true,
+                        'resource_type'        => $book->resource_type ?: 'Audio Book',
+                        'file_format'          => $format,
+                        'file_size'            => $this->formatFileSize((int) $file->getSize()),
+                        'file_path'            => null,
+                        'file_url'             => $uploadResult['secure_url'],
+                        'cloudinary_public_id' => $uploadResult['public_id'],
+                        'file_content'         => null,
+                    ]);
+                    $storageType = 'Cloudinary';
+                } catch (\Exception $e) {
+                    \Log::warning('Cloudinary audio upload failed: ' . $e->getMessage());
+                    // Fall through to TiDB BLOB fallback below
                 }
+            }
+        } else {
+            // ── Path 2: PDF / EPUB → Supabase Storage ───────────────────────
+            $supabaseService = new \App\Services\DocumentStorageService();
 
-                // Upload file mới lên Cloudinary
-                $uploadResult = $cloudinaryService->upload($file, 'library_digital_files');
-                $uploadedToCloudinary = true;
-            } catch (\Exception $e) {
-                \Log::warning('Cloudinary upload failed, falling back to local storage: ' . $e->getMessage());
+            if (\App\Services\DocumentStorageService::isConfigured()) {
+                try {
+                    // Xóa Supabase/R2 file cũ nếu có
+                    if ($book->file_path && str_starts_with($book->file_path, 'supabase:')) {
+                        $supabaseService->delete(substr($book->file_path, 9));
+                    } elseif ($book->file_path && str_starts_with($book->file_path, 'r2:')) {
+                        $supabaseService->delete(substr($book->file_path, 3));
+                    }
+
+                    // Xóa Cloudinary cũ nếu có (EPUB đã từng lưu Cloudinary)
+                    if ($book->cloudinary_public_id) {
+                        try {
+                            (new \App\Services\CloudinaryService())
+                                ->delete($book->cloudinary_public_id, $book->file_format ?: $extension);
+                        } catch (\Exception $ignored) {
+                            // Non-critical: log and continue
+                            \Log::warning('Failed to delete old Cloudinary file during Supabase upload: ' . $ignored->getMessage());
+                        }
+                    }
+
+                    $uploadResult = $supabaseService->upload($file);
+
+                    $book->fill([
+                        'is_digital'           => true,
+                        'resource_type'        => $book->resource_type ?: 'Tài liệu số',
+                        'file_format'          => $format,
+                        'file_size'            => $this->formatFileSize((int) $file->getSize()),
+                        'file_path'            => 'supabase:' . $uploadResult['path'],
+                        'file_url'             => null,
+                        'cloudinary_public_id' => null,
+                        'file_content'         => null,  // Không dùng BLOB nữa
+                    ]);
+                    $storageType = 'Supabase Storage';
+                } catch (\Exception $e) {
+                    \Log::error('Supabase upload failed, falling back to TiDB BLOB: ' . $e->getMessage());
+                    // Fall through to TiDB BLOB fallback below
+                }
             }
         }
 
-        if ($uploadedToCloudinary) {
-            $book->fill([
-                'is_digital' => true,
-                'resource_type' => $book->resource_type ?: ($isAudio ? 'Audio Book' : 'Tài liệu số'),
-                'file_format' => $format,
-                'file_size' => $this->formatFileSize((int) $file->getSize()),
-                'file_path' => null, // Đặt null vì không lưu local nữa
-                'file_url' => $uploadResult['secure_url'],
-                'cloudinary_public_id' => $uploadResult['public_id'],
-            ]);
-        } else {
-            // Lưu PDF/file vào TiDB dưới dạng binary (LONGBLOB)
-            // Tránh mất file do Render dùng ephemeral filesystem
-            $binaryContent = file_get_contents($file->getRealPath());
-
-            // Xóa file local cũ nếu có
-            if ($book->file_path) {
+        // ── Fallback: TiDB LONGBLOB (khi R2 chưa cấu hình hoặc fail) ────────
+        if ($storageType === 'TiDB (BLOB)') {
+            // Xóa file local cũ nếu còn (legacy)
+            if ($book->file_path && !str_starts_with($book->file_path, 'db:') && !str_starts_with($book->file_path, 'r2:') && !str_starts_with($book->file_path, 'supabase:')) {
                 \Illuminate\Support\Facades\Storage::disk('local')->delete($book->file_path);
             }
 
-            $fileName = time() . '_' . \Illuminate\Support\Str::slug(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME)) . '.' . $extension;
+            $fileName = time() . '_' . Str::slug(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME)) . '.' . $extension;
 
             $book->fill([
-                'is_digital'            => true,
-                'resource_type'         => $book->resource_type ?: ($isAudio ? 'Audio Book' : 'Tài liệu số'),
-                'file_format'           => $format,
-                'file_size'             => $this->formatFileSize((int) $file->getSize()),
-                'file_path'             => null,
-                'file_url'              => null,
-                'cloudinary_public_id'  => null,
-                'file_content'          => $binaryContent,
+                'is_digital'           => true,
+                'resource_type'        => $book->resource_type ?: ($isAudio ? 'Audio Book' : 'Tài liệu số'),
+                'file_format'          => $format,
+                'file_size'            => $this->formatFileSize((int) $file->getSize()),
+                'file_path'            => 'db:' . $fileName,
+                'file_url'             => null,
+                'cloudinary_public_id' => null,
+                'file_content'         => file_get_contents($file->getRealPath()),
             ]);
-
-            // Lưu tên file gốc vào file_path để dùng khi serve (không phải path thực)
-            $book->file_path = 'db:' . $fileName;
         }
 
         if ($isAudio) {
             $book->forceFill([
-                'ai_summary' => null,
-                'ai_tags' => [],
+                'ai_summary'              => null,
+                'ai_tags'                 => [],
                 'ai_summary_generated_at' => null,
             ]);
         }
@@ -347,8 +406,10 @@ class BookController extends Controller
 
         $this->bookCache->bump();
 
-        $storageType = $uploadedToCloudinary ? 'Cloudinary' : 'TiDB (BLOB)';
-        \App\Services\AuditLoggerService::log('digital_file_upload', "Đã tải lên tệp tài liệu số ({$storageType}) cho sách: " . $book->title . ' (ID: ' . $book->book_id . ')');
+        \App\Services\AuditLoggerService::log(
+            'digital_file_upload',
+            "Đã tải lên tệp tài liệu số ({$storageType}) cho sách: {$book->title} (ID: {$book->book_id})"
+        );
 
         $book->loadCount([
             'favoritedBy as favorite_count',
@@ -405,7 +466,23 @@ class BookController extends Controller
 
         $filename = $this->digitalFilename($book);
 
-        // Chỉ redirect nếu file được lưu trên Cloudinary (có public_id)
+        // ── Priority 1: Supabase Storage (PDF/EPUB) ─────────────────────────
+        // file_path prefix 'supabase:' or 'r2:' → generate pre-signed URL (60 min) → redirect
+        if ($book->file_path && (str_starts_with($book->file_path, 'supabase:') || str_starts_with($book->file_path, 'r2:'))) {
+            $isSupabase = str_starts_with($book->file_path, 'supabase:');
+            $filePath = $isSupabase ? substr($book->file_path, 9) : substr($book->file_path, 3);
+            try {
+                $supabaseService = new \App\Services\DocumentStorageService();
+                $presignedUrl = $supabaseService->temporaryUrl($filePath, 60);
+                header_remove('X-Frame-Options');
+                return redirect()->away($presignedUrl);
+            } catch (\Exception $e) {
+                \Log::error("Supabase pre-signed URL generation failed for book ID {$book->book_id}, path [{$filePath}]: " . $e->getMessage());
+                // Fall through to next source
+            }
+        }
+
+        // ── Priority 2: Cloudinary (Audio / legacy EPUB) ─────────────────────
         if ($book->cloudinary_public_id && $book->file_url) {
             $isPdf = strtoupper((string) $book->file_format) === 'PDF'
                 || str_ends_with(strtolower((string) $book->file_url), '.pdf')
@@ -419,7 +496,6 @@ class BookController extends Controller
                     ])->get($book->file_url);
 
                     if ($response->successful()) {
-                        // Clear X-Frame-Options to allow framing from React frontend origins
                         header_remove('X-Frame-Options');
 
                         return response()->stream(function () use ($response) {

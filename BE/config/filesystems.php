@@ -60,6 +60,22 @@ return [
             'report' => false,
         ],
 
+        // Supabase Storage — dùng cho digital files (PDF, EPUB)
+        // S3-compatible API, miễn phí 1GB storage + 2GB bandwidth/tháng
+        // Pre-signed URLs có thời hạn — không cần public bucket
+        'supabase' => [
+            'driver'                  => 's3',
+            'key'                     => env('SUPABASE_S3_KEY'),
+            'secret'                  => env('SUPABASE_S3_SECRET'),
+            'region'                  => env('SUPABASE_S3_REGION', 'ap-southeast-1'),
+            'bucket'                  => env('SUPABASE_STORAGE_BUCKET', 'hcmue-library-files'),
+            'url'                     => null,
+            'endpoint'                => env('SUPABASE_S3_ENDPOINT'),
+            'use_path_style_endpoint' => true,
+            'throw'                   => true,
+            'report'                  => false,
+        ],
+
     ],
 
     /*
