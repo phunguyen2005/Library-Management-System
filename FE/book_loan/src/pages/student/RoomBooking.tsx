@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import { useAuth } from '../../auth/AuthContext';
+import { echoClient } from '../../lib/echo';
 import { 
   fetchRooms, 
   fetchRoomSchedule, 
@@ -13,6 +15,7 @@ import { emitToast } from '../../notifications/events';
 import { QRCodeSVG } from 'qrcode.react';
 
 export default function RoomBookingPage() {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<'rooms' | 'my-bookings'>('rooms');
   const [rooms, setRooms] = useState<Room[]>([]);
   const [myBookings, setMyBookings] = useState<BookingRecord[]>([]);
@@ -99,6 +102,55 @@ export default function RoomBookingPage() {
       void loadSchedule();
     }
   }, [selectedRoom, bookingDate]);
+
+  // Real-time WebSocket listener for room bookings and timeline locks
+  useEffect(() => {
+    const channel = echoClient.channel('room-bookings');
+
+    channel.listen('.room.booking.updated', (event: any) => {
+      // 1. If this is a personal booking update, reload list and notify
+      if (user && event.member_id === user.member_id) {
+        void loadMyBookings(currentPage);
+        
+        // Dynamic toast chimes based on status shifts
+        if (event.status === 'approved') {
+          const audio = new Audio('/sounds/notification.mp3');
+          audio.play().catch(() => {});
+          emitToast({
+            tone: 'success',
+            title: 'Đặt phòng được duyệt',
+            message: `Lịch đặt phòng "${event.room_name}" lúc ${event.start_time.substring(0, 5)} đã được phê duyệt!`,
+          });
+        } else if (event.status === 'rejected') {
+          emitToast({
+            tone: 'warning',
+            title: 'Đặt phòng bị từ chối',
+            message: `Lịch đặt phòng "${event.room_name}" đã bị từ chối.`,
+          });
+        }
+      }
+
+      // 2. If student has the booking modal open for the updated room and date, refresh the timeline slots immediately
+      if (selectedRoom && selectedRoom.room_id === event.room_id && bookingDate === event.date) {
+        const reloadSchedule = async () => {
+          try {
+            setLoadingSchedule(true);
+            const res = await fetchRoomSchedule(selectedRoom.room_id, bookingDate);
+            setSchedule(res);
+          } catch (e) {
+            // Ignore
+          } finally {
+            setLoadingSchedule(false);
+          }
+        };
+        void reloadSchedule();
+      }
+    });
+
+    return () => {
+      echoClient.leave('room-bookings');
+    };
+  }, [user, activeTab, selectedRoom, bookingDate, currentPage]);
 
   // Handle booking submission
   const handleBookingSubmit = async (e: React.FormEvent) => {

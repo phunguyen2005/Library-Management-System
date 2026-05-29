@@ -109,6 +109,12 @@ export async function adminCheckInRoomBooking(bookingId: number) {
   });
 }
 
+export async function adminCheckOutRoomBooking(bookingId: number) {
+  return apiRequest<{ message: string; booking: RoomBooking }>(`/admin/room-bookings/${bookingId}/check-out`, {
+    method: 'POST',
+  });
+}
+
 export async function fetchRoomBookingStats(startDate?: string, endDate?: string) {
   const query = new URLSearchParams();
   if (startDate) query.append('start_date', startDate);

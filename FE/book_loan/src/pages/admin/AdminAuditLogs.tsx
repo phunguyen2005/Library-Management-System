@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { getAuditLogs, AuditLogEntry } from '../../api/auditApi';
 import { motion } from 'framer-motion';
+import { echoClient } from '../../lib/echo';
 
 // Helper functions for UI
 const getUserInitials = (name: string) => {
@@ -135,7 +136,51 @@ export default function AdminAuditLogs() {
   const [userType, setUserType] = useState('');
   const [action, setAction] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [userQuery, setUserQuery] = useState('');
   const [dateFilter, setDateFilter] = useState('');
+
+  // Ref to hold latest filter state for stable WebSocket callback without reconnection
+  const filtersRef = useRef({ userType, action, dateFilter, currentPage });
+  useEffect(() => {
+    filtersRef.current = { userType, action, dateFilter, currentPage };
+  }, [userType, action, dateFilter, currentPage]);
+
+  // Real-time live scrolling terminal stream
+  useEffect(() => {
+    const channelName = 'admin-dashboard';
+    const channel = echoClient.private(channelName);
+
+    channel.listen('.audit.log.created', (newLog: AuditLogEntry) => {
+      // 1. Increment total logs
+      setTotalLogs((prev) => prev + 1);
+
+      // 2. Play subtle chime sound
+      const audio = new Audio('/sounds/notification.mp3');
+      audio.play().catch(() => {});
+
+      // 3. Read current filters from Ref
+      const { userType: curUserType, action: curAction, dateFilter: curDate, currentPage: curPage } = filtersRef.current;
+
+      if (curPage === 1) {
+        let isMatch = true;
+        if (curUserType && newLog.raw_user_type !== curUserType) isMatch = false;
+        if (curAction && newLog.raw_action !== curAction) isMatch = false;
+        if (curDate && newLog.created_at.substring(0, 10) !== curDate) isMatch = false;
+
+        if (isMatch) {
+          setLogs((prev) => {
+            if (prev.some((l) => l.log_id === newLog.log_id)) return prev;
+            // Cap at 15 logs per page
+            return [newLog, ...prev.slice(0, 14)];
+          });
+        }
+      }
+    });
+
+    return () => {
+      echoClient.leave(channelName);
+    };
+  }, []);
 
   const fetchLogsData = async (page = 1) => {
     try {
@@ -146,6 +191,7 @@ export default function AdminAuditLogs() {
         user_type: userType || undefined,
         action: action || undefined,
         query: searchQuery || undefined,
+        user_query: userQuery || undefined,
         date: dateFilter || undefined,
       });
       setLogs(res.data);
@@ -242,7 +288,7 @@ export default function AdminAuditLogs() {
 
       {/* Filter and Search Bar */}
       <form onSubmit={handleSearchSubmit} className="bg-surface-bright border border-border/80 rounded-2xl p-4 shadow-sm space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
           {/* Search Query */}
           <div>
             <label className="block text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-2">
@@ -262,6 +308,35 @@ export default function AdminAuditLogs() {
                   type="button"
                   onClick={() => {
                     setSearchQuery('');
+                    setTimeout(() => fetchLogsData(1), 0);
+                  }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground text-xs"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Operator Query */}
+          <div>
+            <label className="block text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-2">
+              Người thực hiện
+            </label>
+            <div className="relative">
+              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-lg">person</span>
+              <input
+                type="text"
+                placeholder="Tên, email user..."
+                value={userQuery}
+                onChange={(e) => setUserQuery(e.target.value)}
+                className="w-full pl-9 pr-12 py-2 bg-surface border border-border/85 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all placeholder:text-muted-foreground/60"
+              />
+              {userQuery && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUserQuery('');
                     setTimeout(() => fetchLogsData(1), 0);
                   }}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground text-xs"
@@ -353,13 +428,14 @@ export default function AdminAuditLogs() {
               <span className="material-symbols-outlined text-lg">filter_alt</span>
               <span>Lọc</span>
             </button>
-            {(userType || action || searchQuery || dateFilter) && (
+            {(userType || action || searchQuery || userQuery || dateFilter) && (
               <button
                 type="button"
                 onClick={() => {
                   setUserType('');
                   setAction('');
                   setSearchQuery('');
+                  setUserQuery('');
                   setDateFilter('');
                   // Immediate reload with empty params
                   setTimeout(() => {
@@ -432,13 +508,14 @@ export default function AdminAuditLogs() {
             <p className="text-xs text-muted-foreground mt-1 max-w-xs mx-auto">
               Không tìm thấy bản ghi nào trùng khớp với tiêu chí tìm kiếm hoặc bộ lọc hiện tại của bạn.
             </p>
-            {(userType || action || searchQuery || dateFilter) && (
+            {(userType || action || searchQuery || userQuery || dateFilter) && (
               <button
                 type="button"
                 onClick={() => {
                   setUserType('');
                   setAction('');
                   setSearchQuery('');
+                  setUserQuery('');
                   setDateFilter('');
                   setTimeout(() => fetchLogsData(1), 0);
                 }}
@@ -497,6 +574,11 @@ export default function AdminAuditLogs() {
                           </div>
                           <div>
                             <div className="font-semibold text-foreground text-sm leading-none">{log.user_name}</div>
+                            {log.user_email && (
+                              <div className="text-muted-foreground text-[10px] mt-1 font-medium leading-none truncate max-w-[150px]" title={log.user_email}>
+                                {log.user_email}
+                              </div>
+                            )}
                             <span
                               className={`inline-flex items-center mt-1.5 px-1.5 py-0.5 rounded-md text-[9px] font-bold tracking-wider uppercase ${
                                 log.raw_user_type === 'admin'

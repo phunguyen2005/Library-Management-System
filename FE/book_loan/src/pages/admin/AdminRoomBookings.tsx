@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Scanner } from '@yudiel/react-qr-scanner';
+import { echoClient } from '../../lib/echo';
 import { 
   fetchRooms, 
   createRoom, 
@@ -9,6 +10,7 @@ import {
   approveRoomBooking, 
   rejectRoomBooking, 
   adminCheckInRoomBooking, 
+  adminCheckOutRoomBooking,
   checkInRoomBooking,
   fetchRoomBookingStats,
   createRoomBooking
@@ -147,6 +149,23 @@ export default function AdminRoomBookings() {
       void loadStats();
     }
   }, [activeTab, statusFilter, dateFilter, statsStartDate, statsEndDate]);
+
+  // Real-time WebSocket listener for room booking state updates
+  useEffect(() => {
+    const channel = echoClient.channel('room-bookings');
+
+    channel.listen('.room.booking.updated', (event: any) => {
+      if (activeTab === 'requests') {
+        void loadBookings(currentPage);
+      } else if (activeTab === 'stats') {
+        void loadStats();
+      }
+    });
+
+    return () => {
+      echoClient.leave('room-bookings');
+    };
+  }, [activeTab, currentPage]);
 
   // Handle Search submit
   const handleSearchSubmit = (e: React.FormEvent) => {
@@ -327,6 +346,17 @@ export default function AdminRoomBookings() {
     try {
       const res = await adminCheckInRoomBooking(id);
       emitToast({ tone: 'success', title: 'Check-in thành công', message: res.message });
+      void loadBookings(currentPage);
+    } catch (e: any) {
+      emitToast({ tone: 'error', title: 'Thất bại', message: getErrorMessage(e, 'Có lỗi xảy ra.') });
+    }
+  };
+
+  // Admin check-out on behalf
+  const handleAdminCheckOut = async (id: number) => {
+    try {
+      const res = await adminCheckOutRoomBooking(id);
+      emitToast({ tone: 'success', title: 'Check-out thành công', message: res.message });
       void loadBookings(currentPage);
     } catch (e: any) {
       emitToast({ tone: 'error', title: 'Thất bại', message: getErrorMessage(e, 'Có lỗi xảy ra.') });
@@ -669,6 +699,15 @@ export default function AdminRoomBookings() {
                               className="bg-primary text-white text-xs font-bold px-3 py-1.5 rounded-lg hover:opacity-90 cursor-pointer"
                             >
                               Check-in
+                            </button>
+                          )}
+
+                          {isApproved && b.check_in_at && !b.check_out_at && (
+                            <button
+                              onClick={() => handleAdminCheckOut(b.booking_id)}
+                              className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg cursor-pointer"
+                            >
+                              Check-out
                             </button>
                           )}
                         </td>

@@ -24,7 +24,49 @@ class AuditLogController extends Controller
             $search = '%' . $request->query('query') . '%';
             $query->where(function ($q) use ($search) {
                 $q->where('description', 'like', $search)
-                  ->orWhere('action', 'like', $search);
+                  ->orWhere('action', 'like', $search)
+                  ->orWhere(function ($sub) use ($search) {
+                      $sub->where('user_type', 'student')
+                          ->whereIn('user_id', function ($subQuery) use ($search) {
+                              $subQuery->select('member_id')
+                                       ->from('members')
+                                       ->where('name', 'like', $search)
+                                       ->orWhere('email', 'like', $search);
+                          });
+                  })
+                  ->orWhere(function ($sub) use ($search) {
+                      $sub->where('user_type', 'admin')
+                          ->whereIn('user_id', function ($subQuery) use ($search) {
+                              $subQuery->select('librarian_id')
+                                       ->from('librarians')
+                                       ->where('name', 'like', $search)
+                                       ->orWhere('email', 'like', $search);
+                          });
+                  });
+            });
+        }
+
+        if ($request->filled('user_query')) {
+            $userSearch = '%' . $request->query('user_query') . '%';
+            $query->where(function ($q) use ($userSearch) {
+                $q->where(function ($sub) use ($userSearch) {
+                    $sub->where('user_type', 'student')
+                        ->whereIn('user_id', function ($subQuery) use ($userSearch) {
+                            $subQuery->select('member_id')
+                                     ->from('members')
+                                     ->where('name', 'like', $userSearch)
+                                     ->orWhere('email', 'like', $userSearch);
+                        });
+                })
+                ->orWhere(function ($sub) use ($userSearch) {
+                    $sub->where('user_type', 'admin')
+                        ->whereIn('user_id', function ($subQuery) use ($userSearch) {
+                            $subQuery->select('librarian_id')
+                                     ->from('librarians')
+                                     ->where('name', 'like', $userSearch)
+                                     ->orWhere('email', 'like', $userSearch);
+                        });
+                });
             });
         }
 
@@ -34,11 +76,36 @@ class AuditLogController extends Controller
 
         $logs = $query->paginate($request->query('limit', 20));
 
-        $logs->getCollection()->transform(function ($log) {
+        // Eager load/cache users to avoid N+1 queries
+        $studentIds = [];
+        $adminIds = [];
+        foreach ($logs as $log) {
+            if ($log->user_type === 'student' && $log->user_id) {
+                $studentIds[] = $log->user_id;
+            } elseif ($log->user_type === 'admin' && $log->user_id) {
+                $adminIds[] = $log->user_id;
+            }
+        }
+
+        $students = !empty($studentIds) ? \App\Models\Member::whereIn('member_id', array_unique($studentIds))->get()->keyBy('member_id') : collect();
+        $admins = !empty($adminIds) ? \App\Models\Librarian::whereIn('librarian_id', array_unique($adminIds))->get()->keyBy('librarian_id') : collect();
+
+        $logs->getCollection()->transform(function ($log) use ($students, $admins) {
             $userName = 'Hệ thống';
-            $user = $log->user;
-            if ($user) {
-                $userName = $user->name;
+            $userEmail = null;
+
+            if ($log->user_type === 'student' && $log->user_id) {
+                $user = $students->get($log->user_id);
+                if ($user) {
+                    $userName = $user->name;
+                    $userEmail = $user->email;
+                }
+            } elseif ($log->user_type === 'admin' && $log->user_id) {
+                $user = $admins->get($log->user_id);
+                if ($user) {
+                    $userName = $user->name;
+                    $userEmail = $user->email;
+                }
             }
 
             return [
@@ -47,6 +114,7 @@ class AuditLogController extends Controller
                 'user_type' => $log->user_type === 'student' ? 'Sinh viên' : ($log->user_type === 'admin' ? 'Thủ thư' : 'Hệ thống'),
                 'raw_user_type' => $log->user_type,
                 'user_name' => $userName,
+                'user_email' => $userEmail,
                 'action' => $this->getActionLabel($log->action),
                 'raw_action' => $log->action,
                 'description' => $log->description,

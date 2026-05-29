@@ -31,17 +31,21 @@ class AiChatController extends Controller
         $message = $request->input('message');
         $history = $request->input('history', []);
 
-        // Load entire book catalog as context
-        $books = Book::all(['book_id', 'title', 'author', 'genre', 'is_available', 'available_quantity', 'location']);
-        $catalogText = $books->map(fn($b) => "- [ID: {$b->book_id}] \"{$b->title}\" của tác giả {$b->author} (Thể loại: {$b->genre}, Kệ: {$b->location}, " . ($b->is_available ? "Còn sách" : "Hết sách") . ")")->join("\n");
+        // Giới hạn lịch sử gửi lên AI (chỉ giữ 8 tin nhắn gần nhất để tránh phình to payload)
+        if (count($history) > 8) {
+            $history = array_slice($history, -8);
+        }
+
+        // Tối ưu hóa Context bằng Simple SQL RAG (chỉ tìm 10 sách liên quan thay vì lấy toàn bộ DB)
+        $catalogText = $this->getRelevantBooksContext($message);
 
         $systemPrompt = "Bạn là thủ thư AI thông thái và thân thiện của Thư viện trường Đại học Sư phạm TP.HCM (HCMUE).\n"
             . "Nhiệm vụ của bạn là tư vấn, tìm kiếm sách và hướng dẫn quy trình cho sinh viên một cách lịch sự, chuyên nghiệp bằng tiếng Việt.\n\n"
-            . "Đây là danh mục sách hiện có trong hệ thống thư viện:\n"
+            . "Dưới đây là một số cuốn sách nổi bật/phù hợp với nội dung câu hỏi trong hệ thống thư viện:\n"
             . $catalogText . "\n\n"
             . "HƯỚNG DẪN TRẢ LỜI:\n"
             . "1. Trả lời câu hỏi ngắn gọn, rõ ràng, sử dụng định dạng Markdown (in đậm, danh sách gạch đầu dòng).\n"
-            . "2. Hãy luôn nhiệt tình tìm kiếm và gợi ý các cuốn sách phù hợp từ danh mục trên khi người dùng hỏi về bất kỳ chủ đề gì liên quan.\n"
+            . "2. Hãy luôn nhiệt tình tìm kiếm và gợi ý các cuốn sách phù hợp từ danh sách ở trên khi người dùng hỏi về bất kỳ chủ đề gì liên quan.\n"
             . "3. QUAN TRỌNG: Khi gợi ý sách, bạn PHẢI viết kèm mã ID sách chính xác dưới dạng '[ID: X]' (ví dụ: 'Tôi gợi ý cuốn Clean Code [ID: 5]...'). Giao diện người dùng sẽ dùng mã này để tạo liên kết cho phép click xem trực tiếp. Đừng quên định dạng [ID: X] này!\n"
             . "4. Nếu người dùng hỏi về quy trình mượn sách, hãy giải thích: Sinh viên gửi yêu cầu trực tuyến trên web -> Thủ thư duyệt -> Sinh viên nhận mã QR trên mail/in-app -> Sinh viên đến thư viện đưa thủ thư quét QR để nhận sách. Thời hạn nhận sách là 24 giờ.\n"
             . "5. Nếu sách họ muốn mượn đã hết (available_quantity = 0), hãy nhắc họ có thể click vào chi tiết sách để sử dụng tính năng 'Đặt chỗ trước' (Reservation Queue) để xếp hàng chờ tự động.\n";
@@ -180,17 +184,21 @@ class AiChatController extends Controller
         $history = $request->input('history', []);
         $member = auth('sanctum')->user();
 
-        // Load entire book catalog as context
-        $books = Book::all(['book_id', 'title', 'author', 'genre', 'is_available', 'available_quantity', 'location']);
-        $catalogText = $books->map(fn($b) => "- [ID: {$b->book_id}] \"{$b->title}\" của tác giả {$b->author} (Thể loại: {$b->genre}, Kệ: {$b->location}, " . ($b->is_available ? "Còn sách" : "Hết sách") . ")")->join("\n");
+        // Giới hạn lịch sử gửi lên AI (chỉ giữ 8 tin nhắn gần nhất để tránh phình to payload)
+        if (count($history) > 8) {
+            $history = array_slice($history, -8);
+        }
+
+        // Tối ưu hóa Context bằng Simple SQL RAG (chỉ tìm 10 sách liên quan thay vì lấy toàn bộ DB)
+        $catalogText = $this->getRelevantBooksContext($message);
 
         $systemPrompt = "Bạn là thủ thư AI thông thái và thân thiện của Thư viện trường Đại học Sư phạm TP.HCM (HCMUE).\n"
             . "Nhiệm vụ của bạn là tư vấn, tìm kiếm sách, giải đáp các thắc mắc của sinh viên và hướng dẫn quy trình một cách lịch sự, chuyên nghiệp bằng tiếng Việt.\n\n"
-            . "Đây là danh mục sách hiện có trong hệ thống thư viện:\n"
+            . "Dưới đây là một số cuốn sách nổi bật/phù hợp với nội dung câu hỏi trong hệ thống thư viện:\n"
             . $catalogText . "\n\n"
             . "HƯỚNG DẪN TRẢ LỜI:\n"
             . "1. Trả lời câu hỏi ngắn gọn, rõ ràng, sử dụng định dạng Markdown (in đậm, danh sách gạch đầu dòng).\n"
-            . "2. Hãy luôn nhiệt tình tìm kiếm và gợi ý các cuốn sách phù hợp từ danh mục trên khi người dùng hỏi về bất kỳ chủ đề gì liên quan.\n"
+            . "2. Hãy luôn nhiệt tình tìm kiếm và gợi ý các cuốn sách phù hợp từ danh sách ở trên khi người dùng hỏi về bất kỳ chủ đề gì liên quan.\n"
             . "3. QUAN TRỌNG: Khi gợi ý sách, bạn PHẢI viết kèm mã ID sách chính xác dưới dạng '[ID: X]' (ví dụ: 'Tôi gợi ý cuốn Clean Code [ID: 5]...'). Giao diện người dùng sẽ dùng mã này để tạo liên kết cho phép click xem trực tiếp. Đừng quên định dạng [ID: X] này!\n"
             . "4. Nếu người dùng hỏi về quy trình mượn sách, hãy giải thích: Sinh viên gửi yêu cầu trực tuyến trên web -> Thủ thư duyệt -> Sinh viên nhận mã QR trên mail/in-app -> Sinh viên đến thư viện đưa thủ thư quét QR để nhận sách. Thời hạn nhận sách là 24 giờ.\n"
             . "5. Nếu sách họ muốn mượn đã hết (available_quantity = 0), hãy nhắc họ có thể click vào chi tiết sách để sử dụng tính năng 'Đặt chỗ trước' (Reservation Queue) để xếp hàng chờ tự động.\n"
@@ -261,6 +269,61 @@ class AiChatController extends Controller
             'Connection' => 'keep-alive',
             'X-Accel-Buffering' => 'no',
         ]);
+    }
+
+    /**
+     * Thu thập danh mục sách liên quan nhất dựa trên SQL RAG để tối ưu token payload.
+     */
+    private function getRelevantBooksContext(string $message): string
+    {
+        $normalizedMsg = mb_strtolower($message, 'UTF-8');
+
+        // Bỏ bớt các từ nối tiếng Việt siêu phổ biến để thu được từ khóa chất lượng
+        $stopWords = [
+            'và', 'của', 'tôi', 'em', 'bạn', 'có', 'không', 'tìm', 'cuốn', 'sách', 
+            'cho', 'mượn', 'nào', 'gì', 'ở', 'đâu', 'được', 'lấy', 'muốn', 'hướng', 
+            'dẫn', 'quy', 'trình', 'đặt', 'chỗ', 'hết', 'còn', 'trên', 'dưới', 
+            'trong', 'ngoài', 'thư', 'viện', 'hệ', 'thống', 'xin', 'chào', 'bot', 
+            'thủ', 'thư', 'nhờ', 'giúp', 'một', 'những', 'cách', 'làm', 'sao'
+        ];
+
+        // Tách các từ đơn
+        $words = preg_split('/[\s,;.?!]+/', $normalizedMsg, -1, PREG_SPLIT_NO_EMPTY);
+        $keywords = [];
+
+        foreach ($words as $word) {
+            if (!in_array($word, $stopWords) && mb_strlen($word, 'UTF-8') > 1) {
+                $keywords[] = $word;
+            }
+        }
+
+        $query = Book::query();
+
+        // Tìm kiếm các sách khớp với một trong các từ khóa thu được
+        if (!empty($keywords)) {
+            $query->where(function ($q) use ($keywords) {
+                foreach ($keywords as $kw) {
+                    $q->orWhere('title', 'like', "%{$kw}%")
+                      ->orWhere('author', 'like', "%{$kw}%")
+                      ->orWhere('genre', 'like', "%{$kw}%");
+                }
+            });
+        }
+
+        $books = $query->limit(10)->get(['book_id', 'title', 'author', 'genre', 'is_available', 'available_quantity', 'location']);
+
+        // Nếu số lượng sách khớp quá ít (dưới 6), bổ sung thêm một số sách ngẫu nhiên có sẵn để bot luôn có mẫu sách tư vấn phong phú
+        if ($books->count() < 6) {
+            $excludeIds = $books->pluck('book_id')->toArray();
+            $extraBooks = Book::whereNotIn('book_id', $excludeIds)
+                ->inRandomOrder()
+                ->limit(10 - $books->count())
+                ->get(['book_id', 'title', 'author', 'genre', 'is_available', 'available_quantity', 'location']);
+            $books = $books->concat($extraBooks);
+        }
+
+        // Định dạng danh sách sách thành dạng Markdown context gọn gàng
+        return $books->map(fn($b) => "- [ID: {$b->book_id}] \"{$b->title}\" của tác giả {$b->author} (Thể loại: {$b->genre}, Kệ: {$b->location}, " . ($b->is_available ? "Còn sách" : "Hết sách") . ")")->join("\n");
     }
 
     private function executeFunction($name, $args, $member)

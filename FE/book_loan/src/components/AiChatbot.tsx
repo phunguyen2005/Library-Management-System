@@ -201,6 +201,28 @@ export default function AiChatbot() {
   const [, setSearchParams] = useSearchParams();
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [isScrolling, setIsScrolling] = useState(false);
+  const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolling(true);
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+      scrollTimeoutRef.current = setTimeout(() => {
+        setIsScrolling(false);
+      }, 1200);
+    };
+
+    window.addEventListener('scroll', handleScroll, true);
+    return () => {
+      window.removeEventListener('scroll', handleScroll, true);
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (messagesEndRef.current) {
@@ -343,14 +365,20 @@ export default function AiChatbot() {
 
   return (
     <>
-      <button
+      <motion.button
         type="button"
+        drag="y"
+        dragConstraints={{ top: 20, bottom: typeof window !== 'undefined' ? window.innerHeight - 100 : 600 }}
+        dragElastic={0.1}
+        dragMomentum={false}
         onClick={() => setIsOpen(!isOpen)}
         aria-label="Trợ lý AI"
-        className="fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-white shadow-xl shadow-primary/30 transition-all hover:scale-105 active:scale-95 cursor-pointer glow-pulse"
+        className={`fixed z-40 flex items-center justify-center rounded-full bg-primary text-white shadow-xl shadow-primary/30 active:scale-95 cursor-pointer glow-pulse touch-none transition-all duration-300
+          bottom-20 right-4 h-12 w-12 md:bottom-6 md:right-6 md:h-14 md:w-14
+          ${isScrolling ? 'opacity-20 scale-75 pointer-events-none md:opacity-100 md:scale-100 md:pointer-events-auto' : 'opacity-100 scale-100'}`}
       >
-        <span className="material-symbols-outlined text-3xl animate-pulse">smart_toy</span>
-      </button>
+        <span className="material-symbols-outlined text-2xl md:text-3xl animate-pulse">smart_toy</span>
+      </motion.button>
 
       <AnimatePresence>
         {isOpen && (
@@ -416,15 +444,15 @@ export default function AiChatbot() {
 
             <div className="border-t border-surface-container-high bg-surface p-4">
               {suggestedChips.length > 0 && !isLoading && (
-                <div className="mb-4 flex flex-col gap-2 animate-fade-in">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-outline">Gợi ý câu hỏi nhanh:</p>
-                  <div className="flex flex-col gap-1.5">
+                <div className="mb-3 flex flex-col gap-1.5 animate-fade-in">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-outline px-1">Gợi ý câu hỏi nhanh:</p>
+                  <div className="flex gap-2 overflow-x-auto no-scrollbar py-1 px-1 -mx-1 snap-x snap-mandatory">
                     {suggestedChips.map((chip, idx) => (
                       <button
                         key={idx}
                         type="button"
                         onClick={() => handleSendMessage(chip.query)}
-                        className="rounded-lg bg-surface-bright border border-surface-container-high px-3 py-2 text-left text-xs font-medium text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface cursor-pointer"
+                        className="rounded-full bg-surface-bright border border-surface-container-high px-3 py-1.5 text-xs font-medium text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface cursor-pointer whitespace-nowrap snap-start shrink-0"
                       >
                         {chip.label}
                       </button>

@@ -6,6 +6,7 @@ import { emitToast } from '../notifications/events';
 import { applyImageFallback } from '../lib/display';
 import type { DigitalDocument, ReadingProgressRecord } from '../types/book';
 import { useAuth } from '../auth/AuthContext';
+import { echoClient } from '../lib/echo';
 
 interface ReadingRoomProps {
   document: DigitalDocument;
@@ -25,6 +26,7 @@ export default function ReadingRoom({ document, onClose, onProgressSaved }: Read
   const [totalPages, setTotalPages] = useState(document.readingProgress?.total_pages ?? 1);
   const [isSavingProgress, setIsSavingProgress] = useState(false);
   const [isIframeLoading, setIsIframeLoading] = useState(true);
+  const [showSyncBanner, setShowSyncBanner] = useState<number | null>(null);
   const autoSavePendingRef = useRef(false);
   const saveTimeoutRef = useRef<number | null>(null);
   const lastSavedPageRef = useRef(document.readingProgress?.current_page ?? 1);
@@ -128,6 +130,25 @@ export default function ReadingRoom({ document, onClose, onProgressSaved }: Read
       }
     };
   }, [currentPage, saveProgress, totalPages]);
+
+  // Real-time multi-device reading progress synchronization
+  useEffect(() => {
+    if (role !== 'student' || !user || !user.member_id) return;
+
+    const channelName = `member.${user.member_id}`;
+    const channel = echoClient.private(channelName);
+
+    channel.listen('.reading.progress.updated', (event: any) => {
+      // Only prompt if the progress event is for this document and from a different page position
+      if (event.book_id === document.id && event.current_page !== currentPage) {
+        setShowSyncBanner(event.current_page);
+      }
+    });
+
+    return () => {
+      echoClient.leave(channelName);
+    };
+  }, [user, role, document.id, currentPage]);
 
   // Prefill AI messages on open
   useEffect(() => {
@@ -404,7 +425,38 @@ export default function ReadingRoom({ document, onClose, onProgressSaved }: Read
       {/* Main Split Viewport */}
       <div className="flex flex-1 overflow-hidden">
         {/* Left Reading / Playback Panel */}
-        <main className="flex-1 bg-stone-900 p-4 flex flex-col justify-center items-center overflow-hidden">
+        <main className="relative flex-1 bg-stone-900 p-4 flex flex-col justify-center items-center overflow-hidden">
+          {showSyncBanner !== null && (
+            <div className="absolute top-4 left-1/2 z-45 flex -translate-x-1/2 items-center gap-3 rounded-xl border border-primary/20 bg-stone-900/90 px-4 py-2 text-xs font-semibold text-stone-100 shadow-2xl backdrop-blur-md animate-in slide-in-from-top duration-300">
+              <span className="material-symbols-outlined text-primary text-base animate-pulse">sync</span>
+              <span>Phát hiện tiến trình đọc mới tại trang/giây {showSyncBanner} từ thiết bị khác.</span>
+              <div className="flex items-center gap-2 ml-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCurrentPage(showSyncBanner);
+                    if (audioRef.current && isAudio) {
+                      audioRef.current.currentTime = showSyncBanner;
+                      setCurrentTime(showSyncBanner);
+                    }
+                    setShowSyncBanner(null);
+                    emitToast({ tone: 'success', title: 'Đã đồng bộ', message: 'Tiến độ đọc của bạn đã được cập nhật.' });
+                  }}
+                  className="rounded bg-primary px-2.5 py-1 font-bold text-white hover:bg-primary-hover transition-colors cursor-pointer"
+                >
+                  Đồng bộ
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowSyncBanner(null)}
+                  className="rounded bg-stone-850 px-2 py-1 text-stone-400 hover:text-stone-200 transition-colors cursor-pointer"
+                >
+                  Bỏ qua
+                </button>
+              </div>
+            </div>
+          )}
+
           {document.openUrl ? (
             <div className="h-full w-full overflow-hidden rounded-xl border border-stone-850 bg-stone-950 shadow-2xl flex flex-col items-center justify-center">
               {isPdf ? (

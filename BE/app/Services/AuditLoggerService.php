@@ -27,7 +27,7 @@ class AuditLoggerService
             }
         }
 
-        AuditLog::create([
+        $logEntry = AuditLog::create([
             'user_id' => $userId,
             'user_type' => $userType,
             'action' => $action,
@@ -35,5 +35,11 @@ class AuditLoggerService
             'ip_address' => Request::ip(),
             'user_agent' => Request::userAgent(),
         ]);
+
+        try {
+            broadcast(new \App\Events\AuditLogCreated($logEntry))->toOthers();
+        } catch (\Exception $e) {
+            // Ignore broadcast failures on production if pusher is not configured
+        }
     }
 }

@@ -94,6 +94,12 @@ class ReadingProgressController extends Controller
             );
         }
 
+        try {
+            broadcast(new \App\Events\ReadingProgressUpdated($progress))->toOthers();
+        } catch (\Exception $e) {
+            // Ignore broadcast failures
+        }
+
         return response()->json([
             'message' => 'Reading progress synced successfully.',
             'progress' => $this->serializeProgress($progress),

@@ -146,10 +146,26 @@ class ReservationController extends Controller
             $reservation->save();
 
             // Shift positions of other waiting reservations
-            Reservation::where('book_id', $reservation->book_id)
+            $toShift = Reservation::where('book_id', $reservation->book_id)
                 ->where('status', Reservation::STATUS_WAITING)
                 ->where('position', '>', $position)
-                ->decrement('position');
+                ->lockForUpdate()
+                ->get();
+
+            foreach ($toShift as $r) {
+                $r->decrement('position');
+            }
+
+            // Broadcast post-commit
+            DB::afterCommit(function () use ($toShift) {
+                foreach ($toShift as $r) {
+                    try {
+                        broadcast(new \App\Events\ReservationQueueShifted($r))->toOthers();
+                    } catch (\Exception $e) {
+                        // Ignore
+                    }
+                }
+            });
         });
 
         return response()->json([

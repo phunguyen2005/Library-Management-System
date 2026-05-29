@@ -173,6 +173,12 @@ class BorrowController extends Controller
             return $loan->fresh(['book', 'bookCopy', 'member', 'librarian']);
         });
 
+        try {
+            broadcast(new \App\Events\BorrowRequestApproved($loan))->toOthers();
+        } catch (\Exception $e) {
+            // Ignore broadcast failures on production if pusher is not configured
+        }
+
         return response()->json([
             'message' => __('messages.borrow.approved'),
             'loan' => BorrowingResource::make($loan),
@@ -673,10 +679,15 @@ class BorrowController extends Controller
                 $nextReservation->save();
 
                 // Shift remaining positions
-                \App\Models\Reservation::where('book_id', $bookId)
+                $toShift = \App\Models\Reservation::where('book_id', $bookId)
                     ->where('status', \App\Models\Reservation::STATUS_WAITING)
                     ->where('position', '>', $nextReservation->position)
-                    ->decrement('position');
+                    ->lockForUpdate()
+                    ->get();
+
+                foreach ($toShift as $r) {
+                    $r->decrement('position');
+                }
 
                 // Create approved borrowing request
                 $borrowing = Borrowing::create([
@@ -696,6 +707,23 @@ class BorrowController extends Controller
                 } catch (\Exception $e) {
                     // Ignore mail failures in tests/local
                 }
+
+                // Broadcast post-commit
+                DB::afterCommit(function () use ($borrowing, $toShift) {
+                    try {
+                        broadcast(new \App\Events\BorrowRequestApproved($borrowing))->toOthers();
+                    } catch (\Exception $e) {
+                        // Ignore
+                    }
+
+                    foreach ($toShift as $r) {
+                        try {
+                            broadcast(new \App\Events\ReservationQueueShifted($r))->toOthers();
+                        } catch (\Exception $e) {
+                            // Ignore
+                        }
+                    }
+                });
             } else {
                 if (! $book->copies()->exists()) {
                     // Legacy fallback for databases that have not been backfilled.

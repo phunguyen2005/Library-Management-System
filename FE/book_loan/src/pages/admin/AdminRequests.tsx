@@ -15,6 +15,7 @@ import {
 import EmptyState from '../../components/EmptyState';
 import { getErrorMessage, isUnauthorizedError } from '../../lib/errors';
 import { emitToast } from '../../notifications/events';
+import { echoClient } from '../../lib/echo';
 
 type RequestTab = 'ALL' | 'APPROVED' | 'BORROWED' | 'HISTORY' | 'REJECTED' | 'CANCELLED';
 
@@ -133,51 +134,47 @@ export default function AdminRequests() {
 
   // Real-time WebSocket listener for new incoming borrow requests
   useEffect(() => {
-    import('../../lib/echo').then(({ echoClient }) => {
-      const channel = echoClient.private('librarians');
+    const channel = echoClient.private('librarians');
 
-      channel.listen('.borrow.request.created', (newRequest: any) => {
-        // Map payload to BorrowRequest structure matching the frontend model
-        const mappedRequest: BorrowRequest = {
-          id: newRequest.loan_id,
-          code: String(newRequest.member_id),
-          name: newRequest.member_name,
-          bookCode: String(newRequest.book_id),
-          book: newRequest.book_title,
-          status: getOptimisticStatusLabel('pending'),
-          raw_status: 'pending',
-          date: newRequest.created_at ? newRequest.created_at.slice(0, 10) : getTodayLabel(),
-          requested_at: newRequest.created_at,
-          role: 'Student',
-          roleColor: 'bg-blue-100 text-blue-700',
-          due_status: undefined,
-          is_overdue: false,
-          days_overdue: 0,
-        };
+    channel.listen('.borrow.request.created', (newRequest: any) => {
+      // Map payload to BorrowRequest structure matching the frontend model
+      const mappedRequest: BorrowRequest = {
+        id: newRequest.loan_id,
+        code: String(newRequest.member_id),
+        name: newRequest.member_name,
+        bookCode: String(newRequest.book_id),
+        book: newRequest.book_title,
+        status: getOptimisticStatusLabel('pending'),
+        raw_status: 'pending',
+        date: newRequest.created_at ? newRequest.created_at.slice(0, 10) : getTodayLabel(),
+        requested_at: newRequest.created_at,
+        role: 'Student',
+        roleColor: 'bg-blue-100 text-blue-700',
+        due_status: undefined,
+        is_overdue: false,
+        days_overdue: 0,
+      };
 
-        // Prepend new request immediately without duplicates
-        setRequests((prev) => {
-          if (prev.some((r) => r.id === mappedRequest.id)) return prev;
-          return [mappedRequest, ...prev];
-        });
+      // Prepend new request immediately without duplicates
+      setRequests((prev) => {
+        if (prev.some((r) => r.id === mappedRequest.id)) return prev;
+        return [mappedRequest, ...prev];
+      });
 
-        // Chime sound for premium UX
-        const audio = new Audio('/sounds/notification.mp3');
-        audio.play().catch(() => {});
+      // Chime sound for premium UX
+      const audio = new Audio('/sounds/notification.mp3');
+      audio.play().catch(() => {});
 
-        // Screen Toast notification
-        emitToast({
-          tone: 'info',
-          title: 'Yêu cầu mượn mới',
-          message: `Độc giả ${mappedRequest.name} vừa yêu cầu mượn "${mappedRequest.book}"`
-        });
+      // Screen Toast notification
+      emitToast({
+        tone: 'info',
+        title: 'Yêu cầu mượn mới',
+        message: `Độc giả ${mappedRequest.name} vừa yêu cầu mượn "${mappedRequest.book}"`
       });
     });
 
     return () => {
-      import('../../lib/echo').then(({ echoClient }) => {
-        echoClient.leave('librarians');
-      });
+      echoClient.leave('librarians');
     };
   }, []);
 

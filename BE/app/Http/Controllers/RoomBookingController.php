@@ -105,7 +105,7 @@ class RoomBookingController extends Controller
             }
         }
 
-        return DB::transaction(function () use ($roomId, $member, $user, $dateStr, $startTimeStr, $endTimeStr, $durationHours, $isWalkin, $validated, $settings) {
+        $booking = DB::transaction(function () use ($roomId, $member, $user, $dateStr, $startTimeStr, $endTimeStr, $durationHours, $isWalkin, $validated, $settings) {
             $roomLocked = Room::query()->bookable()->lockForUpdate()->findOrFail($roomId);
             $memberLocked = Member::query()->lockForUpdate()->findOrFail($member->member_id);
 
@@ -211,8 +211,20 @@ class RoomBookingController extends Controller
                 }
             }
 
-            return response()->json($booking, 201);
+            return $booking;
         });
+
+        if ($booking instanceof JsonResponse) {
+            return $booking;
+        }
+
+        try {
+            broadcast(new \App\Events\RoomBookingUpdated($booking))->toOthers();
+        } catch (\Exception $e) {
+            // Ignore
+        }
+
+        return response()->json($booking, 201);
     }
 
     /**
@@ -243,15 +255,13 @@ class RoomBookingController extends Controller
     {
         $member = $request->user();
 
-        return DB::transaction(function () use ($id, $member) {
+        $booking = DB::transaction(function () use ($id, $member) {
             $booking = RoomBooking::where('member_id', $member->member_id)
                 ->lockForUpdate()
                 ->findOrFail($id);
 
             if (! in_array($booking->status, [RoomBooking::STATUS_PENDING, RoomBooking::STATUS_APPROVED])) {
-                return response()->json([
-                    'message' => 'Chỉ có thể hủy lịch đặt phòng ở trạng thái chờ duyệt hoặc đã duyệt.'
-                ], 422);
+                throw new \Exception('Chỉ có thể hủy lịch đặt phòng ở trạng thái chờ duyệt hoặc đã duyệt.');
             }
 
             $settings = LibrarySetting::singleton();
@@ -286,11 +296,19 @@ class RoomBookingController extends Controller
                 // Ignore
             }
 
-            return response()->json([
-                'message' => 'Đã hủy lịch đặt phòng thành công.',
-                'booking' => $booking
-            ]);
+            return $booking;
         });
+
+        try {
+            broadcast(new \App\Events\RoomBookingUpdated($booking))->toOthers();
+        } catch (\Exception $e) {
+            // Ignore
+        }
+
+        return response()->json([
+            'message' => 'Đã hủy lịch đặt phòng thành công.',
+            'booking' => $booking
+        ]);
     }
 
     /**
@@ -305,21 +323,21 @@ class RoomBookingController extends Controller
         $code = strtoupper(trim($request->input('booking_code')));
         $admin = $request->user();
 
-        return DB::transaction(function () use ($code, $admin) {
+        $booking = DB::transaction(function () use ($code, $admin) {
             $booking = RoomBooking::where('booking_code', $code)
                 ->lockForUpdate()
                 ->first();
 
             if (! $booking) {
-                return response()->json(['message' => 'Mã đặt phòng không hợp lệ.'], 404);
+                throw new \Exception('Mã đặt phòng không hợp lệ.');
             }
 
             if ($booking->status !== RoomBooking::STATUS_APPROVED) {
-                return response()->json(['message' => 'Lượt đặt phòng này không ở trạng thái sẵn sàng để check-in.'], 422);
+                throw new \Exception('Lượt đặt phòng này không ở trạng thái sẵn sàng để check-in.');
             }
 
             if (! is_null($booking->check_in_at)) {
-                return response()->json(['message' => 'Lượt đặt phòng này đã check-in trước đó.'], 422);
+                throw new \Exception('Lượt đặt phòng này đã check-in trước đó.');
             }
 
             $settings = LibrarySetting::singleton();
@@ -334,15 +352,11 @@ class RoomBookingController extends Controller
             $latest = $startDateTime->copy()->addMinutes($windowMinutes);
 
             if (now()->lessThan($earliest)) {
-                return response()->json([
-                    'message' => 'Chưa đến thời gian check-in của lượt đặt này (chỉ cho phép trước 10 phút).'
-                ], 422);
+                throw new \Exception('Chưa đến thời gian check-in của lượt đặt này (chỉ cho phép trước 10 phút).');
             }
 
             if (now()->greaterThan($latest)) {
-                return response()->json([
-                    'message' => 'Lượt đặt này đã quá hạn thời gian check-in.'
-                ], 422);
+                throw new \Exception('Lượt đặt này đã quá hạn thời gian check-in.');
             }
 
             $booking->check_in_at = now();
@@ -365,11 +379,19 @@ class RoomBookingController extends Controller
                 $admin
             );
 
-            return response()->json([
-                'message' => 'Check-in phòng học nhóm thành công!',
-                'booking' => $booking
-            ]);
+            return $booking;
         });
+
+        try {
+            broadcast(new \App\Events\RoomBookingUpdated($booking))->toOthers();
+        } catch (\Exception $e) {
+            // Ignore
+        }
+
+        return response()->json([
+            'message' => 'Check-in phòng học nhóm thành công!',
+            'booking' => $booking
+        ]);
     }
 
     /**
@@ -379,17 +401,17 @@ class RoomBookingController extends Controller
     {
         $member = $request->user();
 
-        return DB::transaction(function () use ($id, $member) {
+        $booking = DB::transaction(function () use ($id, $member) {
             $booking = RoomBooking::where('member_id', $member->member_id)
                 ->lockForUpdate()
                 ->findOrFail($id);
 
             if ($booking->status !== RoomBooking::STATUS_APPROVED || is_null($booking->check_in_at)) {
-                return response()->json(['message' => 'Lượt đặt phòng chưa được check-in.'], 422);
+                throw new \Exception('Lượt đặt phòng chưa được check-in.');
             }
 
             if (! is_null($booking->check_out_at)) {
-                return response()->json(['message' => 'Lượt đặt phòng đã check-out.'], 422);
+                throw new \Exception('Lượt đặt phòng đã check-out.');
             }
 
             $booking->status = RoomBooking::STATUS_COMPLETED;
@@ -408,11 +430,19 @@ class RoomBookingController extends Controller
                 // Ignore
             }
 
-            return response()->json([
-                'message' => 'Check-out thành công. Cảm ơn bạn!',
-                'booking' => $booking
-            ]);
+            return $booking;
         });
+
+        try {
+            broadcast(new \App\Events\RoomBookingUpdated($booking))->toOthers();
+        } catch (\Exception $e) {
+            // Ignore
+        }
+
+        return response()->json([
+            'message' => 'Check-out thành công. Cảm ơn bạn!',
+            'booking' => $booking
+        ]);
     }
 
     /**
@@ -456,11 +486,11 @@ class RoomBookingController extends Controller
     {
         $admin = $request->user();
 
-        return DB::transaction(function () use ($id, $admin) {
+        $booking = DB::transaction(function () use ($id, $admin) {
             $booking = RoomBooking::lockForUpdate()->findOrFail($id);
 
             if ($booking->status !== RoomBooking::STATUS_PENDING) {
-                return response()->json(['message' => 'Lượt đặt phòng này không ở trạng thái chờ duyệt.'], 422);
+                throw new \Exception('Lượt đặt phòng này không ở trạng thái chờ duyệt.');
             }
 
             Room::query()->lockForUpdate()->findOrFail($booking->room_id);
@@ -471,9 +501,7 @@ class RoomBookingController extends Controller
                 : $booking->date;
             $hasConflict = RoomBooking::hasConflict($booking->room_id, $bookingDateStr, $booking->start_time, $booking->end_time, $booking->booking_id);
             if ($hasConflict) {
-                return response()->json([
-                    'message' => 'Không thể duyệt vì khoảng thời gian này đã bị trùng lịch với một yêu cầu khác vừa được duyệt.'
-                ], 422);
+                throw new \Exception('Không thể duyệt vì khoảng thời gian này đã bị trùng lịch với một yêu cầu khác vừa được duyệt.');
             }
 
             $booking->status = RoomBooking::STATUS_APPROVED;
@@ -492,8 +520,16 @@ class RoomBookingController extends Controller
                 // Ignore
             }
 
-            return response()->json($booking);
+            return $booking;
         });
+
+        try {
+            broadcast(new \App\Events\RoomBookingUpdated($booking))->toOthers();
+        } catch (\Exception $e) {
+            // Ignore
+        }
+
+        return response()->json($booking);
     }
 
     /**
@@ -504,11 +540,11 @@ class RoomBookingController extends Controller
         $admin = $request->user();
         $validated = $request->validated();
 
-        return DB::transaction(function () use ($id, $validated, $admin) {
+        $booking = DB::transaction(function () use ($id, $validated, $admin) {
             $booking = RoomBooking::lockForUpdate()->findOrFail($id);
 
             if ($booking->status !== RoomBooking::STATUS_PENDING) {
-                return response()->json(['message' => 'Lượt đặt phòng này không ở trạng thái chờ duyệt.'], 422);
+                throw new \Exception('Lượt đặt phòng này không ở trạng thái chờ duyệt.');
             }
 
             $booking->status = RoomBooking::STATUS_REJECTED;
@@ -527,8 +563,16 @@ class RoomBookingController extends Controller
                 // Ignore
             }
 
-            return response()->json($booking);
+            return $booking;
         });
+
+        try {
+            broadcast(new \App\Events\RoomBookingUpdated($booking))->toOthers();
+        } catch (\Exception $e) {
+            // Ignore
+        }
+
+        return response()->json($booking);
     }
 
     /**
@@ -538,15 +582,15 @@ class RoomBookingController extends Controller
     {
         $admin = $request->user();
 
-        return DB::transaction(function () use ($id, $admin) {
+        $booking = DB::transaction(function () use ($id, $admin) {
             $booking = RoomBooking::lockForUpdate()->findOrFail($id);
 
             if ($booking->status !== RoomBooking::STATUS_APPROVED) {
-                return response()->json(['message' => 'Lượt đặt phòng chưa được duyệt hoặc không khả dụng để check-in.'], 422);
+                throw new \Exception('Lượt đặt phòng chưa được duyệt hoặc không khả dụng để check-in.');
             }
 
             if (! is_null($booking->check_in_at)) {
-                return response()->json(['message' => 'Lượt đặt phòng này đã check-in.'], 422);
+                throw new \Exception('Lượt đặt phòng này đã check-in.');
             }
 
             $booking->check_in_at = now();
@@ -569,11 +613,68 @@ class RoomBookingController extends Controller
                 $admin
             );
 
-            return response()->json([
-                'message' => 'Đã check-in hộ thành công.',
-                'booking' => $booking
-            ]);
+            return $booking;
         });
+
+        try {
+            broadcast(new \App\Events\RoomBookingUpdated($booking))->toOthers();
+        } catch (\Exception $e) {
+            // Ignore
+        }
+
+        return response()->json([
+            'message' => 'Đã check-in hộ thành công.',
+            'booking' => $booking
+        ]);
+    }
+
+    /**
+     * Admin check-out on behalf of student (Admin).
+     */
+    public function adminCheckOut(Request $request, int $id): JsonResponse
+    {
+        $admin = $request->user();
+
+        $booking = DB::transaction(function () use ($id, $admin) {
+            $booking = RoomBooking::lockForUpdate()->findOrFail($id);
+
+            if ($booking->status !== RoomBooking::STATUS_APPROVED || is_null($booking->check_in_at)) {
+                throw new \Exception('Lượt đặt phòng chưa được check-in.');
+            }
+
+            if (! is_null($booking->check_out_at)) {
+                throw new \Exception('Lượt đặt phòng đã check-out.');
+            }
+
+            $booking->status = RoomBooking::STATUS_COMPLETED;
+            $booking->check_out_at = now();
+            $booking->save();
+
+            AuditLoggerService::log(
+                'room_booking_admin_checkout',
+                'Thủ thư check-out hộ phòng ' . $booking->room?->name . ' của ' . $booking->member?->name,
+                $admin
+            );
+
+            try {
+                $booking->member?->notify(new RoomBookingStatusNotification($booking, 'completed'));
+            } catch (\Exception $e) {
+                // Ignore
+            }
+
+            return $booking;
+        });
+
+        try {
+            broadcast(new \App\Events\RoomBookingUpdated($booking))->toOthers();
+        } catch (\Exception $e) {
+            // Ignore
+        }
+
+        return response()->json([
+            'message' => 'Đã check-out hộ thành công.',
+            'booking' => $booking
+        ]);
     }
 
     /**

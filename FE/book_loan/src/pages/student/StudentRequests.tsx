@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../auth/AuthContext';
+import { echoClient } from '../../lib/echo';
 import { cancelBorrow, getMyRequests } from '../../api/borrowApi';
 import { getFineSummary } from '../../api/fineApi';
 import { fetchMyReservations, cancelReservation, type ReservationRecord } from '../../api/reservationApi';
@@ -41,6 +43,7 @@ type RequestRow = {
 
 export default function StudentRequests() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<'all' | MemberBorrowRequest['status'] | 'reservations'>('all');
   const [allRequests, setAllRequests] = useState<RequestRow[]>([]);
   const [myReservations, setMyReservations] = useState<ReservationRecord[]>([]);
@@ -93,6 +96,50 @@ export default function StudentRequests() {
   useEffect(() => {
     loadRequestsData();
   }, []);
+
+  // Real-time WebSocket listener for approved borrow requests and reservation queue shifts
+  useEffect(() => {
+    if (!user || !user.member_id) return;
+
+    const channelName = `member.${user.member_id}`;
+    const channel = echoClient.private(channelName);
+
+    channel.listen('.borrow.request.approved', (event: any) => {
+      // Live-update all request and reservation data
+      loadRequestsData();
+
+      // Chime sound for premium UX
+      const audio = new Audio('/sounds/notification.mp3');
+      audio.play().catch(() => {});
+
+      // Screen Toast notification
+      emitToast({
+        tone: 'success',
+        title: 'Yêu cầu được duyệt',
+        message: event.message || `Yêu cầu mượn sách "${event.book_title}" của bạn đã được phê duyệt!`,
+      });
+    });
+
+    channel.listen('.reservation.queue.shifted', (event: any) => {
+      // Live-update all request and reservation data
+      loadRequestsData();
+
+      // Chime sound for premium UX
+      const audio = new Audio('/sounds/notification.mp3');
+      audio.play().catch(() => {});
+
+      // Screen Toast notification
+      emitToast({
+        tone: 'info',
+        title: 'Cập nhật xếp hàng',
+        message: event.message || `Vị trí xếp hàng đặt chỗ sách "${event.book_title}" của bạn đã tiến thêm!`,
+      });
+    });
+
+    return () => {
+      echoClient.leave(channelName);
+    };
+  }, [user]);
 
   const handleCancelReservation = async (reservationId: number) => {
     try {

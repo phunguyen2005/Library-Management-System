@@ -2,11 +2,11 @@ import { apiRequest } from './client';
 
 export type AppNotification = {
   id: string;
-  type: string;
-  notifiable_type: string;
-  notifiable_id: number;
+  type?: string;
+  notifiable_type?: string;
+  notifiable_id?: number;
   data: {
-    type: string;
+    type?: string;
     message: string;
     book_title?: string;
     borrowing_id?: string;
@@ -16,7 +16,7 @@ export type AppNotification = {
   };
   read_at: string | null;
   created_at: string;
-  updated_at: string;
+  updated_at?: string;
 };
 
 type PaginatedResponse<T> = {

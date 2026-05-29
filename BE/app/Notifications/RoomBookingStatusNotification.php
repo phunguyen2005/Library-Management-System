@@ -49,6 +49,7 @@ class RoomBookingStatusNotification extends Notification implements ShouldQueue
         $message->salutation("Trân trọng,\nThư viện số HCMUE");
 
         if ($this->statusType === 'approved') {
+            $qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data={$this->booking->booking_code}";
             $message->subject('[Thư viện số HCMUE] Phê duyệt yêu cầu đặt phòng tự học')
                     ->greeting("Kính chào $studentName,")
                     ->line("Yêu cầu đặt phòng tự học của bạn đã được phê duyệt thành công.")
@@ -57,6 +58,7 @@ class RoomBookingStatusNotification extends Notification implements ShouldQueue
                     ->line("- Ngày đặt: $dateStr")
                     ->line("- Khung giờ: $timeStr")
                     ->line("- Mã nhận phòng: {$this->booking->booking_code}")
+                    ->line(new \Illuminate\Support\HtmlString('<div style="text-align: center; margin: 20px 0;"><img src="'.$qrUrl.'" alt="Mã QR Nhận Phòng" style="border: 1px solid #e2e8f0; padding: 10px; border-radius: 8px;" /></div>'))
                     ->line("Vui lòng đến đúng giờ và thực hiện quét mã check-in tại phòng để bắt đầu sử dụng.")
                     ->action('Xem lịch sử đặt phòng', config('app.frontend_url', 'http://localhost:3000') . '/room-bookings');
         } elseif ($this->statusType === 'rejected') {

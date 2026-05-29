@@ -6,6 +6,7 @@ export type AuditLogEntry = {
   user_type: string; // 'Sinh viên' | 'Thủ thư' | 'Hệ thống'
   raw_user_type: string; // 'student' | 'admin' | 'unknown'
   user_name: string;
+  user_email: string | null;
   action: string;
   raw_action: string;
   description: string;
@@ -28,6 +29,7 @@ export async function getAuditLogs(params?: {
   user_type?: string;
   action?: string;
   query?: string;
+  user_query?: string;
   date?: string;
 }) {
   const queryParams = new URLSearchParams();
@@ -36,6 +38,7 @@ export async function getAuditLogs(params?: {
   if (params?.user_type) queryParams.append('user_type', params.user_type);
   if (params?.action) queryParams.append('action', params.action);
   if (params?.query) queryParams.append('query', params.query);
+  if (params?.user_query) queryParams.append('user_query', params.user_query);
   if (params?.date) queryParams.append('date', params.date);
 
   const queryStr = queryParams.toString();
