@@ -30,7 +30,7 @@ class ForgotPasswordOTP extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Khôi phục mật khẩu - Thư viện HCMUE',
+            subject: 'Mã xác minh tài khoản - Thư viện HCMUE',
         );
     }
 

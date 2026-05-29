@@ -30,7 +30,7 @@ class ChangePasswordOTP extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Xác thực thay đổi mật khẩu - Thư viện HCMUE',
+            subject: 'Mã xác nhận bảo mật - Thư viện HCMUE',
         );
     }
 
