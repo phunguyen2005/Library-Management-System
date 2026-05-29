@@ -54,6 +54,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    import('../lib/echo').then(({ updateEchoAuth }) => {
+      updateEchoAuth(session?.token || null);
+    });
+  }, [session?.token]);
+
+  useEffect(() => {
     let isMounted = true;
 
     const verifyStoredSession = async () => {

@@ -74,8 +74,8 @@ export default function Digital() {
 
     Promise.all([
       fetchDigitalDocuments(),
-      fetchReadingProgress().catch(() => []),
-      fetchFavoriteBooks().catch(() => []),
+      role === 'student' ? fetchReadingProgress().catch(() => []) : Promise.resolve([]),
+      role === 'student' ? fetchFavoriteBooks().catch(() => []) : Promise.resolve([]),
     ])
       .then(([digitalDocuments, readingProgress, favoriteBooks]) => {
         const progressByBook = new Map<number, import('../../types/book').ReadingProgressRecord>(
@@ -97,7 +97,7 @@ export default function Digital() {
         emitToast({ tone: 'error', title: 'Không thể tải tài liệu số', message });
       })
       .finally(() => setIsLoading(false));
-  }, []);
+  }, [role]);
 
   useEffect(() => {
     const selectedId = Number(searchParams.get('book'));

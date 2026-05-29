@@ -21,7 +21,7 @@ class FineStatusNotification extends Notification implements ShouldQueue
 
     public function via(object $notifiable): array
     {
-        $channels = ['database'];
+        $channels = ['database', 'broadcast'];
         if ($notifiable instanceof \App\Models\Member && $notifiable->notify_fine_status) {
             $channels[] = 'mail';
         }

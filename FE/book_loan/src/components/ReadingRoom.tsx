@@ -27,6 +27,7 @@ export default function ReadingRoom({ document, onClose, onProgressSaved }: Read
   const [isIframeLoading, setIsIframeLoading] = useState(true);
   const autoSavePendingRef = useRef(false);
   const saveTimeoutRef = useRef<number | null>(null);
+  const lastSavedPageRef = useRef(document.readingProgress?.current_page ?? 1);
   const progressPercent = totalPages > 0 ? Math.min(100, Math.round((currentPage / totalPages) * 100)) : 0;
 
   // Audio specific states & refs
@@ -44,7 +45,18 @@ export default function ReadingRoom({ document, onClose, onProgressSaved }: Read
   const chatMessagesEndRef = useRef<HTMLDivElement>(null);
 
   const saveProgress = useCallback(async () => {
-    const nextTotalPages = Math.max(1, totalPages);
+    if (role !== 'student') {
+      return;
+    }
+
+    if (saveTimeoutRef.current) {
+      window.clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = null;
+    }
+    autoSavePendingRef.current = false;
+
+    // Automatically set total pages to at least current page to avoid capping back to 1
+    const nextTotalPages = Math.max(1, totalPages, currentPage);
     const nextCurrentPage = Math.min(Math.max(1, currentPage), nextTotalPages);
 
     setIsSavingProgress(true);
@@ -58,6 +70,7 @@ export default function ReadingRoom({ document, onClose, onProgressSaved }: Read
       if (progress) {
         setCurrentPage(progress.current_page);
         setTotalPages(progress.total_pages);
+        lastSavedPageRef.current = progress.current_page;
         onProgressSaved?.(progress);
       }
 
@@ -67,7 +80,7 @@ export default function ReadingRoom({ document, onClose, onProgressSaved }: Read
     } finally {
       setIsSavingProgress(false);
     }
-  }, [currentPage, document.id, onProgressSaved, totalPages]);
+  }, [currentPage, document.id, onProgressSaved, totalPages, role]);
 
   const queueProgressSave = () => {
     autoSavePendingRef.current = true;
@@ -166,8 +179,17 @@ export default function ReadingRoom({ document, onClose, onProgressSaved }: Read
 
     // Save playback position to progress: 1 sec = 1 page
     const currentSec = Math.max(1, Math.floor(current));
-    setCurrentPage(currentSec);
-    queueProgressSave();
+    if (currentSec !== currentPage) {
+      setCurrentPage(currentSec);
+
+      // Save progress to database every 10 seconds of continuous listening for students
+      if (role === 'student' && Math.abs(currentSec - lastSavedPageRef.current) >= 10) {
+        autoSavePendingRef.current = true;
+        void saveProgress();
+      } else {
+        queueProgressSave();
+      }
+    }
   };
 
   const handleLoadedMetadata = () => {

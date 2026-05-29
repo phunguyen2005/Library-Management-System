@@ -37,6 +37,15 @@ return [
         'model' => env('GEMINI_MODEL', 'gemini-1.5-flash'),
     ],
 
+    'groq' => [
+        'api_key' => env('GROQ_API_KEY'),
+        'model' => env('GROQ_MODEL', 'llama3-8b-8192'),
+    ],
+
+    'ai' => [
+        'preferred_provider' => env('AI_PREFERRED_PROVIDER', 'gemini'),
+    ],
+
     'cloudinary' => [
         'cloud_name' => env('CLOUDINARY_CLOUD_NAME'),
         'api_key' => env('CLOUDINARY_API_KEY'),

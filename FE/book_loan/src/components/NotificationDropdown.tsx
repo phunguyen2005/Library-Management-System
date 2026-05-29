@@ -21,12 +21,51 @@ export default function NotificationDropdown() {
   };
 
   useEffect(() => {
-    if (user) {
-      fetchNotifications();
-      // Optional: Polling every 60 seconds
-      const interval = setInterval(fetchNotifications, 60000);
-      return () => clearInterval(interval);
-    }
+    if (!user) return;
+
+    fetchNotifications();
+
+    // Resolve channel name dynamically for student or staff
+    const channelName = user.member_id
+      ? `App.Models.Member.${user.member_id}`
+      : `App.Models.Librarian.${user.librarian_id}`;
+
+    // Import echo client dynamically or use standard import
+    import('../lib/echo').then(({ echoClient }) => {
+      const channel = echoClient.private(channelName);
+
+      channel.notification((notification: any) => {
+        const newNotification: AppNotification = {
+          id: notification.id || Math.random().toString(),
+          read_at: null,
+          created_at: new Date().toISOString(),
+          data: {
+            message: notification.message || notification.data?.message || 'Thông báo mới',
+            ...notification
+          }
+        };
+
+        setNotifications((prev) => [newNotification, ...prev]);
+        setUnreadCount((count) => count + 1);
+
+        // Sound chime for premium UX
+        const audio = new Audio('/sounds/notification.mp3');
+        audio.play().catch(() => {});
+
+        // Screen Toast notification
+        emitToast({
+          tone: 'info',
+          title: 'Thông báo mới',
+          message: newNotification.data.message
+        });
+      });
+    });
+
+    return () => {
+      import('../lib/echo').then(({ echoClient }) => {
+        echoClient.leave(channelName);
+      });
+    };
   }, [user]);
 
   useEffect(() => {

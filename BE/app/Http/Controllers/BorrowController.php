@@ -120,8 +120,11 @@ class BorrowController extends Controller
             \App\Models\Librarian::all()->each(function ($librarian) use ($loan) {
                 $librarian->notify(new \App\Notifications\NewBorrowRequestNotification($loan));
             });
+            
+            // Broadcast real-time WebSocket event to librarians private channel
+            broadcast(new \App\Events\BorrowRequestCreated($loan))->toOthers();
         } catch (\Exception $e) {
-            // Ignore notification failures on production
+            // Ignore notification and broadcast failures on production if mailer or pusher is not configured
         }
 
         return response()->json([
