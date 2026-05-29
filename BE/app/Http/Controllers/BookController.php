@@ -301,23 +301,30 @@ class BookController extends Controller
                 'cloudinary_public_id' => $uploadResult['public_id'],
             ]);
         } else {
-            // Lưu local file
+            // Lưu PDF/file vào TiDB dưới dạng binary (LONGBLOB)
+            // Tránh mất file do Render dùng ephemeral filesystem
+            $binaryContent = file_get_contents($file->getRealPath());
+
+            // Xóa file local cũ nếu có
             if ($book->file_path) {
                 \Illuminate\Support\Facades\Storage::disk('local')->delete($book->file_path);
             }
 
             $fileName = time() . '_' . \Illuminate\Support\Str::slug(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME)) . '.' . $extension;
-            $path = $file->storeAs('digital-documents', $fileName, 'local');
 
             $book->fill([
-                'is_digital' => true,
-                'resource_type' => $book->resource_type ?: ($isAudio ? 'Audio Book' : 'Tài liệu số'),
-                'file_format' => $format,
-                'file_size' => $this->formatFileSize((int) $file->getSize()),
-                'file_path' => $path,
-                'file_url' => null,
-                'cloudinary_public_id' => null,
+                'is_digital'            => true,
+                'resource_type'         => $book->resource_type ?: ($isAudio ? 'Audio Book' : 'Tài liệu số'),
+                'file_format'           => $format,
+                'file_size'             => $this->formatFileSize((int) $file->getSize()),
+                'file_path'             => null,
+                'file_url'              => null,
+                'cloudinary_public_id'  => null,
+                'file_content'          => $binaryContent,
             ]);
+
+            // Lưu tên file gốc vào file_path để dùng khi serve (không phải path thực)
+            $book->file_path = 'db:' . $fileName;
         }
 
         if ($isAudio) {
@@ -340,7 +347,7 @@ class BookController extends Controller
 
         $this->bookCache->bump();
 
-        $storageType = $uploadedToCloudinary ? 'Cloudinary' : 'Local Disk';
+        $storageType = $uploadedToCloudinary ? 'Cloudinary' : 'TiDB (BLOB)';
         \App\Services\AuditLoggerService::log('digital_file_upload', "Đã tải lên tệp tài liệu số ({$storageType}) cho sách: " . $book->title . ' (ID: ' . $book->book_id . ')');
 
         $book->loadCount([
@@ -440,8 +447,25 @@ class BookController extends Controller
             return redirect()->away($book->file_url);
         }
 
-        // Còn lại đọc từ Local Disk
-        if ($book->file_path) {
+        // Đọc từ TiDB (file_content LONGBLOB) - ưu tiên hàng đầu
+        if ($book->file_path && str_starts_with($book->file_path, 'db:')) {
+            // Tải file_content từ DB (không được load sẵn do $hidden)
+            $bookWithContent = \App\Models\Book::withoutGlobalScopes()
+                ->select(['book_id', 'file_content', 'file_format', 'file_path'])
+                ->find($book->book_id);
+
+            if ($bookWithContent && $bookWithContent->file_content) {
+                $isPdf = strtoupper((string) $book->file_format) === 'PDF'
+                    || str_ends_with(strtolower($book->file_path), '.pdf');
+                $mimeType = $isPdf ? 'application/pdf' : 'application/octet-stream';
+
+                header_remove('X-Frame-Options');
+                return response($bookWithContent->file_content, 200, $this->previewHeaders($request, $filename, $mimeType));
+            }
+        }
+
+        // Còn lại đọc từ Local Disk (fallback cho data cũ)
+        if ($book->file_path && !str_starts_with($book->file_path, 'db:')) {
             $isPdf = strtoupper((string) $book->file_format) === 'PDF'
                 || str_ends_with(strtolower((string) $book->file_path), '.pdf');
 

@@ -32,6 +32,7 @@ class Book extends Model
         'file_size',
         'file_path',
         'file_url',
+        'file_content',
         'cloudinary_public_id',
         'ai_summary',
         'ai_tags',
@@ -41,6 +42,9 @@ class Book extends Model
         'available_quantity',
         'repairing_quantity',
     ];
+
+    // Exclude binary file content from JSON responses to avoid huge payloads
+    protected $hidden = ['file_content'];
 
     protected function casts(): array
     {

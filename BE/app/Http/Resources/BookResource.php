@@ -25,7 +25,11 @@ class BookResource extends JsonResource
             'file_size' => $this->file_size,
             'file_url' => $this->file_url,
             'has_digital_file' => filled($this->file_path) || filled($this->file_url),
-            'digital_file_name' => $this->file_path ? basename($this->file_path) : ($this->file_url ? basename($this->file_url) : null),
+            'digital_file_name' => $this->file_path
+                ? (str_starts_with($this->file_path, 'db:')
+                    ? substr($this->file_path, 3)   // strip "db:" prefix
+                    : basename($this->file_path))
+                : ($this->file_url ? basename($this->file_url) : null),
             'ai_summary' => $isAudio ? null : $this->ai_summary,
             'ai_tags' => $isAudio ? [] : ($this->ai_tags ?? []),
             'ai_summary_generated_at' => $isAudio ? null : $this->ai_summary_generated_at?->toISOString(),
