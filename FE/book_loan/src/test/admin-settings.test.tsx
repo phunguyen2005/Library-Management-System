@@ -7,12 +7,14 @@ import AdminSettings from '../pages/admin/AdminSettings';
 const {
   updateMyProfileMock,
   sendPasswordOtpMock,
+  verifyPasswordOtpMock,
   updateUserMock,
   fetchLibrarySettingsMock,
   updateLibrarySettingsMock,
 } = vi.hoisted(() => ({
   updateMyProfileMock: vi.fn(),
   sendPasswordOtpMock: vi.fn(),
+  verifyPasswordOtpMock: vi.fn(),
   updateUserMock: vi.fn(),
   fetchLibrarySettingsMock: vi.fn(),
   updateLibrarySettingsMock: vi.fn(),
@@ -21,6 +23,7 @@ const {
 vi.mock('../api/userApi', () => ({
   updateMyProfile: (...args: unknown[]) => updateMyProfileMock(...args),
   sendPasswordOtp: () => sendPasswordOtpMock(),
+  verifyPasswordOtp: (otp: string) => verifyPasswordOtpMock(otp),
 }));
 
 vi.mock('../api/librarySettingsApi', () => ({
@@ -105,6 +108,7 @@ describe('AdminSettings', () => {
   it('submits password fields without allowing email edits, requiring OTP flow', async () => {
     const user = userEvent.setup();
     sendPasswordOtpMock.mockResolvedValueOnce({ message: 'Success' });
+    verifyPasswordOtpMock.mockResolvedValueOnce({ message: 'Success' });
     updateMyProfileMock.mockResolvedValueOnce({
       message: 'Cập nhật hồ sơ thành công.',
       role: 'admin',
@@ -126,22 +130,29 @@ describe('AdminSettings', () => {
 
     render(<AdminSettings />);
 
-    await user.type(await screen.findByLabelText('Mật khẩu hiện tại'), 'Library@2026');
-    await user.type(screen.getByLabelText('Mật khẩu mới'), 'NewPass123');
-    await user.type(screen.getByLabelText('Xác nhận mật khẩu mới'), 'NewPass123');
-    await user.click(screen.getByTestId('save-admin-profile'));
+    // Click "Thay đổi mật khẩu" to trigger OTP sending
+    const changePasswordBtn = await screen.findByRole('button', { name: 'Thay đổi mật khẩu' });
+    await user.click(changePasswordBtn);
 
     expect(sendPasswordOtpMock).toHaveBeenCalled();
 
-    // Fill in OTP Modal
+    // Fill in OTP and click "Tiếp tục"
     const otpInput = await screen.findByLabelText('Mã OTP đổi mật khẩu');
     await user.type(otpInput, '123456');
+    await user.click(screen.getByRole('button', { name: 'Tiếp tục' }));
+
+    expect(verifyPasswordOtpMock).toHaveBeenCalledWith('123456');
+
+    // Fill in the new password fields in step 2
+    const passwordInput = await screen.findByLabelText('Mật khẩu mới');
+    const confirmInput = screen.getByLabelText('Xác nhận mật khẩu mới');
+    await user.type(passwordInput, 'NewPass123');
+    await user.type(confirmInput, 'NewPass123');
     await user.click(screen.getByRole('button', { name: 'Xác nhận' }));
 
     expect(updateMyProfileMock).toHaveBeenCalledWith({
       name: 'Old Admin',
       phone_number: '0901000001',
-      current_password: 'Library@2026',
       password: 'NewPass123',
       password_confirmation: 'NewPass123',
       otp: '123456',

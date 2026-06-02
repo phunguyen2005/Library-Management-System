@@ -25,6 +25,7 @@ class Book extends Model
         'published_year',
         'is_available',
         'cover',
+        'cover_public_id',
         'location',
         'is_digital',
         'resource_type',

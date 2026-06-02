@@ -5,6 +5,7 @@ export interface BookApiRecord {
   genre?: string | null;
   published_year?: number | null;
   cover?: string | null;
+  cover_public_id?: string | null;
   location?: string | null;
   is_digital?: boolean | number;
   resource_type?: string | null;
@@ -18,7 +19,7 @@ export interface BookApiRecord {
   digital_file_name?: string | null;
   download_count?: number | null;
   total_quantity?: number | null;
-   available_quantity?: number | null;
+  available_quantity?: number | null;
   repairing_quantity?: number | null;
   is_available?: boolean | number;
   favorite_count?: number | null;
@@ -43,6 +44,7 @@ export interface FormattedBook {
   statusKey?: 'available' | 'unavailable';
   statusColor: string;
   cover: string;
+  cover_public_id?: string | null;
   quantity: number;
   available_quantity: number;
   repairing_quantity?: number;

@@ -22,6 +22,7 @@ export type BookPayload = {
   published_year?: number;
   location?: string;
   cover?: string;
+  cover_public_id?: string;
   quantity?: number;
   is_digital?: boolean;
   resource_type?: string;
@@ -64,6 +65,7 @@ export function normalizeBook(book: BookApiRecord): FormattedBook {
     statusKey: isAvailable ? 'available' : 'unavailable',
     statusColor: toStatusColor(isAvailable),
     cover: getCoverUrl(book.cover),
+    cover_public_id: book.cover_public_id || null,
     quantity: totalQuantity || 0,
     available_quantity: availableQuantity,
     repairing_quantity: Number(book.repairing_quantity ?? 0),
@@ -225,6 +227,18 @@ export async function uploadDigitalFile(bookId: number, file: File) {
   formData.append('file', file);
 
   const book = await apiRequest<BookApiRecord>(`/books/${bookId}/digital-file`, {
+    method: 'POST',
+    body: formData,
+  });
+
+  return normalizeBook(book);
+}
+
+export async function uploadBookCover(bookId: number, file: File) {
+  const formData = new FormData();
+  formData.append('cover_image_file', file);
+
+  const book = await apiRequest<BookApiRecord>(`/books/${bookId}/cover-image`, {
     method: 'POST',
     body: formData,
   });

@@ -12,6 +12,7 @@ import {
   updateBorrowableBook,
   updateDigitalResource,
   uploadDigitalFile,
+  uploadBookCover,
   importBooks,
   updateBookCopy,
   addBookCopy,
@@ -170,6 +171,9 @@ export default function AdminInventory() {
   const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
   const [formData, setFormData] = useState<InventoryFormData>(EMPTY_FORM);
   const [selectedDigitalFile, setSelectedDigitalFile] = useState<File | null>(null);
+  const [selectedCoverFile, setSelectedCoverFile] = useState<File | null>(null);
+  const [coverPreview, setCoverPreview] = useState<string | null>(null);
+  const [coverInputMode, setCoverInputMode] = useState<'upload' | 'url'>('upload');
   const [bookToDelete, setBookToDelete] = useState<FormattedBook | null>(null);
   const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
   const [aiActionId, setAiActionId] = useState<number | null>(null);
@@ -330,6 +334,9 @@ export default function AdminInventory() {
       category: activeTab === 'borrow' ? 'Giáo trình' : 'PDF',
     });
     setSelectedDigitalFile(null);
+    setSelectedCoverFile(null);
+    setCoverPreview(null);
+    setCoverInputMode('upload');
     setIsModalOpen(true);
   };
 
@@ -337,12 +344,44 @@ export default function AdminInventory() {
     setModalMode('edit');
     setFormData(toFormData(book));
     setSelectedDigitalFile(null);
+    setSelectedCoverFile(null);
+    setCoverPreview(book.cover || null);
+    setCoverInputMode('upload');
     setIsModalOpen(true);
   };
 
   const closeModal = () => {
     setIsModalOpen(false);
     setSelectedDigitalFile(null);
+    setSelectedCoverFile(null);
+    if (coverPreview && coverPreview.startsWith('blob:')) {
+      URL.revokeObjectURL(coverPreview);
+    }
+    setCoverPreview(null);
+  };
+
+  const handleCoverFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] || null;
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        emitToast({
+          tone: 'error',
+          title: 'Định dạng không hợp lệ',
+          message: 'Hệ thống chỉ chấp nhận định dạng ảnh (JPG, PNG, WEBP, GIF).',
+        });
+        return;
+      }
+      setSelectedCoverFile(file);
+      const url = URL.createObjectURL(file);
+      setCoverPreview(url);
+      setFormData((prev) => ({ ...prev, cover: '' })); // Clear URL string field since we're uploading a file
+    }
+  };
+
+  const handleRemoveCoverFile = () => {
+    setSelectedCoverFile(null);
+    setCoverPreview(null);
+    setFormData((prev) => ({ ...prev, cover: '' }));
   };
 
   const promptDelete = (book: FormattedBook) => {
@@ -573,6 +612,10 @@ export default function AdminInventory() {
           : modalMode === 'add'
             ? await addDigitalResource(payload)
             : await updateDigitalResource(formData.id, payload);
+
+      if (selectedCoverFile) {
+        await uploadBookCover(savedBook.id, selectedCoverFile);
+      }
 
       if (activeTab === 'digital' && selectedDigitalFile) {
         await uploadDigitalFile(savedBook.id, selectedDigitalFile);
@@ -1462,19 +1505,98 @@ export default function AdminInventory() {
                 </div>
 
                 <div className="col-span-2">
-                  <label htmlFor="book-cover" className="mb-1 block text-xs font-bold text-slate-600">
-                    URL bìa
-                  </label>
-                  <input
-                    id="book-cover"
-                    type="text"
-                    value={formData.cover}
-                    onChange={(event) =>
-                      setFormData({ ...formData, cover: event.target.value })
-                    }
-                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
-                    placeholder="https://..."
-                  />
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-600">Ảnh bìa tài liệu</span>
+                    <div className="flex rounded-lg bg-slate-100 p-0.5 text-[10px] font-bold">
+                      <button
+                        type="button"
+                        onClick={() => setCoverInputMode('upload')}
+                        className={`rounded px-3 py-1 transition-colors ${
+                          coverInputMode === 'upload' ? 'bg-white text-primary shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                        }`}
+                      >
+                        Tải ảnh lên
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCoverInputMode('url')}
+                        className={`rounded px-3 py-1 transition-colors ${
+                          coverInputMode === 'url' ? 'bg-white text-primary shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                        }`}
+                      >
+                        Dùng URL ảnh
+                      </button>
+                    </div>
+                  </div>
+
+                  {coverInputMode === 'upload' ? (
+                    <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/50 p-4 transition-all hover:border-primary/50">
+                      {coverPreview ? (
+                        <div className="flex items-center gap-4">
+                          <div className="h-20 w-16 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm shrink-0">
+                            <img
+                              src={coverPreview}
+                              alt="Bìa xem trước"
+                              onError={(event) => applyImageFallback(event.currentTarget)}
+                              className="h-full w-full object-cover"
+                            />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-bold text-slate-700 truncate">
+                              {selectedCoverFile ? selectedCoverFile.name : 'Đang sử dụng bìa hiện tại'}
+                            </p>
+                            <p className="mt-0.5 text-[10px] text-slate-400">
+                              {selectedCoverFile ? formatFileSize(selectedCoverFile) : 'Đã tải lên Cloudinary'}
+                            </p>
+                            <div className="mt-2 flex gap-2">
+                              <label className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-bold text-slate-700 hover:bg-slate-50 transition-colors shadow-sm cursor-pointer">
+                                <span className="material-symbols-outlined text-[14px]">cached</span>
+                                Thay đổi
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={handleCoverFileChange}
+                                  className="hidden"
+                                />
+                              </label>
+                              <button
+                                type="button"
+                                onClick={handleRemoveCoverFile}
+                                className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-2.5 py-1 text-[10px] font-bold text-red-600 hover:bg-red-50 transition-colors shadow-sm"
+                              >
+                                <span className="material-symbols-outlined text-[14px]">delete</span>
+                                Xóa bỏ
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <label className="flex flex-col items-center justify-center py-4 cursor-pointer">
+                          <span className="material-symbols-outlined text-[36px] text-slate-400">image</span>
+                          <span className="mt-2 text-xs font-semibold text-slate-600">Chọn hoặc thả tệp ảnh bìa</span>
+                          <span className="mt-0.5 text-[10px] text-slate-400">Chấp nhận PNG, JPG, WEBP lên đến 4MB</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleCoverFileChange}
+                            className="hidden"
+                          />
+                        </label>
+                      )}
+                    </div>
+                  ) : (
+                    <input
+                      id="book-cover"
+                      type="text"
+                      value={formData.cover}
+                      onChange={(event) => {
+                        setFormData({ ...formData, cover: event.target.value });
+                        setCoverPreview(event.target.value || null);
+                      }}
+                      className="w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20 text-sm"
+                      placeholder="https://..."
+                    />
+                  )}
                 </div>
 
                 {isDigitalTab ? (

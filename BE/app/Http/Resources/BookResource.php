@@ -18,6 +18,7 @@ class BookResource extends JsonResource
             'genre'                  => $this->genre,
             'published_year'         => $this->published_year,
             'cover'                  => $this->cover ? (filter_var($this->cover, FILTER_VALIDATE_URL) ? $this->cover : asset($this->cover)) : null,
+            'cover_public_id'        => $this->cover_public_id,
             'location'               => $this->location,
             'is_digital'             => (bool) $this->is_digital,
             'resource_type'          => $this->resource_type,

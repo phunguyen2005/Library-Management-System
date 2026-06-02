@@ -183,6 +183,9 @@ class BookController extends Controller
         $book = DB::transaction(function () use ($book, $validated, $isDigital, $nextQuantity) {
             $book = Book::query()->lockForUpdate()->findOrFail($book->book_id);
 
+            $oldCoverPublicId = $book->cover_public_id;
+            $oldCover = $book->cover;
+
             $book->fill([
                 'title' => $validated['title'],
                 'author' => $validated['author'],
@@ -197,6 +200,16 @@ class BookController extends Controller
                 'file_path' => array_key_exists('file_path', $validated) ? $validated['file_path'] : $book->file_path,
                 'file_url' => array_key_exists('file_url', $validated) ? $validated['file_url'] : $book->file_url,
             ]);
+
+            if ($oldCoverPublicId && array_key_exists('cover', $validated) && $validated['cover'] !== $oldCover) {
+                try {
+                    $cloudinaryService = new \App\Services\CloudinaryService();
+                    $cloudinaryService->delete($oldCoverPublicId, 'jpg');
+                } catch (\Exception $e) {
+                    \Log::warning('Failed to delete old Cloudinary cover during update: ' . $e->getMessage());
+                }
+                $book->cover_public_id = null;
+            }
 
             if (strtoupper((string) $book->file_format) === 'AUDIO') {
                 $book->forceFill([
@@ -254,6 +267,14 @@ class BookController extends Controller
         if ($book->cloudinary_public_id) {
             $cloudinaryService = new \App\Services\CloudinaryService();
             $cloudinaryService->delete($book->cloudinary_public_id, $book->file_format ?: 'pdf');
+        }
+
+        // Xóa bìa sách trên Cloudinary nếu có
+        if ($book->cover_public_id) {
+            try {
+                $cloudinaryService = new \App\Services\CloudinaryService();
+                $cloudinaryService->delete($book->cover_public_id, 'jpg');
+            } catch (\Exception $ignored) {}
         }
 
         $book->delete();
@@ -409,6 +430,48 @@ class BookController extends Controller
         \App\Services\AuditLoggerService::log(
             'digital_file_upload',
             "Đã tải lên tệp tài liệu số ({$storageType}) cho sách: {$book->title} (ID: {$book->book_id})"
+        );
+
+        $book->loadCount([
+            'favoritedBy as favorite_count',
+            'digitalDownloads as digital_downloads_count',
+            'reviews as reviews_count',
+        ])->loadAvg('reviews', 'rating');
+
+        return response()->json(new BookResource($book));
+    }
+
+    public function uploadCoverImage(Request $request, Book $book)
+    {
+        $request->validate([
+            'cover_image_file' => ['required', 'file', 'image', 'mimes:jpeg,png,jpg,gif,webp', 'max:4096'],
+        ]);
+
+        $file = $request->file('cover_image_file');
+        
+        $service = new \App\Services\CloudinaryService();
+
+        // Xóa file bìa cũ nếu có
+        if ($book->cover_public_id) {
+            try {
+                $service->delete($book->cover_public_id, 'jpg');
+            } catch (\Exception $ignored) {
+                \Log::warning('Failed to delete old cover from Cloudinary during replacement: ' . $ignored->getMessage());
+            }
+        }
+
+        $upload = $service->upload($file, 'library_book_covers');
+
+        $book->forceFill([
+            'cover' => $upload['secure_url'],
+            'cover_public_id' => $upload['public_id'],
+        ])->save();
+
+        $this->bookCache->bump();
+
+        \App\Services\AuditLoggerService::log(
+            'book_cover_upload',
+            "Đã tải lên tệp ảnh bìa mới cho sách: {$book->title} (ID: {$book->book_id})"
         );
 
         $book->loadCount([

@@ -143,6 +143,7 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::put('/books/{book}/copies/{copy}', [BookController::class, 'updateCopy']);
             Route::delete('/books/{book}/copies/{copy}', [BookController::class, 'deleteCopy']);
             Route::post('/books/{book}/digital-file', [BookController::class, 'uploadDigitalFile']);
+            Route::post('/books/{book}/cover-image', [BookController::class, 'uploadCoverImage']);
             Route::delete('/books/{book}', [BookController::class, 'destroy']);
             Route::post('/books/{bookId}/complete-repair', [BookController::class, 'completeRepair']);
         });

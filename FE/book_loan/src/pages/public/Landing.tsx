@@ -879,7 +879,7 @@ export default function Landing() {
             {/* Social Icons */}
             <div className="flex gap-4 pt-2">
               <a
-                href="https://www.facebook.com/HCMUE.EDUVN"
+                href="https://www.facebook.com/HCMUE.VN"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-900 text-slate-400 hover:bg-primary hover:text-white transition-all duration-300 active:scale-95"
@@ -890,20 +890,18 @@ export default function Landing() {
                 </svg>
               </a>
               <a
-                href="https://www.instagram.com/"
+                href="https://www.youtube.com/@HCMUEofficial"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-900 text-slate-400 hover:bg-pink-600 hover:text-white transition-all duration-300 active:scale-95"
-                title="Instagram"
+                className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-900 text-slate-400 hover:bg-red-600 hover:text-white transition-all duration-300 active:scale-95"
+                title="YouTube HCMUE"
               >
-                <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-                  <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/>
-                  <path d="M16 11.37A4 4 0 1112.63 8 4 4 0 0116 11.37z"/>
-                  <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/>
+                <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M23.498 6.163a3.003 3.003 0 0 0-2.11-2.11C19.518 3.545 12 3.545 12 3.545s-7.518 0-9.388.508a3.003 3.003 0 0 0-2.11 2.11C0 8.033 0 12 0 12s0 3.967.502 5.837a3.003 3.003 0 0 0 2.11 2.11c1.87.508 9.388.508 9.388.508s7.518 0 9.388-.508a3.003 3.003 0 0 0 2.11-2.11C24 15.967 24 12 24 12s0-3.967-.502-5.837zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
                 </svg>
               </a>
               <a
-                href="https://github.com/ThaiNguyen-2005/Php-GiuaKy-NhomTTVP"
+                href="https://github.com/phunguyen2005/Library-Management-System.git"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-900 text-slate-400 hover:bg-slate-800 hover:text-white transition-all duration-300 active:scale-95"

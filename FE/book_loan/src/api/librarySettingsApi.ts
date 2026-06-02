@@ -16,6 +16,9 @@ export type LibrarySettings = {
   room_open_time: string;
   room_close_time: string;
   room_cancel_deadline_hours: number;
+  pickup_deadline_hours: number;
+  max_missed_pickups: number;
+  suspension_duration_days: number;
   updated_at?: string | null;
 };
 
@@ -35,6 +38,9 @@ export type LibrarySettingsPayload = {
   room_open_time: string;
   room_close_time: string;
   room_cancel_deadline_hours: number;
+  pickup_deadline_hours: number;
+  max_missed_pickups: number;
+  suspension_duration_days: number;
 };
 
 export async function fetchLibrarySettings() {
