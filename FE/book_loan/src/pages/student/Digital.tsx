@@ -259,11 +259,6 @@ export default function Digital() {
                   <span className="text-[10px] font-bold uppercase tracking-widest text-outline">
                     {resource.type}
                   </span>
-                  {resource.readingProgress && (
-                    <span className="rounded-md bg-green-500/10 px-1.5 py-0.5 text-[9px] font-bold text-green-600 animate-pulse">
-                      {resource.format.toUpperCase() === 'AUDIO' ? 'Đang nghe' : 'Đang đọc'}
-                    </span>
-                  )}
                 </div>
                 <h3 className="mt-1 line-clamp-2 text-sm font-bold leading-snug text-on-surface transition-colors group-hover:text-primary">
                   {resource.title}
@@ -344,20 +339,6 @@ export default function Digital() {
                     </span>
                   ))}
                 </div>
-
-                {resource.readingProgress ? (
-                  <div className="mt-3 space-y-1">
-                    <div className="h-1.5 overflow-hidden rounded-full bg-surface-container-high">
-                      <div
-                        className="h-full rounded-full bg-primary"
-                        style={{ width: `${Math.min(100, resource.readingProgress.progress_percent)}%` }}
-                      />
-                    </div>
-                    <p className="text-[10px] font-semibold text-on-surface-variant">
-                      Tiếp tục: trang {resource.readingProgress.current_page}/{resource.readingProgress.total_pages}
-                    </p>
-                  </div>
-                ) : null}
               </div>
             </div>
           ))
