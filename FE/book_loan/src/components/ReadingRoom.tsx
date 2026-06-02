@@ -27,9 +27,15 @@ export default function ReadingRoom({ document, onClose, onProgressSaved }: Read
   const [isSavingProgress, setIsSavingProgress] = useState(false);
   const [isIframeLoading, setIsIframeLoading] = useState(true);
   const [showSyncBanner, setShowSyncBanner] = useState<number | null>(null);
-  const autoSavePendingRef = useRef(false);
+  // Use state (not just ref) so the debounce useEffect actually re-triggers
+  const [pendingSave, setPendingSave] = useState(false);
   const saveTimeoutRef = useRef<number | null>(null);
   const lastSavedPageRef = useRef(document.readingProgress?.current_page ?? 1);
+  // Refs to always hold latest values inside async callbacks / event handlers
+  const currentPageRef = useRef(document.readingProgress?.current_page ?? 1);
+  const totalPagesRef = useRef(document.readingProgress?.total_pages ?? 1);
+  // Guard to prevent audio timeupdate from writing before it has seeked to saved position
+  const audioReadyRef = useRef(false);
   const progressPercent = totalPages > 0 ? Math.min(100, Math.round((currentPage / totalPages) * 100)) : 0;
 
   // Audio specific states & refs
@@ -46,6 +52,10 @@ export default function ReadingRoom({ document, onClose, onProgressSaved }: Read
   const [isAiLoading, setIsAiLoading] = useState(false);
   const chatMessagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Keep refs in sync with state so async save always reads latest values
+  useEffect(() => { currentPageRef.current = currentPage; }, [currentPage]);
+  useEffect(() => { totalPagesRef.current = totalPages; }, [totalPages]);
+
   const saveProgress = useCallback(async () => {
     if (role !== 'student') {
       return;
@@ -55,11 +65,15 @@ export default function ReadingRoom({ document, onClose, onProgressSaved }: Read
       window.clearTimeout(saveTimeoutRef.current);
       saveTimeoutRef.current = null;
     }
-    autoSavePendingRef.current = false;
+    setPendingSave(false);
+
+    // Read from refs so we always get the latest values even inside stale closures
+    const latestPage = currentPageRef.current;
+    const latestTotal = totalPagesRef.current;
 
     // Automatically set total pages to at least current page to avoid capping back to 1
-    const nextTotalPages = Math.max(1, totalPages, currentPage);
-    const nextCurrentPage = Math.min(Math.max(1, currentPage), nextTotalPages);
+    const nextTotalPages = Math.max(1, latestTotal, latestPage);
+    const nextCurrentPage = Math.min(Math.max(1, latestPage), nextTotalPages);
 
     setIsSavingProgress(true);
 
@@ -72,6 +86,8 @@ export default function ReadingRoom({ document, onClose, onProgressSaved }: Read
       if (progress) {
         setCurrentPage(progress.current_page);
         setTotalPages(progress.total_pages);
+        currentPageRef.current = progress.current_page;
+        totalPagesRef.current = progress.total_pages;
         lastSavedPageRef.current = progress.current_page;
         onProgressSaved?.(progress);
       }
@@ -82,10 +98,10 @@ export default function ReadingRoom({ document, onClose, onProgressSaved }: Read
     } finally {
       setIsSavingProgress(false);
     }
-  }, [currentPage, document.id, onProgressSaved, totalPages, role]);
+  }, [document.id, onProgressSaved, role]);
 
   const queueProgressSave = () => {
-    autoSavePendingRef.current = true;
+    setPendingSave(true);
   };
 
   const flushPendingProgressSave = useCallback(async () => {
@@ -93,23 +109,23 @@ export default function ReadingRoom({ document, onClose, onProgressSaved }: Read
       window.clearTimeout(saveTimeoutRef.current);
       saveTimeoutRef.current = null;
     }
-
-    if (!autoSavePendingRef.current) {
-      return;
-    }
-
-    autoSavePendingRef.current = false;
+    setPendingSave(false);
     await saveProgress();
   }, [saveProgress]);
 
   const handleClose = async () => {
-    await flushPendingProgressSave();
+    // Flush any pending save before closing
+    if (saveTimeoutRef.current) {
+      window.clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = null;
+    }
+    await saveProgress();
     onClose();
   };
 
-  // Debounced auto save for progress
+  // Debounced auto save: triggers whenever pendingSave flips to true
   useEffect(() => {
-    if (!autoSavePendingRef.current) {
+    if (!pendingSave) {
       return undefined;
     }
 
@@ -119,9 +135,8 @@ export default function ReadingRoom({ document, onClose, onProgressSaved }: Read
 
     saveTimeoutRef.current = window.setTimeout(() => {
       saveTimeoutRef.current = null;
-      autoSavePendingRef.current = false;
       void saveProgress();
-    }, 800); // 800ms debounce to save server writes
+    }, 800); // 800ms debounce
 
     return () => {
       if (saveTimeoutRef.current) {
@@ -129,7 +144,7 @@ export default function ReadingRoom({ document, onClose, onProgressSaved }: Read
         saveTimeoutRef.current = null;
       }
     };
-  }, [currentPage, saveProgress, totalPages]);
+  }, [pendingSave, currentPage, totalPages, saveProgress]);
 
   // Real-time multi-device reading progress synchronization
   useEffect(() => {
@@ -195,17 +210,19 @@ export default function ReadingRoom({ document, onClose, onProgressSaved }: Read
 
   const handleTimeUpdate = () => {
     if (!audioRef.current) return;
+    // Guard: don't record progress until audio has seeked to saved position
+    if (!audioReadyRef.current) return;
     const current = audioRef.current.currentTime;
     setCurrentTime(current);
 
     // Save playback position to progress: 1 sec = 1 page
     const currentSec = Math.max(1, Math.floor(current));
-    if (currentSec !== currentPage) {
+    if (currentSec !== currentPageRef.current) {
       setCurrentPage(currentSec);
+      currentPageRef.current = currentSec;
 
       // Save progress to database every 10 seconds of continuous listening for students
       if (role === 'student' && Math.abs(currentSec - lastSavedPageRef.current) >= 10) {
-        autoSavePendingRef.current = true;
         void saveProgress();
       } else {
         queueProgressSave();
@@ -217,8 +234,18 @@ export default function ReadingRoom({ document, onClose, onProgressSaved }: Read
     if (!audioRef.current) return;
     const dur = audioRef.current.duration;
     setDuration(dur);
-    setTotalPages(Math.max(1, Math.floor(dur)));
-    queueProgressSave();
+    const totalSecs = Math.max(1, Math.floor(dur));
+    setTotalPages(totalSecs);
+    totalPagesRef.current = totalSecs;
+
+    // Seek audio back to saved position from previous session
+    const savedSec = document.readingProgress?.current_page ?? 0;
+    if (savedSec > 1 && savedSec < totalSecs) {
+      audioRef.current.currentTime = savedSec;
+      setCurrentTime(savedSec);
+    }
+    // Mark audio as ready so handleTimeUpdate starts recording
+    audioReadyRef.current = true;
   };
 
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
