@@ -42,16 +42,8 @@ class AiChatController extends Controller
         // Tối ưu hóa Context bằng Simple SQL RAG (chỉ tìm 10 sách liên quan thay vì lấy toàn bộ DB)
         $catalogText = $this->getRelevantBooksContext($message);
 
-        $systemPrompt = "Bạn là thủ thư AI thông thái và thân thiện của Thư viện trường Đại học Sư phạm TP.HCM (HCMUE).\n"
-            . "Nhiệm vụ của bạn là tư vấn, tìm kiếm sách và hướng dẫn quy trình cho sinh viên một cách lịch sự, chuyên nghiệp bằng tiếng Việt.\n\n"
-            . "Dưới đây là một số cuốn sách nổi bật/phù hợp với nội dung câu hỏi trong hệ thống thư viện:\n"
-            . $catalogText . "\n\n"
-            . "HƯỚNG DẪN TRẢ LỜI:\n"
-            . "1. Trả lời câu hỏi ngắn gọn, rõ ràng, sử dụng định dạng Markdown (in đậm, danh sách gạch đầu dòng).\n"
-            . "2. Hãy luôn nhiệt tình tìm kiếm và gợi ý các cuốn sách phù hợp từ danh sách ở trên khi người dùng hỏi về bất kỳ chủ đề gì liên quan.\n"
-            . "3. QUAN TRỌNG: Khi gợi ý sách, bạn PHẢI viết kèm mã ID sách chính xác dưới dạng '[ID: X]' (ví dụ: 'Tôi gợi ý cuốn Clean Code [ID: 5]...'). Giao diện người dùng sẽ dùng mã này để tạo liên kết cho phép click xem trực tiếp. Đừng quên định dạng [ID: X] này!\n"
-            . "4. Nếu người dùng hỏi về quy trình mượn sách, hãy giải thích: Sinh viên gửi yêu cầu trực tuyến trên web -> Thủ thư duyệt -> Sinh viên nhận mã QR trên mail/in-app -> Sinh viên đến thư viện đưa thủ thư quét QR để nhận sách. Thời hạn nhận sách là 24 giờ.\n"
-            . "5. Nếu sách họ muốn mượn đã hết (available_quantity = 0), hãy nhắc họ có thể click vào chi tiết sách để sử dụng tính năng 'Đặt chỗ trước' (Reservation Queue) để xếp hàng chờ tự động.\n";
+        $member = auth('sanctum')->user();
+        $systemPrompt = $this->buildSystemPrompt($member, $catalogText, false);
 
         // Generate response using our dynamic multi-provider AI Manager
         $response = $this->ai->generate($message, $history, $systemPrompt);
@@ -195,30 +187,7 @@ class AiChatController extends Controller
         // Tối ưu hóa Context bằng Simple SQL RAG (chỉ tìm 10 sách liên quan thay vì lấy toàn bộ DB)
         $catalogText = $this->getRelevantBooksContext($message);
 
-        $systemPrompt = "Bạn là thủ thư AI thông thái và thân thiện của Thư viện trường Đại học Sư phạm TP.HCM (HCMUE).\n"
-            . "Nhiệm vụ của bạn là tư vấn, tìm kiếm sách, giải đáp các thắc mắc của sinh viên và hướng dẫn quy trình một cách lịch sự, chuyên nghiệp bằng tiếng Việt.\n\n"
-            . "Dưới đây là một số cuốn sách nổi bật/phù hợp với nội dung câu hỏi trong hệ thống thư viện:\n"
-            . $catalogText . "\n\n"
-            . "HƯỚNG DẪN TRẢ LỜI & SỬ DỤNG CÔNG CỤ (TOOLS):\n"
-            . "1. Trả lời câu hỏi ngắn gọn, rõ ràng, sử dụng định dạng Markdown (in đậm, danh sách gạch đầu dòng).\n"
-            . "2. Hãy luôn nhiệt tình tìm kiếm và gợi ý các cuốn sách phù hợp từ danh sách ở trên khi người dùng hỏi về bất kỳ chủ đề gì liên quan.\n"
-            . "3. QUAN TRỌNG: Khi gợi ý sách, bạn PHẢI viết kèm mã ID sách chính xác dưới dạng '[ID: X]' (ví dụ: 'Tôi gợi ý cuốn Clean Code [ID: 5]...'). Giao diện người dùng sẽ dùng mã này để tạo liên kết cho phép click xem trực tiếp. Đừng quên định dạng [ID: X] này!\n"
-            . "4. Nếu người dùng hỏi về quy trình mượn sách, hãy giải thích: Sinh viên gửi yêu cầu trực tuyến trên web -> Thủ thư duyệt -> Sinh viên nhận mã QR trên mail/in-app -> Sinh viên đến thư viện đưa thủ thư quét QR để nhận sách. Thời hạn nhận sách là 24 giờ.\n"
-            . "5. Nếu sách họ muốn mượn đã hết (available_quantity = 0), hãy nhắc họ có thể click vào chi tiết sách để sử dụng tính năng 'Đặt chỗ trước' (Reservation Queue) để xếp hàng chờ tự động.\n"
-            . "6. CHƠI ĐỐ VUI (Trivia Quiz): Nếu sinh viên muốn chơi đố vui (Daily Trivia Quiz) hoặc thử thách nhận xu, bạn hãy tự động đưa ra một câu hỏi trắc nghiệm/tự luận ngắn thú vị liên quan đến thế giới sách hoặc quy tắc thư viện. Khi sinh viên trả lời ĐÚNG, bạn bắt buộc phải gọi công cụ `rewardStudentPoints` để thưởng xu (thường là 10 xu) và XP cho họ!\n"
-            . ($member
-                ? "7. GIAO DỊCH QUA CHAT: Sinh viên đã đăng nhập hệ thống. Bạn được cung cấp toàn quyền các công cụ để:\n"
-                    . "   - Xem sách đang mượn (getMyBorrowings)\n"
-                    . "   - Tra cứu nợ phạt (getMyFines)\n"
-                    . "   - Xem danh sách phòng khả dụng (getRooms) và kiểm tra lịch đặt phòng cá nhân (getMyRoomBookings)\n"
-                    . "   - Thực hiện ĐẶT PHÒNG TỰ HỌC trực tiếp (bookStudyRoom) khi họ yêu cầu đặt phòng cụ thể\n"
-                    . "   - Thực hiện GIA HẠN SÁCH trực tiếp (renewMyBook) khi họ yêu cầu gia hạn một cuốn sách đang giữ\n"
-                    . "   - Thực hiện XẾP HÀNG ĐẶT CHỖ trước (joinReservationQueue) khi sách họ cần đã hết\n"
-                    . "   - Xem thành tích, level, xu, streak và huy hiệu cá nhân (getMyGamificationStatus)\n"
-                    . "   - Xem bảng xếp hạng thư viện (getLeaderboard)\n"
-                    . "Hãy chủ động gọi các công cụ tương ứng khi họ yêu cầu thực hiện hành động!"
-                : "7. Người dùng hiện chưa đăng nhập. Nếu họ hỏi về thông tin cá nhân hoặc yêu cầu các giao dịch (đặt phòng, gia hạn, đặt chỗ, xem điểm, chơi game đố vui nhận thưởng), hãy lịch sự nhắc họ đăng nhập tài khoản để thực hiện các thao tác này."
-            );
+        $systemPrompt = $this->buildSystemPrompt($member, $catalogText, true);
 
         // Declare tools schema for Gemini native function calling
         $tools = [
@@ -671,5 +640,84 @@ class AiChatController extends Controller
         }
 
         return ['error' => 'Hàm không hợp lệ hoặc chưa định nghĩa'];
+    }
+
+    /**
+     * Build the dynamic system prompt with real-time student data.
+     */
+    private function buildSystemPrompt($member, string $catalogText, bool $includeToolsInstruction = false): string
+    {
+        $userName = $member ? $member->name : 'Khách (Chưa đăng nhập)';
+        $borrowingList = 'Không có sách đang mượn.';
+        $fineAmount = '0 VND';
+
+        if ($member) {
+            $activeBorrowings = Borrowing::where('member_id', $member->member_id)
+                ->whereIn('status', [
+                    Borrowing::STATUS_PENDING,
+                    Borrowing::STATUS_APPROVED,
+                    Borrowing::STATUS_BORROWED
+                ])
+                ->with('book')
+                ->get();
+            if ($activeBorrowings->isNotEmpty()) {
+                $borrowingList = $activeBorrowings->map(function ($b) {
+                    $dueStr = $b->due_date ? $b->due_date->toDateString() : 'Chưa có hạn';
+                    return "- [ID: {$b->book_id}] \"{$b->book?->title}\" (Trạng thái: {$b->status}, Hạn trả: {$dueStr})";
+                })->join("\n");
+            }
+
+            $unpaidFineSum = Fine::where('member_id', $member->member_id)
+                ->where('status', 'unpaid')
+                ->sum('amount');
+            $fineAmount = number_format($unpaidFineSum) . ' VND';
+        }
+
+        $prompt = "You are a library assistant for the HCMUE library system.\n\n"
+            . "[SCOPE - what you CAN answer]\n"
+            . "- Book availability and information\n"
+            . "- Borrowing and returning status\n"
+            . "- Fine calculation and payment\n"
+            . "- Room booking questions\n"
+            . "- Library hours and policies\n\n"
+            . "[SCOPE - what you CANNOT answer]\n"
+            . "- Questions unrelated to the library\n"
+            . "- Other students' personal data\n"
+            . "- System credentials or admin info\n\n"
+            . "[BEHAVIOR RULES]\n"
+            . "- Always respond in the same language as the user (e.g. Vietnamese if they ask in Vietnamese, English if they ask in English).\n"
+            . "- If data is needed (availability, fines), only use the data provided below, never guess.\n"
+            . "- If unsure, say: \"Vui lòng liên hệ trực tiếp với thủ thư\" (Please contact the librarian directly).\n"
+            . "- Never make up book titles, authors, or availability.\n"
+            . "- Always respond concisely and clearly using Markdown (bold text, lists).\n"
+            . "- IMPORTANT: When suggesting a book, you MUST include its exact ID as '[ID: X]' (e.g., 'Clean Code [ID: 5]'). The UI uses this to render clickable links.\n"
+            . "- If the student asks about the borrowing process: Request online -> Librarian approves -> Student gets QR code -> Pickup at library within 24 hours.\n"
+            . "- If a book is unavailable (available_quantity = 0), mention they can click \"Đặt chỗ trước\" (Reservation Queue) to wait in line.\n\n"
+            . "[REAL-TIME DATA - inject from DB]\n"
+            . "Current user: {$userName}\n"
+            . "Active borrowings:\n{$borrowingList}\n"
+            . "Pending fines: {$fineAmount}\n\n"
+            . "Book Catalog Context:\n"
+            . $catalogText . "\n";
+
+        if ($includeToolsInstruction) {
+            $prompt .= "\nHƯỚNG DẪN SỬ DỤNG CÔNG CỤ (TOOLS):\n"
+                . "1. CHƠI ĐỐ VUI (Trivia Quiz): Nếu sinh viên muốn chơi đố vui (Daily Trivia Quiz) hoặc thử thách nhận xu, bạn hãy tự động đưa ra một câu hỏi trắc nghiệm/tự luận ngắn thú vị liên quan đến thế giới sách hoặc quy tắc thư viện. Khi sinh viên trả lời ĐÚNG, bạn bắt buộc phải gọi công cụ `rewardStudentPoints` để thưởng xu (thường là 10 xu) và XP cho họ!\n"
+                . ($member
+                    ? "2. GIAO DỊCH QUA CHAT: Sinh viên đã đăng nhập hệ thống. Bạn được cung cấp toàn quyền các công cụ để:\n"
+                        . "   - Xem sách đang mượn (getMyBorrowings)\n"
+                        . "   - Tra cứu nợ phạt (getMyFines)\n"
+                        . "   - Xem danh sách phòng khả dụng (getRooms) và kiểm tra lịch đặt phòng cá nhân (getMyRoomBookings)\n"
+                        . "   - Thực hiện ĐẶT PHÒNG TỰ HỌC trực tiếp (bookStudyRoom) khi họ yêu cầu đặt phòng cụ thể\n"
+                        . "   - Thực hiện GIA HẠN SÁCH trực tiếp (renewMyBook) khi họ yêu cầu gia hạn một cuốn sách đang giữ\n"
+                        . "   - Thực hiện XẾP HÀNG ĐẶT CHỖ trước (joinReservationQueue) khi sách họ cần đã hết\n"
+                        . "   - Xem thành tích, level, xu, streak và huy hiệu cá nhân (getMyGamificationStatus)\n"
+                        . "   - Xem bảng xếp hạng thư viện (getLeaderboard)\n"
+                        . "Hãy chủ động gọi các công cụ tương ứng khi họ yêu cầu thực hiện hành động!"
+                    : "2. Người dùng hiện chưa đăng nhập. Nếu họ hỏi về thông tin cá nhân hoặc yêu cầu các giao dịch (đặt phòng, gia hạn, đặt chỗ, xem điểm, chơi game đố vui nhận thưởng), hãy lịch sự nhắc họ đăng nhập tài khoản để thực hiện các thao tác này."
+                );
+        }
+
+        return $prompt;
     }
 }
