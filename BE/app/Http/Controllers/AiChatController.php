@@ -519,6 +519,10 @@ class AiChatController extends Controller
                     return ['error' => 'Khung giờ bạn chọn đã bị trùng lịch đặt phòng. Vui lòng chọn khung giờ hoặc phòng khác.'];
                 }
 
+                $settings = LibrarySetting::singleton();
+                $requiresApproval = (bool) ($settings->room_booking_requires_approval ?? LibrarySetting::DEFAULT_ROOM_BOOKING_REQUIRES_APPROVAL);
+                $status = $requiresApproval ? RoomBooking::STATUS_PENDING : RoomBooking::STATUS_APPROVED;
+
                 $booking = RoomBooking::create([
                     'room_id' => $roomId,
                     'member_id' => $member->member_id,
@@ -527,7 +531,7 @@ class AiChatController extends Controller
                     'end_time' => $endTime,
                     'purpose' => $purpose,
                     'group_size' => $groupSize,
-                    'status' => RoomBooking::STATUS_APPROVED, // Tự động duyệt thông minh trên chatbot
+                    'status' => $status,
                     'booking_code' => RoomBooking::generateBookingCode(),
                 ]);
 
@@ -539,7 +543,9 @@ class AiChatController extends Controller
 
                 return [
                     'success' => true,
-                    'message' => "Đặt phòng học nhóm {$room->name} thành công! Ngày: {$date}, Khung giờ: {$startTime} - {$endTime}. Mã đặt phòng: **{$booking->booking_code}**."
+                    'message' => $requiresApproval
+                        ? "Đăng ký đặt phòng học nhóm {$room->name} thành công! Ngày: {$date}, Khung giờ: {$startTime} - {$endTime}. Yêu cầu đang ở trạng thái chờ thủ thư duyệt. Mã đặt phòng: **{$booking->booking_code}**."
+                        : "Đặt phòng học nhóm {$room->name} thành công! Ngày: {$date}, Khung giờ: {$startTime} - {$endTime}. Mã đặt phòng: **{$booking->booking_code}**."
                 ];
             }
 

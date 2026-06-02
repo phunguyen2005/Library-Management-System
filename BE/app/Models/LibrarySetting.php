@@ -25,7 +25,7 @@ class LibrarySetting extends Model
     public const DEFAULT_ROOM_ADVANCE_BOOKING_DAYS = 7;
     public const DEFAULT_ROOM_MIN_GROUP_SIZE = 2;
     public const DEFAULT_ROOM_CHECKIN_WINDOW_MINUTES = 15;
-    public const DEFAULT_ROOM_BOOKING_REQUIRES_APPROVAL = false;
+    public const DEFAULT_ROOM_BOOKING_REQUIRES_APPROVAL = true;
     public const DEFAULT_ROOM_OPEN_TIME = '07:00';
     public const DEFAULT_ROOM_CLOSE_TIME = '21:00';
     public const DEFAULT_ROOM_CANCEL_DEADLINE_HOURS = 2;

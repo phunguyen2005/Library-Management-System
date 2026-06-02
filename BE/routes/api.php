@@ -187,6 +187,7 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/admin/room-bookings/{id}/check-in', [RoomBookingController::class, 'adminCheckIn']);
             Route::post('/admin/room-bookings/check-in-code', [RoomBookingController::class, 'adminCheckInCode']);
             Route::post('/admin/room-bookings/{id}/check-out', [RoomBookingController::class, 'adminCheckOut']);
+            Route::post('/admin/room-bookings/{id}/cancel-check-in', [RoomBookingController::class, 'adminCancelCheckIn']);
             Route::post('/rooms', [RoomController::class, 'store']);
             Route::put('/rooms/{room}', [RoomController::class, 'update']);
             Route::delete('/rooms/{room}', [RoomController::class, 'destroy']);

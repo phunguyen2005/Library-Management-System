@@ -115,6 +115,12 @@ export async function adminCheckOutRoomBooking(bookingId: number) {
   });
 }
 
+export async function adminCancelCheckInRoomBooking(bookingId: number) {
+  return apiRequest<{ message: string; booking: RoomBooking }>(`/admin/room-bookings/${bookingId}/cancel-check-in`, {
+    method: 'POST',
+  });
+}
+
 export async function fetchRoomBookingStats(startDate?: string, endDate?: string) {
   const query = new URLSearchParams();
   if (startDate) query.append('start_date', startDate);

@@ -11,6 +11,7 @@ import {
   rejectRoomBooking, 
   adminCheckInRoomBooking, 
   adminCheckOutRoomBooking,
+  adminCancelCheckInRoomBooking,
   checkInRoomBooking,
   fetchRoomBookingStats,
   createRoomBooking
@@ -363,6 +364,18 @@ export default function AdminRoomBookings() {
     }
   };
 
+  // Admin cancel check-in on behalf
+  const handleCancelCheckIn = async (id: number) => {
+    if (!confirm('Bạn có chắc chắn muốn hủy check-in cho lượt đặt phòng này?')) return;
+    try {
+      const res = await adminCancelCheckInRoomBooking(id);
+      emitToast({ tone: 'success', title: 'Hủy check-in thành công', message: res.message });
+      void loadBookings(currentPage);
+    } catch (err: any) {
+      emitToast({ tone: 'error', title: 'Thất bại', message: getErrorMessage(err, 'Có lỗi xảy ra.') });
+    }
+  };
+
   const getStatusLabel = (status: string) => {
     switch (status) {
       case 'pending': return { text: 'Chờ duyệt', color: 'bg-amber-100 text-amber-800 border-amber-200' };
@@ -703,12 +716,20 @@ export default function AdminRoomBookings() {
                           )}
 
                           {isApproved && b.check_in_at && !b.check_out_at && (
-                            <button
-                              onClick={() => handleAdminCheckOut(b.booking_id)}
-                              className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg cursor-pointer"
-                            >
-                              Check-out
-                            </button>
+                            <div className="flex gap-2 justify-end">
+                              <button
+                                onClick={() => handleAdminCheckOut(b.booking_id)}
+                                className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg cursor-pointer"
+                              >
+                                Check-out
+                              </button>
+                              <button
+                                onClick={() => handleCancelCheckIn(b.booking_id)}
+                                className="bg-rose-100 hover:bg-rose-200 text-rose-700 text-xs font-bold px-3 py-1.5 rounded-lg cursor-pointer"
+                              >
+                                Hủy Check-in
+                              </button>
+                            </div>
                           )}
                         </td>
                       </tr>

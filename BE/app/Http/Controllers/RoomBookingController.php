@@ -678,6 +678,59 @@ class RoomBookingController extends Controller
     }
 
     /**
+     * Admin cancel check-in (revert check-in) for a room booking (Admin).
+     */
+    public function adminCancelCheckIn(Request $request, int $id): JsonResponse
+    {
+        $admin = $request->user();
+
+        $booking = DB::transaction(function () use ($id, $admin) {
+            $booking = RoomBooking::lockForUpdate()->findOrFail($id);
+
+            if (is_null($booking->check_in_at)) {
+                throw new \Exception('Lượt đặt phòng này chưa được check-in.');
+            }
+
+            if (! is_null($booking->check_out_at) || $booking->status === RoomBooking::STATUS_COMPLETED) {
+                throw new \Exception('Lượt đặt phòng này đã kết thúc hoặc đã check-out, không thể hủy check-in.');
+            }
+
+            $booking->check_in_at = null;
+            $booking->save();
+
+            // Deduct check-in XP and Points
+            if ($booking->member) {
+                app(\App\Services\GamifyService::class)->awardXpAndPoints(
+                    $booking->member,
+                    -40,
+                    -10,
+                    'room_checkin_cancel',
+                    'Hủy check-in phòng học nhóm: ' . ($booking->room?->name ?? 'Phòng tự học')
+                );
+            }
+
+            AuditLoggerService::log(
+                'room_booking_admin_cancel_checkin',
+                'Thủ thư đã hủy check-in phòng ' . $booking->room?->name . ' của ' . $booking->member?->name,
+                $admin
+            );
+
+            return $booking;
+        });
+
+        try {
+            broadcast(new \App\Events\RoomBookingUpdated($booking))->toOthers();
+        } catch (\Exception $e) {
+            // Ignore
+        }
+
+        return response()->json([
+            'message' => 'Đã hủy check-in thành công.',
+            'booking' => $booking
+        ]);
+    }
+
+    /**
      * Statistics for Room Bookings.
      */
     public function statistics(Request $request): JsonResponse

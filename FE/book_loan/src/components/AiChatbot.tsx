@@ -367,14 +367,19 @@ export default function AiChatbot() {
     <>
       <motion.button
         type="button"
-        drag="y"
-        dragConstraints={{ top: 20, bottom: typeof window !== 'undefined' ? window.innerHeight - 100 : 600 }}
+        drag
+        dragConstraints={{
+          top: typeof window !== 'undefined' ? -window.innerHeight + 120 : -600,
+          bottom: 20,
+          left: typeof window !== 'undefined' ? -window.innerWidth + 80 : -350,
+          right: 20
+        }}
         dragElastic={0.1}
         dragMomentum={false}
         onClick={() => setIsOpen(!isOpen)}
         aria-label="Trợ lý AI"
         className={`fixed z-40 flex items-center justify-center rounded-full bg-primary text-white shadow-xl shadow-primary/30 active:scale-95 cursor-pointer glow-pulse touch-none transition-all duration-300
-          bottom-20 right-4 h-12 w-12 md:bottom-6 md:right-6 md:h-14 md:w-14
+          bottom-28 right-4 h-12 w-12 md:bottom-6 md:right-6 md:h-14 md:w-14
           ${isScrolling ? 'opacity-20 scale-75 pointer-events-none md:opacity-100 md:scale-100 md:pointer-events-auto' : 'opacity-100 scale-100'}`}
       >
         <span className="material-symbols-outlined text-2xl md:text-3xl animate-pulse">smart_toy</span>
