@@ -47,5 +47,6 @@ return [
         'file' => 'tệp',
         'loan_period_days' => 'thời hạn mượn',
         'max_active_loans' => 'số lượng mượn tối đa',
+        'reason' => 'lý do',
     ],
 ];

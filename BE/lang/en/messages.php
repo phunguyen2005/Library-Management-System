@@ -474,4 +474,14 @@ return [
         'Database queue tables are available.' => 'Database queue tables are available.',
         'Storage path is not writable.' => 'Storage path is not writable.',
     ],
+    'validation' => [
+        'file_required' => 'Please select a file to upload.',
+        'file_invalid' => 'The uploaded file is invalid.',
+        'file_extensions' => 'File format not supported. Only PDF, EPUB, MP3, WAV, M4A, PPT, PPTX are accepted.',
+        'file_max' => 'File size exceeds the 50 MB limit.',
+        'file_uploaded' => 'File is too large or upload failed. Please check connection and file size (max 50 MB).',
+        'password_letters' => 'The password must contain at least one letter.',
+        'password_numbers' => 'The password must contain at least one number.',
+        'current_password_required' => 'Please enter your current password when changing password.',
+    ],
 ];

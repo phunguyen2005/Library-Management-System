@@ -40,17 +40,18 @@ class UpdateProfileRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'name.required' => 'Vui lòng nhập họ và tên.',
-            'name.string' => 'Họ và tên không hợp lệ.',
-            'name.max' => 'Họ và tên không được vượt quá 255 ký tự.',
-            'phone_number.string' => 'Số điện thoại không hợp lệ.',
-            'phone_number.max' => 'Số điện thoại không được vượt quá 15 ký tự.',
-            'current_password.required_with' => 'Vui lòng nhập mật khẩu hiện tại khi đổi mật khẩu.',
-            'current_password.string' => 'Mật khẩu hiện tại không hợp lệ.',
-            'password.confirmed' => 'Xác nhận mật khẩu mới không khớp.',
-            'password.min' => 'Mật khẩu mới phải có ít nhất 8 ký tự.',
-            'password.letters' => 'Mật khẩu mới phải có ít nhất một chữ cái.',
-            'password.numbers' => 'Mật khẩu mới phải có ít nhất một chữ số.',
+            'name.required'                  => __('validation.required', ['attribute' => __('validation.attributes.name')]),
+            'name.string'                    => __('validation.string', ['attribute' => __('validation.attributes.name')]),
+            'name.max'                       => __('validation.max.string', ['attribute' => __('validation.attributes.name'), 'max' => 255]),
+            'phone_number.string'            => __('validation.string', ['attribute' => __('validation.attributes.phone_number')]),
+            'phone_number.max'               => __('validation.max.string', ['attribute' => __('validation.attributes.phone_number'), 'max' => 15]),
+            'current_password.required'      => __('messages.validation.current_password_required'),
+            'current_password.required_with' => __('messages.validation.current_password_required'),
+            'current_password.string'        => __('validation.string', ['attribute' => __('validation.attributes.current_password')]),
+            'password.confirmed'             => __('validation.confirmed', ['attribute' => __('validation.attributes.password')]),
+            'password.min'                   => __('validation.min.string', ['attribute' => __('validation.attributes.password'), 'min' => 8]),
+            'password.letters'               => __('messages.validation.password_letters'),
+            'password.numbers'               => __('messages.validation.password_numbers'),
         ];
     }
 }

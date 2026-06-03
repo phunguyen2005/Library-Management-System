@@ -41,7 +41,18 @@ export default function LanguageToggle({ className = '' }: LanguageToggleProps) 
   const currentLangObj = LANGUAGES.find(l => l.code === currentLanguage) || LANGUAGES[0];
 
   const handleSelectLanguage = (langCode: AppLanguage) => {
-    setAppLanguage(langCode);
+    if (langCode === currentLanguage) {
+      setIsOpen(false);
+      return;
+    }
+
+    const targetLang = LANGUAGES.find(l => l.code === langCode);
+    const targetLabel = targetLang ? targetLang.label : langCode;
+    const confirmMsg = t('language.confirmChange', { lang: targetLabel });
+
+    if (window.confirm(confirmMsg)) {
+      setAppLanguage(langCode);
+    }
     setIsOpen(false);
   };
 

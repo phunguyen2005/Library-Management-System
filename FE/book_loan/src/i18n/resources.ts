@@ -30,6 +30,7 @@ export const resources = {
         label: 'Ngôn ngữ',
         current: 'Tiếng Việt',
         target: 'EN',
+        confirmChange: 'Bạn có chắc chắn muốn đổi ngôn ngữ sang {{lang}} không?',
       },
       theme: {
         light: 'Chuyển sang chế độ sáng',
@@ -360,6 +361,7 @@ export const resources = {
         label: 'Language',
         current: 'English',
         target: 'VI',
+        confirmChange: 'Are you sure you want to change the language to {{lang}}?',
       },
       theme: {
         light: 'Switch to light mode',
@@ -691,7 +693,8 @@ export const resources = {
       "toggleToVietnamese": "切换为越南文",
       "label": "语言",
       "current": "简体中文",
-      "target": "ZH"
+      "target": "ZH",
+      "confirmChange": "您确定要将语言切换为 {{lang}} 吗？"
     },
     "theme": {
       "light": "切换至浅色模式",
@@ -1020,7 +1023,8 @@ export const resources = {
       "toggleToVietnamese": "ベトナム語に切り替え",
       "label": "言語",
       "current": "日本語",
-      "target": "JA"
+      "target": "JA",
+      "confirmChange": "言語を {{lang}} に切り替えますか？"
     },
     "theme": {
       "light": "ライトモードに切り替え",
@@ -1349,7 +1353,8 @@ export const resources = {
       "toggleToVietnamese": "베트남어 인터페이스로 전환",
       "label": "언어",
       "current": "한국어",
-      "target": "KO"
+      "target": "KO",
+      "confirmChange": "언어를 {{lang}}(으)로 변경하시겠습니까?"
     },
     "theme": {
       "light": "라이트 모드로 전환",

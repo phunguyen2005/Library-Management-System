@@ -10,7 +10,7 @@ use Symfony\Component\HttpFoundation\Response;
 
 class SetLocale
 {
-    private const SUPPORTED_LOCALES = ['vi', 'en'];
+    private const SUPPORTED_LOCALES = ['vi', 'en', 'zh', 'ja', 'ko'];
 
     public function handle(Request $request, Closure $next): Response
     {
@@ -22,7 +22,8 @@ class SetLocale
     private function resolveLocale(Request $request): string
     {
         if (app()->runningUnitTests()) {
-            return $request->header('Accept-Language') === 'en' ? 'en' : 'vi';
+            $lang = $request->header('Accept-Language');
+            return in_array($lang, self::SUPPORTED_LOCALES, true) ? $lang : 'vi';
         }
 
         $header = strtolower((string) $request->header('Accept-Language', ''));

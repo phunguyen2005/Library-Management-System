@@ -26,11 +26,11 @@ class DigitalFileUploadRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'file.required'   => 'Vui lòng chọn tệp tin để tải lên.',
-            'file.file'       => 'Tệp tải lên không hợp lệ.',
-            'file.extensions' => 'Định dạng tệp không được hỗ trợ. Chỉ chấp nhận: PDF, EPUB, MP3, WAV, M4A, PPT, PPTX.',
-            'file.max'        => 'Kích thước tệp vượt quá giới hạn 50 MB.',
-            'file.uploaded'   => 'Tệp quá lớn hoặc upload thất bại. Vui lòng kiểm tra kết nối và kích thước tệp (tối đa 50 MB).',
+            'file.required'   => __('messages.validation.file_required'),
+            'file.file'       => __('messages.validation.file_invalid'),
+            'file.extensions' => __('messages.validation.file_extensions'),
+            'file.max'        => __('messages.validation.file_max'),
+            'file.uploaded'   => __('messages.validation.file_uploaded'),
         ];
     }
 }

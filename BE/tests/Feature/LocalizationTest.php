@@ -334,6 +334,66 @@ class LocalizationTest extends TestCase
             ->assertJsonPath('data.0.raw_action', 'book_create');
     }
 
+    public function test_zh_ja_ko_locales(): void
+    {
+        $member = Member::query()->findOrFail(1);
+        $token = $member->createToken('student-access', ['role:student']);
+
+        // 1. Check Simplified Chinese (zh)
+        $this->withHeader('Accept-Language', 'zh')
+            ->postJson('/api/login', [
+                'identifier' => 'missing-account@example.com',
+                'password' => 'Library@2026',
+            ])
+            ->assertStatus(401)
+            ->assertJsonPath('message', '登录信息不正确。');
+
+        $this->withHeader('Accept-Language', 'zh')
+            ->withToken($token->plainTextToken)
+            ->putJson('/api/me', [
+                'name' => '',
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['name'])
+            ->assertJsonPath('errors.name.0', '请输入姓名。');
+
+        // 2. Check Japanese (ja)
+        $this->withHeader('Accept-Language', 'ja')
+            ->postJson('/api/login', [
+                'identifier' => 'missing-account@example.com',
+                'password' => 'Library@2026',
+            ])
+            ->assertStatus(401)
+            ->assertJsonPath('message', 'ログイン情報が正しくありません。');
+
+        $this->withHeader('Accept-Language', 'ja')
+            ->withToken($token->plainTextToken)
+            ->putJson('/api/me', [
+                'name' => '',
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['name'])
+            ->assertJsonPath('errors.name.0', '氏名を入力してください。');
+
+        // 3. Check Korean (ko)
+        $this->withHeader('Accept-Language', 'ko')
+            ->postJson('/api/login', [
+                'identifier' => 'missing-account@example.com',
+                'password' => 'Library@2026',
+            ])
+            ->assertStatus(401)
+            ->assertJsonPath('message', '로그인 정보가 정확하지 않습니다.');
+
+        $this->withHeader('Accept-Language', 'ko')
+            ->withToken($token->plainTextToken)
+            ->putJson('/api/me', [
+                'name' => '',
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['name'])
+            ->assertJsonPath('errors.name.0', '성명 필수 항목입니다. 입력해 주세요.');
+    }
+
     private function localizedBorrowingFixture(): Borrowing
     {
         $member = Member::query()->findOrFail(1);

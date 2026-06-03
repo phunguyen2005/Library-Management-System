@@ -473,4 +473,14 @@ return [
         'Database queue tables are available.' => 'Các bảng hàng đợi cơ sở dữ liệu khả dụng.',
         'Storage path is not writable.' => 'Không thể ghi vào đường dẫn lưu trữ.',
     ],
+    'validation' => [
+        'file_required' => 'Vui lòng chọn tệp tin để tải lên.',
+        'file_invalid' => 'Tệp tải lên không hợp lệ.',
+        'file_extensions' => 'Định dạng tệp không được hỗ trợ. Chỉ chấp nhận: PDF, EPUB, MP3, WAV, M4A, PPT, PPTX.',
+        'file_max' => 'Kích thước tệp vượt quá giới hạn 50 MB.',
+        'file_uploaded' => 'Tệp quá lớn hoặc upload thất bại. Vui lòng kiểm tra kết nối và kích thước tệp (tối đa 50 MB).',
+        'password_letters' => 'Mật khẩu mới phải có ít nhất một chữ cái.',
+        'password_numbers' => 'Mật khẩu mới phải có ít nhất một chữ số.',
+        'current_password_required' => 'Vui lòng nhập mật khẩu hiện tại khi đổi mật khẩu.',
+    ],
 ];
