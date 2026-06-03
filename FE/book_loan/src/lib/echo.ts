@@ -16,7 +16,7 @@ const echoConfig: any = {
   key: import.meta.env.VITE_PUSHER_APP_KEY || import.meta.env.VITE_REVERB_APP_KEY || 'hcmue_library_key',
   cluster: import.meta.env.VITE_PUSHER_APP_CLUSTER || 'ap1',
   forceTLS: true,
-  authEndpoint: `${baseDomain}/broadcasting/auth`,
+  authEndpoint: `${apiBase}/broadcasting/auth`,
   auth: {
     headers: {
       Authorization: token ? `Bearer ${token}` : '',

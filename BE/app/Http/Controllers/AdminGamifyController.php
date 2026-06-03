@@ -130,7 +130,7 @@ class AdminGamifyController extends Controller
 
         $badgeIds = $request->input('badge_ids');
         
-        $currentBadges = $member->badges()->pluck('earned_at', 'id')->toArray();
+        $currentBadges = $member->badges()->pluck('member_badges.earned_at', 'badges.id')->toArray();
         $syncData = [];
         foreach ($badgeIds as $id) {
             $syncData[$id] = [

@@ -238,3 +238,6 @@ Route::middleware('auth:sanctum')->group(function () {
         });
     });
 });
+
+use Illuminate\Support\Facades\Broadcast;
+Broadcast::routes(['middleware' => ['auth:sanctum']]);
