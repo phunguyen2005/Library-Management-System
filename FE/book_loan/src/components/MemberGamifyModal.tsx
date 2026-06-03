@@ -31,9 +31,9 @@ export default function MemberGamifyModal({ isOpen, member, onClose, onRefreshLi
   const [selectedRewardId, setSelectedRewardId] = useState<number | ''>('');
   const [ticketExpiry, setTicketExpiry] = useState('');
 
-  const loadMemberGamifyData = async () => {
+  const loadMemberGamifyData = async (isInitialLoad = true) => {
     if (!member) return;
-    setIsLoading(true);
+    if (isInitialLoad) setIsLoading(true);
     try {
       const [gamifyData, rewardsData] = await Promise.all([
         getMemberGamifyInfo(member.id),
@@ -47,15 +47,15 @@ export default function MemberGamifyModal({ isOpen, member, onClose, onRefreshLi
         title: 'Thất bại',
         message: getErrorMessage(err, 'Không thể tải dữ liệu gamification của thành viên.'),
       });
-      onClose();
+      if (isInitialLoad) onClose();
     } finally {
-      setIsLoading(false);
+      if (isInitialLoad) setIsLoading(false);
     }
   };
 
   useEffect(() => {
     if (isOpen && member) {
-      void loadMemberGamifyData();
+      void loadMemberGamifyData(true);
       setSelectedRewardId('');
       setTicketExpiry('');
     }
@@ -64,22 +64,22 @@ export default function MemberGamifyModal({ isOpen, member, onClose, onRefreshLi
   const handleToggleBadge = async (badgeId: number, currentlyEarned: boolean) => {
     if (!details || !member) return;
     
-    // Optimistic UI update
-    const nextBadgeIds = details.badges
-      .filter((b) => (b.id === badgeId ? !currentlyEarned : b.is_earned))
-      .map((b) => b.id);
+    // Proper Optimistic UI update
+    const updatedBadges = details.badges.map(b => 
+      b.id === badgeId ? { ...b, is_earned: !currentlyEarned } : b
+    );
+    setDetails({ ...details, badges: updatedBadges });
+    
+    const nextBadgeIds = updatedBadges.filter(b => b.is_earned).map(b => b.id);
 
     try {
       await syncMemberBadges(member.id, nextBadgeIds);
-      emitToast({
-        tone: 'success',
-        title: 'Thành công',
-        message: 'Đã cập nhật danh sách huy hiệu.',
-      });
-      // Reload
-      await loadMemberGamifyData();
+      // Background reload
+      await loadMemberGamifyData(false);
       onRefreshList();
     } catch (err) {
+      // Revert optimistic update on error
+      await loadMemberGamifyData(false);
       emitToast({
         tone: 'error',
         title: 'Thất bại',
@@ -105,7 +105,7 @@ export default function MemberGamifyModal({ isOpen, member, onClose, onRefreshLi
       });
       setSelectedRewardId('');
       setTicketExpiry('');
-      await loadMemberGamifyData();
+      await loadMemberGamifyData(false);
       onRefreshList();
     } catch (err) {
       emitToast({
@@ -132,7 +132,7 @@ export default function MemberGamifyModal({ isOpen, member, onClose, onRefreshLi
           nextStatus === 'active' ? 'Hoạt động' : nextStatus === 'used' ? 'Đã dùng' : 'Hết hạn'
         }`,
       });
-      await loadMemberGamifyData();
+      await loadMemberGamifyData(false);
     } catch (err) {
       emitToast({
         tone: 'error',
@@ -151,7 +151,7 @@ export default function MemberGamifyModal({ isOpen, member, onClose, onRefreshLi
         title: 'Thành công',
         message: 'Đã thu hồi vé quà tặng.',
       });
-      await loadMemberGamifyData();
+      await loadMemberGamifyData(false);
     } catch (err) {
       emitToast({
         tone: 'error',
