@@ -164,35 +164,41 @@ export default function MemberGamifyModal({ isOpen, member, onClose, onRefreshLi
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            transition={{ duration: 0.3 }}
+            className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
             onClick={onClose}
           />
           <motion.div
-            initial={{ scale: 0.95, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.95, opacity: 0 }}
-            className="relative bg-white rounded-2xl shadow-2xl w-full max-w-4xl h-[90vh] md:h-[80vh] flex flex-col overflow-hidden"
+            initial={{ scale: 0.95, y: 20, opacity: 0 }}
+            animate={{ scale: 1, y: 0, opacity: 1 }}
+            exit={{ scale: 0.95, y: 20, opacity: 0 }}
+            transition={{ type: "spring", bounce: 0, duration: 0.5 }}
+            className="relative bg-white rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.1)] w-full max-w-5xl h-[90vh] md:h-[85vh] flex flex-col overflow-hidden border border-slate-100"
           >
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 px-6 py-4">
-              <div>
-                <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                  <span className="material-symbols-outlined text-indigo-500">workspace_premium</span>
-                  Thiết lập Gamify & Quà tặng: <span className="text-indigo-600 font-extrabold">{member?.name}</span>
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Quản lý huy hiệu, cấp phát quà tặng thủ công hoặc thu hồi đặc quyền của thành viên.
-                </p>
+            <div className="flex items-center justify-between border-b border-slate-100 bg-white/80 backdrop-blur-xl px-6 py-5 z-10">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-500 border border-indigo-100">
+                  <span className="material-symbols-outlined text-[28px]">workspace_premium</span>
+                </div>
+                <div>
+                  <h3 className="text-xl font-extrabold text-slate-800 flex items-center gap-2">
+                    Hồ sơ thành tích: <span className="text-indigo-600">{member?.name}</span>
+                  </h3>
+                  <p className="text-sm text-slate-500 mt-0.5 font-medium">
+                    Quản lý huy hiệu, cấp vé đặc quyền và chỉ số cá nhân.
+                  </p>
+                </div>
               </div>
               <button
                 type="button"
                 onClick={onClose}
-                className="text-slate-400 hover:text-slate-600 rounded-lg p-1 hover:bg-slate-100"
+                className="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-full transition-colors"
               >
                 <span className="material-symbols-outlined">close</span>
               </button>
@@ -200,165 +206,230 @@ export default function MemberGamifyModal({ isOpen, member, onClose, onRefreshLi
 
             {/* Content Body */}
             {isLoading ? (
-              <div className="flex-1 flex items-center justify-center text-xs text-slate-400">
-                Đang tải dữ liệu gamification...
+              <div className="flex-1 flex flex-col items-center justify-center text-slate-400 gap-3">
+                <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+                <span className="text-sm font-medium">Đang đồng bộ dữ liệu...</span>
               </div>
             ) : !details ? (
-              <div className="flex-1 flex items-center justify-center text-xs text-slate-400">
+              <div className="flex-1 flex items-center justify-center text-sm text-slate-400 font-medium">
                 Không thể hiển thị thông tin học giả.
               </div>
             ) : (
-              <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+              <div className="flex-1 flex flex-col md:flex-row overflow-hidden bg-slate-50/30">
                 {/* Left Column: Stats & Badges */}
-                <div className="w-full md:w-1/2 border-r border-slate-100 p-6 overflow-y-auto flex flex-col gap-6">
+                <div className="w-full md:w-[55%] border-r border-slate-100 p-6 flex flex-col gap-8 overflow-y-auto">
                   {/* Stats Overview */}
                   <div>
-                    <h4 className="font-bold text-xs uppercase text-slate-400 tracking-wider mb-3">Chỉ số học giả</h4>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="bg-indigo-50/50 border border-indigo-100/60 rounded-xl p-3 text-center">
-                        <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Cấp độ / XP</span>
-                        <strong className="text-indigo-600 text-lg font-extrabold block mt-0.5">Lvl {details.level}</strong>
-                        <span className="text-xs text-indigo-500 font-bold">{details.xp} XP</span>
+                    <h4 className="font-bold text-sm text-slate-800 mb-4 flex items-center gap-2">
+                      <span className="material-symbols-outlined text-indigo-500 text-[20px]">monitoring</span>
+                      Chỉ số học giả
+                    </h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-gradient-to-br from-indigo-500 to-violet-600 rounded-2xl p-5 text-white shadow-lg shadow-indigo-200/50 relative overflow-hidden group">
+                        <div className="absolute right-[-10px] top-[-10px] opacity-10 transform group-hover:scale-110 transition-transform duration-500">
+                          <span className="material-symbols-outlined text-[100px]">military_tech</span>
+                        </div>
+                        <div className="relative z-10">
+                          <span className="text-xs uppercase font-bold text-indigo-100 tracking-wider">Cấp độ hiện tại</span>
+                          <strong className="text-3xl font-black block mt-1 mb-0.5">Lvl {details.level}</strong>
+                          <span className="text-sm font-medium text-indigo-100 bg-black/10 px-2.5 py-1 rounded-full inline-block mt-2">
+                            {details.xp.toLocaleString()} XP
+                          </span>
+                        </div>
                       </div>
-                      <div className="bg-amber-50/50 border border-amber-100/60 rounded-xl p-3 text-center">
-                        <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Số xu tích lũy</span>
-                        <strong className="text-amber-600 text-lg font-extrabold block mt-0.5">🪙 {details.points} xu</strong>
-                        <span className="text-xs text-slate-500">Chuỗi: {details.daily_streak} ngày 🔥</span>
+                      <div className="bg-gradient-to-br from-amber-400 to-orange-500 rounded-2xl p-5 text-white shadow-lg shadow-amber-200/50 relative overflow-hidden group">
+                        <div className="absolute right-[-10px] top-[-10px] opacity-10 transform group-hover:scale-110 transition-transform duration-500">
+                          <span className="material-symbols-outlined text-[100px]">monetization_on</span>
+                        </div>
+                        <div className="relative z-10">
+                          <span className="text-xs uppercase font-bold text-amber-100 tracking-wider">Tài sản (Xu)</span>
+                          <strong className="text-3xl font-black block mt-1 mb-0.5">{details.points.toLocaleString()}</strong>
+                          <span className="text-sm font-medium text-amber-100 bg-black/10 px-2.5 py-1 rounded-full inline-block mt-2 flex items-center gap-1 w-fit">
+                            <span className="material-symbols-outlined text-[14px]">local_fire_department</span>
+                            Chuỗi: {details.daily_streak} ngày
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>
 
                   {/* Badges Toggle */}
                   <div className="flex-1 flex flex-col">
-                    <h4 className="font-bold text-xs uppercase text-slate-400 tracking-wider mb-3">Huy hiệu danh giá ({details.badges.filter(b => b.is_earned).length}/{details.badges.length})</h4>
-                    <div className="grid grid-cols-2 gap-3 overflow-y-auto flex-1 max-h-[250px] md:max-h-[none] pr-1">
-                      {details.badges.map((badge) => (
-                        <button
-                          key={badge.id}
-                          type="button"
-                          onClick={() => handleToggleBadge(badge.id, badge.is_earned)}
-                          className={`border rounded-xl p-3 text-left transition-all hover:scale-[1.02] flex gap-2.5 items-start ${
-                            badge.is_earned
-                              ? 'border-indigo-100 bg-indigo-50/10 shadow-sm'
-                              : 'border-slate-100 bg-slate-50/50 grayscale opacity-50'
-                          }`}
-                        >
-                          <span className="text-2xl mt-0.5">{badge.icon || '🏅'}</span>
-                          <div>
-                            <div className="flex items-center gap-1">
-                              <span className="font-bold text-slate-800 text-xs">{badge.name}</span>
-                              {badge.is_earned && (
-                                <span className="material-symbols-outlined text-indigo-600 text-xs font-extrabold">check_circle</span>
+                    <div className="flex items-center justify-between mb-4">
+                      <h4 className="font-bold text-sm text-slate-800 flex items-center gap-2">
+                        <span className="material-symbols-outlined text-indigo-500 text-[20px]">award_star</span>
+                        Bộ sưu tập huy hiệu
+                      </h4>
+                      <span className="bg-indigo-100 text-indigo-700 text-xs font-bold px-2.5 py-1 rounded-full">
+                        {details.badges.filter(b => b.is_earned).length} / {details.badges.length}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {details.badges.map((badge) => {
+                        const isMaterialIcon = badge.icon && badge.icon.length > 2;
+                        return (
+                          <button
+                            key={badge.id}
+                            type="button"
+                            onClick={() => handleToggleBadge(badge.id, badge.is_earned)}
+                            className={`relative border rounded-2xl p-4 text-left transition-all duration-300 flex items-start gap-3 overflow-hidden ${
+                              badge.is_earned
+                                ? 'border-indigo-200 bg-indigo-50/50 shadow-sm hover:shadow-md hover:border-indigo-300'
+                                : 'border-slate-200 bg-white hover:bg-slate-50 grayscale opacity-60 hover:opacity-100 hover:grayscale-0'
+                            }`}
+                          >
+                            {badge.is_earned && (
+                              <div className="absolute top-0 right-0 w-12 h-12 overflow-hidden rounded-tr-2xl pointer-events-none">
+                                <div className="absolute top-[-10px] right-[-10px] w-8 h-8 bg-indigo-500 rounded-full blur-xl opacity-30"></div>
+                              </div>
+                            )}
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${badge.is_earned ? 'bg-indigo-100 text-indigo-600 shadow-inner' : 'bg-slate-100 text-slate-500'}`}>
+                              {isMaterialIcon ? (
+                                <span className="material-symbols-outlined text-[24px]">{badge.icon}</span>
+                              ) : (
+                                <span className="text-[24px]">{badge.icon || '🏅'}</span>
                               )}
                             </div>
-                            <p className="text-[10px] text-slate-500 mt-0.5 line-clamp-2 leading-relaxed">
-                              {badge.description}
-                            </p>
-                          </div>
-                        </button>
-                      ))}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between gap-1 mb-1">
+                                <span className="font-bold text-slate-800 text-sm truncate">{badge.name}</span>
+                                {badge.is_earned && (
+                                  <span className="material-symbols-outlined text-indigo-600 text-[18px] shrink-0">check_circle</span>
+                                )}
+                              </div>
+                              <p className="text-[11px] text-slate-500 line-clamp-2 leading-relaxed">
+                                {badge.description}
+                              </p>
+                            </div>
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
 
                 {/* Right Column: Tickets & Rewards */}
-                <div className="w-full md:w-1/2 p-6 flex flex-col gap-6 overflow-hidden bg-slate-50/10">
+                <div className="w-full md:w-[45%] flex flex-col overflow-hidden bg-white">
                   {/* Grant Manual Reward */}
-                  <div className="bg-gradient-to-r from-indigo-50 to-blue-50/30 border border-indigo-100/50 rounded-xl p-4">
-                    <h4 className="font-bold text-xs uppercase text-indigo-900 tracking-wider mb-3 flex items-center gap-1.5">
-                      <span className="material-symbols-outlined text-[16px]">add_card</span>
-                      Cấp vé thưởng thủ công
+                  <div className="p-6 border-b border-slate-100">
+                    <h4 className="font-bold text-sm text-slate-800 mb-4 flex items-center gap-2">
+                      <span className="material-symbols-outlined text-indigo-500 text-[20px]">redeem</span>
+                      Phát hành đặc quyền
                     </h4>
                     
-                    <form onSubmit={handleGrantReward} className="space-y-3">
-                      <div className="flex flex-col md:flex-row gap-3">
-                        <div className="flex-1">
-                          <label className="block text-3xs font-bold uppercase text-slate-500 mb-1">Chọn quà tặng</label>
+                    <form onSubmit={handleGrantReward} className="bg-slate-50 rounded-2xl p-5 border border-slate-100 space-y-4 shadow-sm">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-600 mb-2">Chọn gói phần thưởng</label>
+                        <div className="relative">
                           <select
                             required
                             value={selectedRewardId}
                             onChange={(e) => setSelectedRewardId(e.target.value ? Number(e.target.value) : '')}
-                            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs outline-none focus:ring-2 focus:ring-primary/20"
+                            className="w-full appearance-none rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-sm"
                           >
-                            <option value="">-- Chọn phần quà --</option>
+                            <option value="">-- Lựa chọn phần quà --</option>
                             {availableRewards.map((reward) => (
                               <option key={reward.id} value={reward.id}>
                                 {reward.name} (🪙 {reward.points_cost})
                               </option>
                             ))}
                           </select>
-                        </div>
-                        <div className="w-full md:w-[130px]">
-                          <label className="block text-3xs font-bold uppercase text-slate-500 mb-1">Ngày hết hạn</label>
-                          <input
-                            type="date"
-                            value={ticketExpiry}
-                            onChange={(e) => setTicketExpiry(e.target.value)}
-                            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs outline-none focus:ring-2 focus:ring-primary/20"
-                          />
+                          <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">expand_more</span>
                         </div>
                       </div>
                       
-                      <div className="flex justify-end">
-                        <button
-                          type="submit"
-                          disabled={isSaving || !selectedRewardId}
-                          className="rounded-lg bg-indigo-600 text-white px-4 py-1.5 text-xs font-bold hover:bg-indigo-700 disabled:opacity-50 transition-all flex items-center gap-1"
-                        >
-                          {isSaving ? 'Đang cấp...' : 'Cấp vé quà tặng'}
-                        </button>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-600 mb-2">Hạn sử dụng (Tùy chọn)</label>
+                        <input
+                          type="date"
+                          value={ticketExpiry}
+                          onChange={(e) => setTicketExpiry(e.target.value)}
+                          className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-sm"
+                        />
                       </div>
+                      
+                      <button
+                        type="submit"
+                        disabled={isSaving || !selectedRewardId}
+                        className="w-full rounded-xl bg-indigo-600 text-white px-4 py-3 text-sm font-bold hover:bg-indigo-700 hover:shadow-lg disabled:opacity-50 disabled:hover:bg-indigo-600 disabled:hover:shadow-none transition-all flex items-center justify-center gap-2 shadow-md shadow-indigo-200"
+                      >
+                        {isSaving ? (
+                          <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                        ) : (
+                          <>
+                            <span className="material-symbols-outlined text-[18px]">send</span>
+                            Phát hành ngay
+                          </>
+                        )}
+                      </button>
                     </form>
                   </div>
 
                   {/* List of active/used tickets */}
-                  <div className="flex-1 flex flex-col overflow-hidden">
-                    <h4 className="font-bold text-xs uppercase text-slate-400 tracking-wider mb-3">Ví vé quà tặng hiện có ({details.tickets.length})</h4>
-                    <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+                  <div className="flex-1 flex flex-col overflow-hidden p-6 pt-4">
+                    <div className="flex items-center justify-between mb-4">
+                      <h4 className="font-bold text-sm text-slate-800 flex items-center gap-2">
+                        <span className="material-symbols-outlined text-indigo-500 text-[20px]">local_activity</span>
+                        Ví vé hiện có
+                      </h4>
+                      <span className="bg-slate-100 text-slate-600 text-xs font-bold px-2.5 py-1 rounded-full">
+                        {details.tickets.length} vé
+                      </span>
+                    </div>
+                    
+                    <div className="flex-1 overflow-y-auto space-y-3 pr-2">
                       {details.tickets.length === 0 ? (
-                        <div className="text-center py-12 text-xs text-slate-400">
-                          Thành viên chưa có vé quà tặng nào.
+                        <div className="h-full flex flex-col items-center justify-center text-slate-400 gap-2 opacity-60">
+                          <span className="material-symbols-outlined text-[48px]">confirmation_number</span>
+                          <span className="text-sm font-medium">Chưa có vé nào trong ví</span>
                         </div>
                       ) : (
                         details.tickets.map((ticket) => (
                           <div
                             key={ticket.id}
-                            className="border border-slate-100 bg-white rounded-xl p-3.5 flex items-center justify-between gap-4 shadow-2xs hover:shadow-xs transition-shadow"
+                            className="group border border-slate-100 bg-white rounded-2xl p-4 flex items-center justify-between gap-4 shadow-sm hover:shadow-md hover:border-slate-200 transition-all"
                           >
-                            <div className="space-y-0.5">
-                              <div className="flex items-center gap-2">
-                                <span className="font-bold text-slate-800 text-xs">
-                                  {ticket.reward?.name || 'Quà tặng không tên'}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-3 mb-1.5">
+                                <span className="font-bold text-slate-800 text-sm truncate">
+                                  {ticket.reward?.name || 'Quà tặng không xác định'}
                                 </span>
                                 <button
                                   type="button"
                                   onClick={() => handleUpdateTicketStatus(ticket.id, ticket.status)}
-                                  className={`text-3xs px-2 py-0.5 rounded-full font-bold uppercase transition-all ${
+                                  className={`shrink-0 text-[10px] px-2.5 py-1 rounded-full font-bold uppercase tracking-wide transition-all ${
                                     ticket.status === 'active'
-                                      ? 'bg-green-50 text-green-700 border border-green-200 hover:bg-green-100'
+                                      ? 'bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100'
                                       : ticket.status === 'used'
                                       ? 'bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200'
-                                      : 'bg-red-50 text-red-600 border border-red-200 hover:bg-red-100'
+                                      : 'bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100'
                                   }`}
-                                  title="Click để đổi trạng thái"
+                                  title="Nhấn để đổi trạng thái"
                                 >
-                                  {ticket.status === 'active' ? 'Hoạt động' : ticket.status === 'used' ? 'Đã dùng' : 'Hết hạn'}
+                                  {ticket.status === 'active' ? 'Đang kích hoạt' : ticket.status === 'used' ? 'Đã sử dụng' : 'Hết hạn'}
                                 </button>
                               </div>
-                              <p className="text-[10px] text-slate-400">
-                                Nhận: {new Date(ticket.redeemed_at).toLocaleDateString('vi-VN')}
-                                {ticket.expires_at && ` - Hạn: ${new Date(ticket.expires_at).toLocaleDateString('vi-VN')}`}
-                                {ticket.used_at && ` - Dùng lúc: ${new Date(ticket.used_at).toLocaleDateString('vi-VN')}`}
-                              </p>
+                              <div className="flex flex-col gap-0.5 text-xs text-slate-500 font-medium">
+                                <span className="flex items-center gap-1.5">
+                                  <span className="material-symbols-outlined text-[14px]">event_available</span>
+                                  Cấp: {new Date(ticket.redeemed_at).toLocaleDateString('vi-VN')}
+                                </span>
+                                {ticket.expires_at && (
+                                  <span className="flex items-center gap-1.5 text-amber-600/80">
+                                    <span className="material-symbols-outlined text-[14px]">event_busy</span>
+                                    Hạn: {new Date(ticket.expires_at).toLocaleDateString('vi-VN')}
+                                  </span>
+                                )}
+                              </div>
                             </div>
 
                             <button
                               type="button"
                               onClick={() => handleDeleteTicket(ticket.id)}
-                              className="text-red-500 hover:bg-red-50 rounded-lg p-1.5 shrink-0 transition-colors"
-                              title="Thu hồi/Xóa vé"
+                              className="w-9 h-9 flex items-center justify-center shrink-0 rounded-xl text-rose-400 hover:text-rose-600 hover:bg-rose-50 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+                              title="Thu hồi vé"
                             >
-                              <span className="material-symbols-outlined text-[18px]">delete_sweep</span>
+                              <span className="material-symbols-outlined text-[20px]">delete</span>
                             </button>
                           </div>
                         ))
