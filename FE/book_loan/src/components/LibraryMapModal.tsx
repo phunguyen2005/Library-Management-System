@@ -61,8 +61,8 @@ interface MapZoneInfo {
 
 type LibraryMapTab = 'map' | 'details';
 
-const MAP_BASE_WIDTH = 740;
-const MAP_BASE_HEIGHT = 680;
+const MAP_BASE_WIDTH = 900;
+const MAP_BASE_HEIGHT = 760;
 const MIN_ZOOM = 0.35;
 const MAX_ZOOM = 1.25;
 const ZOOM_STEP = 0.1;
