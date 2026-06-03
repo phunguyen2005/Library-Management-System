@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AdminMemberController;
 use App\Http\Controllers\AdminLibrarianController;
+use App\Http\Controllers\AdminGamifyController;
 use App\Http\Controllers\AiMetadataController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BlogPostController;
@@ -131,6 +132,19 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::put('/members/{member}', [AdminMemberController::class, 'update']);
             Route::delete('/members/{member}', [AdminMemberController::class, 'destroy']);
             Route::patch('/members/{member}/toggle-disable', [AdminMemberController::class, 'toggleDisable']);
+
+            // Admin Gamification & Rewards Catalog
+            Route::get('/admin/rewards', [AdminGamifyController::class, 'indexRewards']);
+            Route::post('/admin/rewards', [AdminGamifyController::class, 'storeReward']);
+            Route::put('/admin/rewards/{reward}', [AdminGamifyController::class, 'updateReward']);
+            Route::delete('/admin/rewards/{reward}', [AdminGamifyController::class, 'destroyReward']);
+
+            // Member-specific Gamify
+            Route::get('/admin/members/{member}/gamification', [AdminGamifyController::class, 'getMemberGamify']);
+            Route::post('/admin/members/{member}/badges', [AdminGamifyController::class, 'syncMemberBadges']);
+            Route::post('/admin/members/{member}/rewards', [AdminGamifyController::class, 'storeMemberReward']);
+            Route::put('/admin/members/rewards/{memberReward}', [AdminGamifyController::class, 'updateMemberReward']);
+            Route::delete('/admin/members/rewards/{memberReward}', [AdminGamifyController::class, 'destroyMemberReward']);
         });
 
         // Books Catalog Management

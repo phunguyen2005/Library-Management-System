@@ -40,6 +40,8 @@ const DEFAULT_EXPORT_COLUMNS = ['member_id', 'name', 'email', 'phone_number', 'j
 import EmptyState from '../../components/EmptyState';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import Pagination from '../../components/Pagination';
+import AdminRewardsModal from '../../components/AdminRewardsModal';
+import MemberGamifyModal from '../../components/MemberGamifyModal';
 import { useDebounce } from '../../hooks/useDebounce';
 import { formatDisplayDate } from '../../lib/display';
 import { getErrorMessage, isUnauthorizedError } from '../../lib/errors';
@@ -57,6 +59,7 @@ type MemberFormData = {
   level?: number;
   xp?: number;
   points?: number;
+  daily_streak?: number;
   badgesCount?: number;
 };
 
@@ -90,6 +93,7 @@ function mapMember(member: MemberApiRecord): MemberListItem {
     xp: member.xp ?? 0,
     points: member.points ?? 0,
     level: member.level ?? 1,
+    dailyStreak: member.daily_streak ?? 0,
     badgesCount: member.badges_count ?? 0,
     isDisabled: disabled,
   };
@@ -111,6 +115,9 @@ function buildPayload(formData: MemberFormData, includePassword: boolean): Membe
   }
   if (formData.points !== undefined) {
     payload.points = formData.points;
+  }
+  if (formData.daily_streak !== undefined) {
+    payload.daily_streak = formData.daily_streak;
   }
 
   if (includePassword || formData.password.trim()) {
@@ -163,6 +170,11 @@ export default function AdminMembers() {
   // --- CSV Import/Export state ---
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+
+  // --- Gamification Admin state ---
+  const [isRewardsModalOpen, setIsRewardsModalOpen] = useState(false);
+  const [selectedMemberForGamify, setSelectedMemberForGamify] = useState<MemberListItem | null>(null);
+  const [isGamifyModalOpen, setIsGamifyModalOpen] = useState(false);
 
   const handleExportMembers = (columns: string[]) => {
     const token = getStoredToken();
@@ -276,6 +288,7 @@ export default function AdminMembers() {
       level: member.level,
       xp: member.xp,
       points: member.points,
+      daily_streak: member.dailyStreak,
       badgesCount: member.badgesCount,
     });
     setIsModalOpen(true);
@@ -397,6 +410,14 @@ export default function AdminMembers() {
         <div className="flex gap-3">
           <button
             type="button"
+            onClick={() => setIsRewardsModalOpen(true)}
+            className="flex items-center gap-2 rounded-xl bg-indigo-50 border border-indigo-100 hover:bg-indigo-100/60 px-5 py-2.5 font-medium text-indigo-700 transition-all hover:-translate-y-0.5"
+          >
+            <span aria-hidden="true" className="material-symbols-outlined text-sm">storefront</span>
+            Quản lý kho quà
+          </button>
+          <button
+            type="button"
             onClick={() => setIsImportModalOpen(true)}
             className="flex items-center gap-2 rounded-xl bg-surface-container-high px-5 py-2.5 font-medium text-slate-700 transition-all hover:bg-slate-200 hover:-translate-y-0.5"
           >
@@ -511,6 +532,18 @@ export default function AdminMembers() {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedMemberForGamify(member);
+                            setIsGamifyModalOpen(true);
+                          }}
+                          className="rounded-lg p-2 text-indigo-600 transition-all hover:bg-indigo-50"
+                          title="Quản lý Gamify & Phần thưởng"
+                          aria-label={`Quản lý Gamify ${member.name}`}
+                        >
+                          <span aria-hidden="true" className="material-symbols-outlined text-[18px]">workspace_premium</span>
+                        </button>
                         <button
                           type="button"
                           onClick={() => openEditModal(member)}
@@ -806,6 +839,25 @@ export default function AdminMembers() {
             defaultColumns={DEFAULT_EXPORT_COLUMNS}
             title="Xuất danh sách Thành viên"
             description="Lọc và xuất danh sách độc giả học giả ra tệp CSV để lưu trữ hoặc phân tích."
+          />
+        )}
+
+        {isRewardsModalOpen && (
+          <AdminRewardsModal
+            isOpen={isRewardsModalOpen}
+            onClose={() => setIsRewardsModalOpen(false)}
+          />
+        )}
+
+        {isGamifyModalOpen && (
+          <MemberGamifyModal
+            isOpen={isGamifyModalOpen}
+            member={selectedMemberForGamify}
+            onClose={() => {
+              setIsGamifyModalOpen(false);
+              setSelectedMemberForGamify(null);
+            }}
+            onRefreshList={() => void loadMembers(false)}
           />
         )}
       </AnimatePresence>

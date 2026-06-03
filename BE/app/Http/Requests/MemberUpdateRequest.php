@@ -35,6 +35,7 @@ class MemberUpdateRequest extends FormRequest
             'level' => ['nullable', 'integer', 'min:1'],
             'xp' => ['nullable', 'integer', 'min:0'],
             'points' => ['nullable', 'integer', 'min:0'],
+            'daily_streak' => ['nullable', 'integer', 'min:0'],
         ];
     }
 }

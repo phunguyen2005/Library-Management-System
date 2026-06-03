@@ -47,7 +47,7 @@ export default function StudentSettings() {
     password_confirmation: '',
     otp: '',
   });
-  const [otpCountdown, setOtpCountdown] = useState(300);
+  const [otpCountdown, setOtpCountdown] = useState(60);
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
   const [otpError, setOtpError] = useState<string | null>(null);
   const [resendingOtp, setResendingOtp] = useState(false);
@@ -72,7 +72,7 @@ export default function StudentSettings() {
       setIsSendingOtp(true);
       await sendPasswordOtp();
       setIsSendingOtp(false);
-      setOtpCountdown(300);
+      setOtpCountdown(60);
       setIsOtpVerified(false);
       setPasswordForm({
         current_password: '',
@@ -159,7 +159,7 @@ export default function StudentSettings() {
 
     try {
       await sendPasswordOtp();
-      setOtpCountdown(300);
+      setOtpCountdown(60);
       setPasswordForm((prev) => ({ ...prev, otp: '' }));
       emitToast({
         tone: 'success',

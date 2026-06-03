@@ -43,7 +43,7 @@ class BorrowingStatusNotification extends Notification implements ShouldQueue
                 $message .= ' Lý do: ' . $this->reason;
             }
         } elseif ($this->statusType === 'returned') {
-            $message = 'Bạn đã trả sách "' . $this->borrowing->book->title . '" thành công.';
+            $message = 'Bạn đã trả sách "' . $this->borrowing->book->title . '" thành công. Hãy để lại đánh giá để tích lũy ngay 30 XP & 10 Điểm nhé! 🌟';
         }
 
         return [

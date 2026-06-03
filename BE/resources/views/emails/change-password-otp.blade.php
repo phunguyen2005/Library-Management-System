@@ -20,7 +20,7 @@
         
         <div class="otp-box">{{ $otp }}</div>
         
-        <p>Mã này có hiệu lực trong vòng 5 phút. <strong>Tuyệt đối không chia sẻ mã này cho bất kỳ ai khác.</strong></p>
+        <p>Mã này có hiệu lực trong vòng 60 giây. <strong>Tuyệt đối không chia sẻ mã này cho bất kỳ ai khác.</strong></p>
         
         <div class="footer">
             <p>Nếu bạn không thực hiện yêu cầu này, vui lòng liên hệ ngay với ban quản lý để bảo mật tài khoản.</p>

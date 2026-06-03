@@ -59,7 +59,7 @@ export default function AdminSettings() {
     password_confirmation: '',
     otp: '',
   });
-  const [otpCountdown, setOtpCountdown] = useState(300);
+  const [otpCountdown, setOtpCountdown] = useState(60);
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
   const [otpError, setOtpError] = useState<string | null>(null);
   const [resendingOtp, setResendingOtp] = useState(false);
@@ -199,7 +199,7 @@ export default function AdminSettings() {
       setIsSendingOtp(true);
       await sendPasswordOtp();
       setIsSendingOtp(false);
-      setOtpCountdown(300);
+      setOtpCountdown(60);
       setIsOtpVerified(false);
       setPasswordForm({
         password: '',
@@ -292,7 +292,7 @@ export default function AdminSettings() {
 
     try {
       await sendPasswordOtp();
-      setOtpCountdown(300);
+      setOtpCountdown(60);
       setPasswordForm((prev) => ({ ...prev, otp: '' }));
       emitToast({
         tone: 'success',

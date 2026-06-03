@@ -87,10 +87,13 @@ class BorrowingStatusMailNotification extends Notification implements ShouldQueu
             $message->line('Nếu có bất kỳ thắc mắc nào, vui lòng liên hệ trực tiếp với bộ phận thư viện để được hỗ trợ.')
                     ->action('Xem chi tiết giao dịch', config('app.frontend_url', 'http://localhost:3000') . '/history');
         } elseif ($this->statusType === 'returned') {
-            $message->subject('[Thư viện số HCMUE] Xác nhận hoàn tất trả sách')
-                    ->greeting("Kính chào $memberName,")
-                    ->line("Hệ thống thư viện xác nhận bạn đã hoàn tất thủ tục trả ấn phẩm \"$bookTitle\".")
-                    ->action('Khám phá sách mới', config('app.frontend_url', 'http://localhost:3000') . '/catalog');
+            $reviewUrl = config('app.frontend_url', 'http://localhost:3000') . '/catalog?book=' . $this->borrowing->book_id;
+            $message->subject('[Thư viện số HCMUE] Bạn vừa trả sách "' . $bookTitle . '" - Chia sẻ cảm nhận & tích lũy điểm thưởng! 📚✨')
+                    ->view('emails.returned_book_review', [
+                        'memberName' => $memberName,
+                        'bookTitle' => $bookTitle,
+                        'reviewUrl' => $reviewUrl,
+                    ]);
         } elseif ($this->statusType === 'expired') {
             $message->subject('[Thư viện số HCMUE] Thông báo hết hạn nhận sách và hủy yêu cầu mượn')
                     ->greeting("Kính chào $memberName,")

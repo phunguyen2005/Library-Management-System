@@ -75,6 +75,10 @@ class AdminMemberController extends Controller
             $member->points = $validated['points'];
         }
 
+        if (array_key_exists('daily_streak', $validated)) {
+            $member->daily_streak = $validated['daily_streak'];
+        }
+
         if (! empty($validated['password'])) {
             $member->password = $validated['password'];
         }

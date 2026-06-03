@@ -10,7 +10,7 @@ export default function VerifyOtp() {
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [countdown, setCountdown] = useState(300); // 5 minutes
+  const [countdown, setCountdown] = useState(60); // 60 seconds
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -63,7 +63,7 @@ export default function VerifyOtp() {
     try {
       await resendOtp(email);
       setSuccessMsg('Mã OTP mới đã được gửi đến email của bạn.');
-      setCountdown(300);
+      setCountdown(60);
     } catch (error: unknown) {
       setErrorMsg(getErrorMessage(error, 'Không thể gửi lại mã xác thực.'));
     } finally {

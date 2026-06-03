@@ -7,6 +7,7 @@ export interface MemberApiRecord {
   xp?: number;
   points?: number;
   level?: number;
+  daily_streak?: number;
   badges_count?: number;
   is_disabled?: boolean;
 }
@@ -24,6 +25,7 @@ export interface MemberListItem {
   xp: number;
   points: number;
   level: number;
+  dailyStreak: number;
   badgesCount: number;
   isDisabled: boolean;
 }
@@ -38,5 +40,6 @@ export type MemberPayload = {
   level?: number;
   xp?: number;
   points?: number;
+  daily_streak?: number;
 };
 

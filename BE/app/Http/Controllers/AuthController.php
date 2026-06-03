@@ -134,7 +134,7 @@ class AuthController extends Controller
         \App\Services\AuditLoggerService::log('register', 'Đăng ký tài khoản thành công', $user);
 
         $otp = (string) random_int(100000, 999999);
-        \Illuminate\Support\Facades\Cache::put('otp_'.$user->email, $otp, now()->addMinutes(5));
+        \Illuminate\Support\Facades\Cache::put('otp_'.$user->email, $otp, now()->addSeconds(60));
 
         try {
             \Illuminate\Support\Facades\Mail::to($user->email)->send(new \App\Mail\VerifyEmailOTP($otp));
@@ -172,7 +172,7 @@ class AuthController extends Controller
         }
 
         $otp = (string) random_int(100000, 999999);
-        \Illuminate\Support\Facades\Cache::put('change_password_otp_'.$user->email, $otp, now()->addMinutes(5));
+        \Illuminate\Support\Facades\Cache::put('change_password_otp_'.$user->email, $otp, now()->addSeconds(60));
 
         try {
             \Illuminate\Support\Facades\Mail::to($user->email)->send(new \App\Mail\ChangePasswordOTP($otp));
@@ -417,7 +417,7 @@ class AuthController extends Controller
         }
 
         $otp = (string) random_int(100000, 999999);
-        \Illuminate\Support\Facades\Cache::put('otp_'.$user->email, $otp, now()->addMinutes(5));
+        \Illuminate\Support\Facades\Cache::put('otp_'.$user->email, $otp, now()->addSeconds(60));
 
         try {
             \Illuminate\Support\Facades\Mail::to($user->email)->send(new \App\Mail\VerifyEmailOTP($otp));
@@ -444,7 +444,7 @@ class AuthController extends Controller
         }
 
         $otp = (string) random_int(100000, 999999);
-        \Illuminate\Support\Facades\Cache::put('forgot_otp_'.$email, $otp, now()->addMinutes(5));
+        \Illuminate\Support\Facades\Cache::put('forgot_otp_'.$email, $otp, now()->addSeconds(60));
 
         try {
             \Illuminate\Support\Facades\Mail::to($email)->send(new \App\Mail\ForgotPasswordOTP($otp));

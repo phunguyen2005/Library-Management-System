@@ -10,6 +10,9 @@ import { useAuth } from '../auth/AuthContext';
 import { submitDailyCheckIn } from '../api/gamifyApi';
 import { emitToast } from '../notifications/events';
 import { getErrorMessage } from '../lib/errors';
+import { getMyRequests } from '../api/borrowApi';
+import type { MemberBorrowRequest } from '../types/request';
+import ReviewPromptPopup from '../components/ReviewPromptPopup';
 
 const bottomNavItems = [
   { path: '/home', icon: 'home', labelKey: 'nav.home' },
@@ -30,6 +33,9 @@ export default function UserLayout() {
   const [isCheckedIn, setIsCheckedIn] = useState(false);
   const [pointsGained, setPointsGained] = useState(10);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Review prompt modal state
+  const [pendingReviewLoan, setPendingReviewLoan] = useState<MemberBorrowRequest | null>(null);
 
   const isOutlookStudent = !!(user?.email && (
     user.email.toLowerCase().endsWith('@student.hcmue.edu.vn') || 
@@ -65,6 +71,31 @@ export default function UserLayout() {
       return () => clearTimeout(timer);
     }
   }, [role, user]);
+
+  // Check for returned but unreviewed books to prompt review
+  useEffect(() => {
+    if (role !== 'student' || !user || showCheckIn) {
+      return;
+    }
+
+    getMyRequests()
+      .then((data: MemberBorrowRequest[]) => {
+        const returnedUnreviewed = data.filter(
+          (req) => req.status === 'returned' && !req.is_reviewed
+        );
+
+        if (returnedUnreviewed.length > 0) {
+          const latestLoan = returnedUnreviewed[0]; // Sort order is descending by loan_id
+          const sessionDismissed = sessionStorage.getItem(`dismissed_review_prompt_${latestLoan.id}`);
+          if (!sessionDismissed) {
+            setPendingReviewLoan(latestLoan);
+          }
+        }
+      })
+      .catch(() => {
+        // Silently catch to not break page load
+      });
+  }, [role, user, showCheckIn]);
 
   const handleCheckIn = async () => {
     if (isSubmitting) return;
@@ -351,6 +382,23 @@ export default function UserLayout() {
               )}
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+
+      {/* Review Prompt Popup */}
+      <AnimatePresence>
+        {pendingReviewLoan && (
+          <ReviewPromptPopup
+            loan={pendingReviewLoan}
+            onClose={() => {
+              sessionStorage.setItem(`dismissed_review_prompt_${pendingReviewLoan.id}`, 'true');
+              setPendingReviewLoan(null);
+            }}
+            onSubmitSuccess={(loanId) => {
+              sessionStorage.setItem(`dismissed_review_prompt_${loanId}`, 'true');
+              setPendingReviewLoan(null);
+            }}
+          />
         )}
       </AnimatePresence>
     </div>

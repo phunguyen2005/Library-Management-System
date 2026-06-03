@@ -38,7 +38,7 @@ export default function ForgotPassword() {
       await forgotPassword(email);
       setSuccessMsg('Mã xác thực đã được gửi đến email của bạn.');
       setStep(2);
-      setCountdown(300); // 5 minutes
+      setCountdown(60); // 60 seconds
     } catch (error: unknown) {
       setErrorMsg(getErrorMessage(error, 'Không tìm thấy tài khoản với email này.'));
     } finally {

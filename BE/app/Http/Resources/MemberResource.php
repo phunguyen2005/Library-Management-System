@@ -18,6 +18,7 @@ class MemberResource extends JsonResource
             'xp' => $this->xp ?? 0,
             'points' => $this->points ?? 0,
             'level' => $this->level ?? 1,
+            'daily_streak' => $this->daily_streak ?? 0,
             'badges_count' => $this->badges_count ?? $this->badges()->count(),
             'borrow_suspended_until' => $this->borrow_suspended_until?->toIso8601String(),
             'is_disabled' => (bool) ($this->is_disabled ?? false),
