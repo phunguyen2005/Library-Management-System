@@ -91,7 +91,7 @@ class AuditLogController extends Controller
         $admins = !empty($adminIds) ? \App\Models\Librarian::whereIn('librarian_id', array_unique($adminIds))->get()->keyBy('librarian_id') : collect();
 
         $logs->getCollection()->transform(function ($log) use ($students, $admins) {
-            $userName = 'Hệ thống';
+            $userName = __('messages.audit.user_type.system');
             $userEmail = null;
 
             if ($log->user_type === 'student' && $log->user_id) {
@@ -111,11 +111,13 @@ class AuditLogController extends Controller
             return [
                 'log_id' => $log->log_id,
                 'user_id' => $log->user_id,
-                'user_type' => $log->user_type === 'student' ? 'Sinh viên' : ($log->user_type === 'admin' ? 'Thủ thư' : 'Hệ thống'),
+                'user_type' => $this->getUserTypeLabel($log->user_type),
+                'user_type_key' => 'messages.audit.user_type.'.$this->normalizeUserType($log->user_type),
                 'raw_user_type' => $log->user_type,
                 'user_name' => $userName,
                 'user_email' => $userEmail,
                 'action' => $this->getActionLabel($log->action),
+                'action_key' => 'messages.audit.action.'.$log->action,
                 'raw_action' => $log->action,
                 'description' => $log->description,
                 'ip_address' => $log->ip_address,
@@ -129,23 +131,19 @@ class AuditLogController extends Controller
 
     private function getActionLabel(string $action): string
     {
-        return match ($action) {
-            'login' => 'Đăng nhập',
-            'logout' => 'Đăng xuất',
-            'register' => 'Đăng ký',
-            'profile_update' => 'Sửa hồ sơ',
-            'book_create' => 'Thêm sách',
-            'book_update' => 'Sửa thông tin sách',
-            'book_delete' => 'Xóa sách',
-            'digital_file_upload' => 'Tải lên tài liệu số',
-            'digital_file_download' => 'Tải/Xem tài liệu số',
-            'borrow_request' => 'Yêu cầu mượn sách',
-            'borrow_approve' => 'Duyệt yêu cầu mượn',
-            'borrow_pickup' => 'Giao sách vật lý',
-            'borrow_reject' => 'Từ chối yêu cầu',
-            'borrow_return' => 'Nhận sách trả',
-            'settings_update' => 'Cập nhật cấu hình',
-            default => $action,
-        };
+        $key = 'messages.audit.action.'.$action;
+        $label = __($key);
+
+        return $label === $key ? $action : $label;
+    }
+
+    private function getUserTypeLabel(?string $userType): string
+    {
+        return __('messages.audit.user_type.'.$this->normalizeUserType($userType));
+    }
+
+    private function normalizeUserType(?string $userType): string
+    {
+        return in_array($userType, ['student', 'admin'], true) ? $userType : 'system';
     }
 }

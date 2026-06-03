@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Support\LocalizedContent;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\App;
@@ -15,7 +16,7 @@ class SetLocale
     {
         App::setLocale($this->resolveLocale($request));
 
-        return $next($request);
+        return LocalizedContent::response($next($request));
     }
 
     private function resolveLocale(Request $request): string

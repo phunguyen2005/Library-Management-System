@@ -219,10 +219,14 @@ class GamifyController extends Controller
             // Notify redemption
             try {
                 $member->notify(new GamifyNotification(
-                    'Đổi quà thành công!',
-                    "Bạn đã đổi quà thành công: \"{$reward->name}\". Hãy kiểm tra túi đồ của bạn!",
+                    'messages.notifications.gamify.reward_redeemed.title',
+                    'messages.notifications.gamify.reward_redeemed.message',
                     'reward_redeemed',
-                    ['reward_code' => $reward->code, 'reward_name' => $reward->name]
+                    [
+                        'reward_code' => $reward->code,
+                        'reward_name' => $reward->name,
+                        'message_params' => ['reward_name' => $reward->name],
+                    ]
                 ));
             } catch (\Exception $e) {
                 // Ignore
@@ -236,7 +240,9 @@ class GamifyController extends Controller
             );
 
             return response()->json([
-                'message' => "Bạn đã đổi quà \"{$reward->name}\" thành công!",
+                'message_key' => 'messages.notifications.gamify.reward_redeemed.response',
+                'message_params' => ['reward_name' => $reward->name],
+                'message' => __('messages.notifications.gamify.reward_redeemed.response', ['reward_name' => $reward->name]),
                 'points' => $member->points,
                 'ticket' => $ticket->load('reward'),
             ]);

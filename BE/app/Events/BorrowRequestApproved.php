@@ -41,6 +41,10 @@ class BorrowRequestApproved implements ShouldBroadcast
     public function broadcastWith(): array
     {
         $this->borrowing->loadMissing(['book', 'member']);
+        $messageKey = 'messages.events.borrow_request_approved';
+        $messageParams = [
+            'book_title' => $this->borrowing->book->title ?? 'N/A',
+        ];
 
         return [
             'loan_id' => $this->borrowing->loan_id,
@@ -48,7 +52,9 @@ class BorrowRequestApproved implements ShouldBroadcast
             'book_title' => $this->borrowing->book->title ?? 'N/A',
             'status' => $this->borrowing->status,
             'approved_at' => $this->borrowing->approved_at ? $this->borrowing->approved_at->toIso8601String() : now()->toIso8601String(),
-            'message' => 'Yêu cầu mượn sách "' . ($this->borrowing->book->title ?? 'N/A') . '" của bạn đã được phê duyệt! Bạn có thể đến nhận sách ngay lập tức.',
+            'message_key' => $messageKey,
+            'message_params' => $messageParams,
+            'message' => __($messageKey, $messageParams),
         ];
     }
 

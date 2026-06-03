@@ -41,6 +41,11 @@ class ReservationQueueShifted implements ShouldBroadcast
     public function broadcastWith(): array
     {
         $this->reservation->loadMissing(['book']);
+        $messageKey = 'messages.events.reservation_queue_shifted';
+        $messageParams = [
+            'book_title' => $this->reservation->book->title ?? 'N/A',
+            'position' => $this->reservation->position,
+        ];
 
         return [
             'reservation_id' => $this->reservation->reservation_id,
@@ -48,7 +53,9 @@ class ReservationQueueShifted implements ShouldBroadcast
             'book_title' => $this->reservation->book->title ?? 'N/A',
             'position' => $this->reservation->position,
             'status' => $this->reservation->status,
-            'message' => 'Vị trí đặt chỗ sách "' . ($this->reservation->book->title ?? 'N/A') . '" của bạn đã được cập nhật thành vị trí số ' . $this->reservation->position . '.',
+            'message_key' => $messageKey,
+            'message_params' => $messageParams,
+            'message' => __($messageKey, $messageParams),
         ];
     }
 

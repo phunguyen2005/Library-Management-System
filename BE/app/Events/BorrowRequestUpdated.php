@@ -41,10 +41,14 @@ class BorrowRequestUpdated implements ShouldBroadcastNow
      */
     public function broadcastWith(): array
     {
+        $messageKey = 'messages.events.borrow_request_updated';
+
         return [
             'loan_id' => $this->borrowing->loan_id,
             'status' => $this->borrowing->status,
-            'message' => 'Yêu cầu mượn sách đã được cập nhật trạng thái.',
+            'message_key' => $messageKey,
+            'message_params' => [],
+            'message' => __($messageKey),
         ];
     }
 

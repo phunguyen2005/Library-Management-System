@@ -100,7 +100,8 @@ class RefreshTokenTest extends TestCase
             'expires_at' => now()->subMinutes(1),
         ]);
 
-        $response = $this->postJson('/api/refresh', [
+        $response = $this->withHeader('Accept-Language', 'en')
+            ->postJson('/api/refresh', [
             'refresh_token' => $plainRefreshToken,
         ]);
 
@@ -115,7 +116,8 @@ class RefreshTokenTest extends TestCase
 
     public function test_invalid_refresh_token_is_rejected(): void
     {
-        $response = $this->postJson('/api/refresh', [
+        $response = $this->withHeader('Accept-Language', 'en')
+            ->postJson('/api/refresh', [
             'refresh_token' => 'non-existent-token-value-here-1234567890',
         ]);
 

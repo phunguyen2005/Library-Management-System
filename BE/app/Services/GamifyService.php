@@ -34,10 +34,13 @@ class GamifyService
                 // Notify level up
                 try {
                     $member->notify(new GamifyNotification(
-                        'Chúc mừng thăng hạng!',
-                        "Bạn đã thăng hạng lên Cấp độ {$newLevel}!",
+                        'messages.notifications.gamify.level_up.title',
+                        'messages.notifications.gamify.level_up.message',
                         'level_up',
-                        ['new_level' => $newLevel]
+                        [
+                            'new_level' => $newLevel,
+                            'message_params' => ['level' => $newLevel],
+                        ]
                     ));
                 } catch (\Exception $e) {
                     // Ignore notification exceptions in tests/local
@@ -130,10 +133,14 @@ class GamifyService
                 // Notify badge earned
                 try {
                     $member->notify(new GamifyNotification(
-                        'Đã mở khóa huy hiệu mới!',
-                        "Chúc mừng! Bạn đã nhận được huy hiệu \"{$badge->name}\"!",
+                        'messages.notifications.gamify.badge_earned.title',
+                        'messages.notifications.gamify.badge_earned.message',
                         'badge_earned',
-                        ['badge_code' => $badge->code, 'badge_name' => $badge->name]
+                        [
+                            'badge_code' => $badge->code,
+                            'badge_name' => $badge->name,
+                            'message_params' => ['badge_name' => $badge->name],
+                        ]
                     ));
                 } catch (\Exception $e) {
                     // Ignore

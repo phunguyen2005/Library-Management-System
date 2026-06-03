@@ -3,61 +3,69 @@
 namespace App\Notifications;
 
 use App\Models\Borrowing;
+use App\Support\LocalizedContent;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
+use Illuminate\Support\Facades\App;
 
 class OverdueNotification extends Notification implements ShouldQueue
 {
     use Queueable;
 
-    public $borrowing;
-
-    /**
-     * Create a new notification instance.
-     */
-    public function __construct(Borrowing $borrowing)
+    public function __construct(public Borrowing $borrowing, private ?string $notificationLocale = null)
     {
-        $this->borrowing = $borrowing;
+        $this->notificationLocale ??= App::getLocale();
     }
 
-    /**
-     * Get the notification's delivery channels.
-     *
-     * @return array<int, string>
-     */
     public function via(object $notifiable): array
     {
         return ['database', 'mail'];
     }
 
-    /**
-     * Get the mail representation of the notification.
-     */
     public function toMail(object $notifiable): MailMessage
     {
-        return (new MailMessage)
-            ->subject('Cảnh báo: Sách quá hạn trả')
-            ->line('Cuốn sách "' . $this->borrowing->book->title . '" mà bạn mượn đã quá hạn trả.')
-            ->line('Hạn trả cuối cùng là ngày ' . $this->borrowing->due_date->format('d/m/Y') . '.')
-            ->line('Vui lòng đến thư viện trả sách ngay lập tức để tránh các hình phạt theo quy định.')
-            ->action('Xem chi tiết', config('app.frontend_url', 'http://localhost:3000') . '/history');
+        return LocalizedContent::withLocale($this->notificationLocale, fn () => $this->buildMail());
     }
 
-    /**
-     * Get the array representation of the notification.
-     *
-     * @return array<string, mixed>
-     */
+    private function buildMail(): MailMessage
+    {
+        return (new MailMessage)
+            ->subject(__('messages.mail.overdue.subject'))
+            ->line(__('messages.mail.overdue.line_book', ['book_title' => $this->borrowing->book->title]))
+            ->line(__('messages.mail.overdue.line_due', ['due_date' => $this->dueDate()]))
+            ->line(__('messages.mail.overdue.instruction'))
+            ->action(__('messages.mail.overdue.action'), config('app.frontend_url', 'http://localhost:3000').'/history')
+            ->salutation(__('messages.mail.common.salutation'));
+    }
+
     public function toArray(object $notifiable): array
     {
+        return LocalizedContent::withLocale($this->notificationLocale, fn () => $this->buildArray());
+    }
+
+    private function buildArray(): array
+    {
+        $messageKey = 'messages.notifications.overdue.message';
+        $messageParams = [
+            'book_title' => $this->borrowing->book->title,
+            'due_date' => $this->dueDate(),
+        ];
+
         return [
             'type' => 'overdue',
             'borrowing_id' => $this->borrowing->borrowing_id,
             'book_title' => $this->borrowing->book->title,
             'due_date' => $this->borrowing->due_date->toDateString(),
-            'message' => 'Sách "' . $this->borrowing->book->title . '" đã QUÁ HẠN trả từ ngày ' . $this->borrowing->due_date->format('d/m/Y') . '.',
+            'message_key' => $messageKey,
+            'message_params' => $messageParams,
+            'message' => __($messageKey, $messageParams),
         ];
+    }
+
+    private function dueDate(): string
+    {
+        return $this->borrowing->due_date->format('d/m/Y');
     }
 }

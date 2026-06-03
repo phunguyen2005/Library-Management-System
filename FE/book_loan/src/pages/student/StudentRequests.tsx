@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../auth/AuthContext';
 import { echoClient } from '../../lib/echo';
 import { cancelBorrow, getMyRequests } from '../../api/borrowApi';
@@ -41,8 +42,17 @@ type RequestRow = {
   dueStatus?: string;
 };
 
+type LocalizedBroadcastEvent = {
+  message?: string;
+  message_key?: string;
+  message_params?: Record<string, unknown>;
+  book_title?: string;
+  position?: number;
+};
+
 export default function StudentRequests() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<'all' | MemberBorrowRequest['status'] | 'reservations'>('all');
   const [allRequests, setAllRequests] = useState<RequestRow[]>([]);
@@ -51,6 +61,19 @@ export default function StudentRequests() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [zoomQrCode, setZoomQrCode] = useState<{ id: string; title: string } | null>(null);
+
+  const localizedEventMessage = useCallback((
+    event: LocalizedBroadcastEvent,
+    fallbackKey: string,
+    fallbackParams: Record<string, unknown> = {},
+  ) => {
+    const key = event.message_key?.replace(/^messages\./, '');
+    if (key) {
+      return t(key, event.message_params ?? fallbackParams);
+    }
+
+    return event.message || t(fallbackKey, fallbackParams);
+  }, [t]);
 
   const loadRequestsData = () => {
     setIsLoading(true);
@@ -104,7 +127,7 @@ export default function StudentRequests() {
     const channelName = `member.${user.member_id}`;
     const channel = echoClient.private(channelName);
 
-    channel.listen('.borrow.request.approved', (event: any) => {
+    channel.listen('.borrow.request.approved', (event: LocalizedBroadcastEvent) => {
       // Live-update all request and reservation data
       loadRequestsData();
 
@@ -115,12 +138,14 @@ export default function StudentRequests() {
       // Screen Toast notification
       emitToast({
         tone: 'success',
-        title: 'Yêu cầu được duyệt',
-        message: event.message || `Yêu cầu mượn sách "${event.book_title}" của bạn đã được phê duyệt!`,
+        title: t('events.borrowApprovedTitle'),
+        message: localizedEventMessage(event, 'events.borrow_request_approved', {
+          book_title: event.book_title,
+        }),
       });
     });
 
-    channel.listen('.reservation.queue.shifted', (event: any) => {
+    channel.listen('.reservation.queue.shifted', (event: LocalizedBroadcastEvent) => {
       // Live-update all request and reservation data
       loadRequestsData();
 
@@ -131,27 +156,30 @@ export default function StudentRequests() {
       // Screen Toast notification
       emitToast({
         tone: 'info',
-        title: 'Cập nhật xếp hàng',
-        message: event.message || `Vị trí xếp hàng đặt chỗ sách "${event.book_title}" của bạn đã tiến thêm!`,
+        title: t('events.reservationShiftedTitle'),
+        message: localizedEventMessage(event, 'events.reservation_queue_shifted', {
+          book_title: event.book_title,
+          position: event.position,
+        }),
       });
     });
 
-    channel.listen('.borrow.request.updated', (event: any) => {
+    channel.listen('.borrow.request.updated', (event: LocalizedBroadcastEvent) => {
       // Background reload of the requests list to get the latest status (return, reject, etc)
       loadRequestsData();
 
       // Screen Toast notification
       emitToast({
         tone: 'info',
-        title: 'Cập nhật yêu cầu',
-        message: event.message || 'Một yêu cầu mượn sách của bạn vừa được cập nhật.',
+        title: t('events.borrowUpdatedTitle'),
+        message: localizedEventMessage(event, 'events.borrow_request_updated'),
       });
     });
 
     return () => {
       echoClient.leave(channelName);
     };
-  }, [user]);
+  }, [localizedEventMessage, user, t]);
 
   const handleCancelReservation = async (reservationId: number) => {
     try {

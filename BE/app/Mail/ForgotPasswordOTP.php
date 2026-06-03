@@ -2,6 +2,7 @@
 
 namespace App\Mail;
 
+use App\Support\LocalizedContent;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
@@ -9,19 +10,23 @@ use Illuminate\Mail\Mailables\Attachment;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\App;
 
 class ForgotPasswordOTP extends Mailable
 {
     use Queueable, SerializesModels;
 
     public string $otp;
+    private string $mailLocale;
 
     /**
      * Create a new message instance.
      */
-    public function __construct(string $otp)
+    public function __construct(string $otp, ?string $mailLocale = null)
     {
         $this->otp = $otp;
+        $this->mailLocale = $mailLocale ?? App::getLocale();
+        $this->locale($this->mailLocale);
     }
 
     /**
@@ -29,8 +34,9 @@ class ForgotPasswordOTP extends Mailable
      */
     public function envelope(): Envelope
     {
-        return new Envelope(
-            subject: 'Mã xác minh tài khoản - Thư viện HCMUE',
+        return LocalizedContent::withLocale(
+            $this->mailLocale,
+            fn () => new Envelope(subject: __('messages.mail.otp.forgot_password.subject'))
         );
     }
 
@@ -41,7 +47,21 @@ class ForgotPasswordOTP extends Mailable
     {
         return new Content(
             view: 'emails.forgot-password-otp',
+            with: ['copy' => $this->copy()],
         );
+    }
+
+    private function copy(): array
+    {
+        return LocalizedContent::withLocale($this->mailLocale, fn () => [
+            'title' => __('messages.mail.otp.forgot_password.title'),
+            'heading' => __('messages.mail.otp.forgot_password.heading'),
+            'intro' => __('messages.mail.otp.forgot_password.intro'),
+            'instruction' => __('messages.mail.otp.forgot_password.instruction'),
+            'validity' => __('messages.mail.otp.forgot_password.validity'),
+            'footer_notice' => __('messages.mail.otp.forgot_password.footer_notice'),
+            'salutation' => __('messages.mail.common.salutation'),
+        ]);
     }
 
     /**

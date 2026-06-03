@@ -24,13 +24,19 @@ class NotificationController extends Controller
             $notification->markAsRead();
         }
 
-        return response()->json(['message' => 'Đánh dấu đã đọc thành công.']);
+        return response()->json([
+            'message_key' => 'messages.notifications.mark_read',
+            'message' => __('messages.notifications.mark_read'),
+        ]);
     }
 
     public function markAllAsRead(Request $request)
     {
         $request->user()->unreadNotifications->markAsRead();
 
-        return response()->json(['message' => 'Đã đánh dấu tất cả là đã đọc.']);
+        return response()->json([
+            'message_key' => 'messages.notifications.mark_all_read',
+            'message' => __('messages.notifications.mark_all_read'),
+        ]);
     }
 }

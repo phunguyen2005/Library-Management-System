@@ -2,21 +2,23 @@
 
 namespace App\Notifications;
 
+use App\Support\LocalizedContent;
+use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
+use Illuminate\Support\Facades\App;
 
 class MemberSuspendedNotification extends Notification implements ShouldQueue
 {
     use Queueable;
 
-    public $suspensionDays;
-    public $suspendedUntil;
-
-    public function __construct(int $suspensionDays, $suspendedUntil)
-    {
-        $this->suspensionDays = $suspensionDays;
-        $this->suspendedUntil = $suspendedUntil;
+    public function __construct(
+        public int $suspensionDays,
+        public mixed $suspendedUntil,
+        private ?string $notificationLocale = null
+    ) {
+        $this->notificationLocale ??= App::getLocale();
     }
 
     public function via(object $notifiable): array
@@ -26,10 +28,22 @@ class MemberSuspendedNotification extends Notification implements ShouldQueue
 
     public function toArray(object $notifiable): array
     {
-        $dateStr = \Carbon\Carbon::parse($this->suspendedUntil)->format('d/m/Y H:i');
+        return LocalizedContent::withLocale($this->notificationLocale, fn () => $this->buildArray());
+    }
+
+    private function buildArray(): array
+    {
+        $messageKey = 'messages.notifications.member_suspended.message';
+        $messageParams = [
+            'suspended_until' => Carbon::parse($this->suspendedUntil)->format('d/m/Y H:i'),
+            'days' => $this->suspensionDays,
+        ];
+
         return [
             'type' => 'member_suspended',
-            'message' => "Tài khoản của bạn đã bị tạm khóa quyền mượn và đặt chỗ sách đến {$dateStr} ({$this->suspensionDays} ngày) do vi phạm quá hạn nhận sách quá 3 lần trong vòng 2 tuần.",
+            'message_key' => $messageKey,
+            'message_params' => $messageParams,
+            'message' => __($messageKey, $messageParams),
             'suspended_until' => $this->suspendedUntil,
         ];
     }

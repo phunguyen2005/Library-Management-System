@@ -28,12 +28,17 @@ describe('LanguageToggle', () => {
     expect(getCurrentLanguage()).toBe('vi');
     expect(document.documentElement.lang).toBe('vi');
 
-    await user.click(screen.getByRole('button', { name: 'Switch language to English' }));
+    // Click the main language selector button to open dropdown
+    const toggleButton = screen.getByRole('button');
+    await user.click(toggleButton);
+
+    // Select English option
+    const englishOption = screen.getByRole('button', { name: /English/i });
+    await user.click(englishOption);
 
     expect(getCurrentLanguage()).toBe('en');
     expect(localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBe('en');
     expect(document.documentElement.lang).toBe('en');
-    expect(screen.getByRole('button', { name: 'Switch language to Vietnamese' })).toBeInTheDocument();
   });
 });
 
@@ -61,5 +66,20 @@ describe('apiRequest localization', () => {
     const headers = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0][1].headers as Headers;
 
     expect(headers.get('Accept-Language')).toBe('en');
+  });
+
+  it('clears cached API responses whenever the language changes', async () => {
+    setAppLanguage('vi');
+    await apiRequest('/health', { auth: false });
+    await apiRequest('/health', { auth: false });
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+
+    setAppLanguage('en');
+    await apiRequest('/health', { auth: false });
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+
+    setAppLanguage('vi');
+    await apiRequest('/health', { auth: false });
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(3));
   });
 });

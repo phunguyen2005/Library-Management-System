@@ -1,18 +1,18 @@
 <x-mail::message>
-# Nhắc nhở: Sách sắp đến hạn trả
+# {{ $copy['title'] }}
 
-Chào **{{ $borrowing->member->name }}**,
+{{ $copy['greeting'] }}
 
-Phiếu mượn của bạn sắp đến hạn trả trong vòng 2 ngày tới. Dưới đây là thông tin chi tiết:
+{{ $copy['intro'] }}
 
-- **Mã phiếu mượn:** {{ $borrowing->borrowing_id }}
-- **Sách mượn:** {{ $borrowing->book->title }}
-- **Ngày mượn:** {{ $borrowing->borrow_date->format('d/m/Y') }}
-- **Hạn trả:** {{ $borrowing->due_date->format('d/m/Y') }}
+- **{{ $copy['loan_code'] }}:** {{ $borrowing->loan_id }}
+- **{{ $copy['book'] }}:** {{ $borrowing->book->title }}
+- **{{ $copy['borrow_date'] }}:** {{ $borrowing->borrow_date->format('d/m/Y') }}
+- **{{ $copy['due_date'] }}:** {{ $borrowing->due_date->format('d/m/Y') }}
 
-Vui lòng mang sách đến thư viện để trả đúng hạn, tránh phát sinh phí phạt. 
-Nếu bạn cần gia hạn thêm, hãy liên hệ với thư viện.
+{{ $copy['instruction'] }}
+{{ $copy['extension'] }}
 
-Cảm ơn bạn,
-Thư viện HCMUE
+{{ $copy['thank_you'] }}
+{{ $copy['signature'] }}
 </x-mail::message>

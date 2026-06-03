@@ -26,6 +26,10 @@ type CacheEntry = {
 
 const responseCache = new Map<string, CacheEntry>();
 
+i18n.on('languageChanged', () => {
+  responseCache.clear();
+});
+
 function buildRequestUrl(path: string) {
   return `${API_BASE_URL}${path.startsWith('/') ? path : `/${path}`}`;
 }

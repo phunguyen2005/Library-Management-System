@@ -2,13 +2,14 @@ import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import { resources } from './resources';
 
-export type AppLanguage = 'vi' | 'en';
+export type AppLanguage = 'vi' | 'en' | 'zh' | 'ja' | 'ko';
 
 export const LANGUAGE_STORAGE_KEY = 'book-loan-language';
 
-const SUPPORTED_LANGUAGES: AppLanguage[] = ['vi', 'en'];
+const SUPPORTED_LANGUAGES: AppLanguage[] = ['vi', 'en', 'zh', 'ja', 'ko'];
 
 function normalizeLanguage(value?: string | null): AppLanguage {
+  // Handle zh-CN / zh-TW → zh, ja-JP → ja, ko-KR → ko, etc.
   const language = value?.toLowerCase().split('-')[0];
   return SUPPORTED_LANGUAGES.includes(language as AppLanguage) ? (language as AppLanguage) : 'vi';
 }
@@ -71,7 +72,14 @@ export function setAppLanguage(language: AppLanguage) {
 }
 
 export function getIntlLocale(language: AppLanguage = getCurrentLanguage()) {
-  return language === 'en' ? 'en-US' : 'vi-VN';
+  const localeMap: Record<AppLanguage, string> = {
+    vi: 'vi-VN',
+    en: 'en-US',
+    zh: 'zh-CN',
+    ja: 'ja-JP',
+    ko: 'ko-KR',
+  };
+  return localeMap[language] ?? 'vi-VN';
 }
 
 export default i18n;

@@ -2,135 +2,149 @@
 
 namespace App\Notifications;
 
+use App\Models\Member;
 use App\Models\RoomBooking;
+use App\Support\LocalizedContent;
 use Illuminate\Bus\Queueable;
-use Illuminate\Notifications\Notification;
-
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
+use Illuminate\Notifications\Notification;
+use Illuminate\Support\Facades\App;
+use Illuminate\Support\HtmlString;
 
 class RoomBookingStatusNotification extends Notification implements ShouldQueue
 {
     use Queueable;
 
-    public $booking;
-    public $statusType;
-    public $reason;
-
-    public function __construct(RoomBooking $booking, string $statusType, ?string $reason = null)
-    {
-        $this->booking = $booking;
-        $this->statusType = $statusType; // 'approved', 'rejected', 'cancelled', 'completed', 'no_show'
-        $this->reason = $reason;
+    public function __construct(
+        public RoomBooking $booking,
+        public string $statusType,
+        public ?string $reason = null,
+        private ?string $notificationLocale = null
+    ) {
+        $this->notificationLocale ??= App::getLocale();
     }
 
     public function via(object $notifiable): array
     {
         $channels = ['database'];
-        if ($notifiable instanceof \App\Models\Member && $notifiable->notify_room_status) {
-            if (in_array($this->statusType, ['approved', 'rejected', 'cancelled', 'no_show'])) {
-                $channels[] = 'mail';
-            }
+
+        if (
+            $notifiable instanceof Member
+            && $notifiable->notify_room_status
+            && in_array($this->statusType, ['approved', 'rejected', 'cancelled', 'no_show'], true)
+        ) {
+            $channels[] = 'mail';
         }
+
         return $channels;
     }
 
-    /**
-     * Get the mail representation of the notification.
-     */
     public function toMail(object $notifiable): MailMessage
     {
-        $message = new MailMessage();
-        $roomName = $this->booking->room?->name ?? 'Phòng';
-        $dateStr = $this->booking->date ? $this->booking->date->format('d/m/Y') : '';
-        $timeStr = substr($this->booking->start_time, 0, 5) . ' - ' . substr($this->booking->end_time, 0, 5);
-        $studentName = $notifiable->name ?? 'Bạn';
+        return LocalizedContent::withLocale($this->notificationLocale, fn () => $this->buildMail($notifiable));
+    }
 
-        $message->salutation("Trân trọng,\nThư viện số HCMUE");
+    private function buildMail(object $notifiable): MailMessage
+    {
+        $message = (new MailMessage())
+            ->subject(__('messages.mail.room.'.$this->mailKey().'.subject'))
+            ->greeting(__('messages.mail.common.greeting', [
+                'name' => $notifiable->name ?? __('messages.mail.fine.student_fallback'),
+            ]))
+            ->line(__('messages.mail.room.'.$this->mailKey().'.intro'))
+            ->line(__('messages.mail.common.details'))
+            ->line('- '.__('messages.mail.room.room', ['room_name' => $this->roomName()]))
+            ->line('- '.__('messages.mail.room.date', ['date' => $this->dateString()]))
+            ->line('- '.__('messages.mail.room.time', ['time' => $this->timeString()]));
 
         if ($this->statusType === 'approved') {
             $qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data={$this->booking->booking_code}";
-            $message->subject('[Thư viện số HCMUE] Phê duyệt yêu cầu đặt phòng tự học')
-                    ->greeting("Kính chào $studentName,")
-                    ->line("Yêu cầu đặt phòng tự học của bạn đã được phê duyệt thành công.")
-                    ->line("Thông tin phòng đặt:")
-                    ->line("- Phòng học: $roomName")
-                    ->line("- Ngày đặt: $dateStr")
-                    ->line("- Khung giờ: $timeStr")
-                    ->line("- Mã nhận phòng: {$this->booking->booking_code}")
-                    ->line(new \Illuminate\Support\HtmlString('<div style="text-align: center; margin: 20px 0;"><img src="'.$qrUrl.'" alt="Mã QR Nhận Phòng" style="border: 1px solid #e2e8f0; padding: 10px; border-radius: 8px;" /></div>'))
-                    ->line("Vui lòng đến đúng giờ và thực hiện quét mã check-in tại phòng để bắt đầu sử dụng.")
-                    ->action('Xem lịch sử đặt phòng', config('app.frontend_url', 'http://localhost:3000') . '/room-bookings');
-        } elseif ($this->statusType === 'rejected') {
-            $message->subject('[Thư viện số HCMUE] Từ chối yêu cầu đặt phòng tự học')
-                    ->greeting("Kính chào $studentName,")
-                    ->line("Yêu cầu đặt phòng tự học của bạn không được phê duyệt.")
-                    ->line("Thông tin chi tiết:")
-                    ->line("- Phòng: $roomName vào ngày $dateStr ($timeStr)");
-            if ($this->reason) {
-                $message->line("- Lý do từ chối: {$this->reason}");
-            }
-            $message->action('Đặt phòng khác', config('app.frontend_url', 'http://localhost:3000') . '/rooms');
-        } elseif ($this->statusType === 'cancelled') {
-            $message->subject('[Thư viện số HCMUE] Xác nhận hủy đặt phòng tự học')
-                    ->greeting("Kính chào $studentName,")
-                    ->line("Lịch đặt phòng tự học của bạn đã được hủy thành công.")
-                    ->line("Thông tin phòng đã hủy:")
-                    ->line("- Phòng: $roomName")
-                    ->line("- Thời gian: ngày $dateStr ($timeStr)")
-                    ->action('Đặt phòng khác', config('app.frontend_url', 'http://localhost:3000') . '/rooms');
-        } elseif ($this->statusType === 'no_show') {
-            $message->subject('[Thư viện số HCMUE] Cảnh báo: Vắng mặt lịch đặt phòng tự học')
-                    ->greeting("Kính chào $studentName,")
-                    ->line("Hệ thống ghi nhận bạn đã không đến check-in nhận phòng tự học đúng giờ quy định.")
-                    ->line("Chi tiết lịch đặt:")
-                    ->line("- Phòng: $roomName vào ngày $dateStr ($timeStr)")
-                    ->line("Lịch đặt của bạn đã bị hủy tự động do quá giờ check-in. Vui lòng lưu ý tuân thủ đúng thời gian quy định trong các lần đặt tiếp theo.");
-            if ($this->reason) {
-                $message->line("- Lý do: {$this->reason}");
-            }
-            $message->action('Xem lịch sử đặt phòng', config('app.frontend_url', 'http://localhost:3000') . '/room-bookings');
+            $message->line('- '.__('messages.mail.room.code', ['code' => $this->booking->booking_code]))
+                ->line(new HtmlString('<div style="text-align: center; margin: 20px 0;"><img src="'.$qrUrl.'" alt="QR code" style="border: 1px solid #e2e8f0; padding: 10px; border-radius: 8px;" /></div>'))
+                ->line(__('messages.mail.room.approved.instruction'));
         }
 
-        return $message;
+        if ($this->reason) {
+            $message->line('- '.__('messages.mail.room.reason', ['reason' => $this->reason]));
+        }
+
+        return $message
+            ->action(
+                __('messages.mail.room.'.$this->mailKey().'.action'),
+                config('app.frontend_url', 'http://localhost:3000').($this->statusType === 'rejected' || $this->statusType === 'cancelled' ? '/rooms' : '/room-bookings')
+            )
+            ->salutation(__('messages.mail.common.salutation'));
     }
 
-    /**
-     * Get the array representation of the notification.
-     *
-     * @return array<string, mixed>
-     */
     public function toArray(object $notifiable): array
     {
-        $message = '';
-        $roomName = $this->booking->room?->name ?? 'Phòng';
-        $dateStr = $this->booking->date ? $this->booking->date->format('d/m/Y') : '';
-        $timeStr = substr($this->booking->start_time, 0, 5) . ' - ' . substr($this->booking->end_time, 0, 5);
+        return LocalizedContent::withLocale($this->notificationLocale, fn () => $this->buildArray());
+    }
 
-        if ($this->statusType === 'approved') {
-            $message = 'Yêu cầu đặt phòng "' . $roomName . '" vào ngày ' . $dateStr . ' (' . $timeStr . ') đã được duyệt.';
-        } elseif ($this->statusType === 'rejected') {
-            $message = 'Yêu cầu đặt phòng "' . $roomName . '" vào ngày ' . $dateStr . ' (' . $timeStr . ') đã bị từ chối.';
-            if ($this->reason) {
-                $message .= ' Lý do: ' . $this->reason;
-            }
-        } elseif ($this->statusType === 'cancelled') {
-            $message = 'Đã hủy lịch đặt phòng "' . $roomName . '" vào ngày ' . $dateStr . ' (' . $timeStr . ') thành công.';
-        } elseif ($this->statusType === 'completed') {
-            $message = 'Lịch sử sử dụng phòng "' . $roomName . '" vào ngày ' . $dateStr . ' (' . $timeStr . ') đã hoàn thành.';
-        } elseif ($this->statusType === 'no_show') {
-            $message = 'Bạn đã không đến nhận phòng "' . $roomName . '" vào ngày ' . $dateStr . ' (' . $timeStr . ') quá giờ check-in.';
-            if ($this->reason) {
-                $message .= ' ' . $this->reason;
-            }
-        }
+    private function buildArray(): array
+    {
+        $messageKey = $this->messageKey();
+        $messageParams = array_filter([
+            'room_name' => $this->roomName(),
+            'date' => $this->dateString(),
+            'time' => $this->timeString(),
+            'reason' => $this->reason,
+        ], static fn ($value) => $value !== null && $value !== '');
 
         return [
             'type' => 'room_booking_status',
             'booking_id' => $this->booking->booking_id,
-            'room_name' => $roomName,
+            'room_name' => $this->roomName(),
             'status_type' => $this->statusType,
-            'message' => $message,
+            'message_key' => $messageKey,
+            'message_params' => $messageParams,
+            'message' => __($messageKey, $messageParams),
         ];
+    }
+
+    private function messageKey(): string
+    {
+        if ($this->statusType === 'rejected' && $this->reason) {
+            return 'messages.notifications.room.status.rejected_with_reason';
+        }
+
+        if ($this->statusType === 'no_show' && $this->reason) {
+            return 'messages.notifications.room.status.no_show_with_reason';
+        }
+
+        return match ($this->statusType) {
+            'approved' => 'messages.notifications.room.status.approved',
+            'rejected' => 'messages.notifications.room.status.rejected',
+            'cancelled' => 'messages.notifications.room.status.cancelled',
+            'completed' => 'messages.notifications.room.status.completed',
+            'no_show' => 'messages.notifications.room.status.no_show',
+            default => 'messages.notifications.room.status.approved',
+        };
+    }
+
+    private function mailKey(): string
+    {
+        return match ($this->statusType) {
+            'rejected' => 'rejected',
+            'cancelled' => 'cancelled',
+            'no_show' => 'no_show',
+            default => 'approved',
+        };
+    }
+
+    private function roomName(): string
+    {
+        return $this->booking->room?->name ?? __('messages.notifications.room.fallback_room');
+    }
+
+    private function dateString(): string
+    {
+        return $this->booking->date ? $this->booking->date->format('d/m/Y') : '';
+    }
+
+    private function timeString(): string
+    {
+        return substr($this->booking->start_time, 0, 5).' - '.substr($this->booking->end_time, 0, 5);
     }
 }
