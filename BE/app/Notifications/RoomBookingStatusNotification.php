@@ -40,42 +40,59 @@ class RoomBookingStatusNotification extends Notification implements ShouldQueue
      */
     public function toMail(object $notifiable): MailMessage
     {
+        $message = new MailMessage();
         $roomName = $this->booking->room?->name ?? 'Phòng';
         $dateStr = $this->booking->date ? $this->booking->date->format('d/m/Y') : '';
         $timeStr = substr($this->booking->start_time, 0, 5) . ' - ' . substr($this->booking->end_time, 0, 5);
         $studentName = $notifiable->name ?? 'Bạn';
 
-        $message = new MailMessage();
+        $message->salutation("Trân trọng,\nThư viện số HCMUE");
 
         if ($this->statusType === 'approved') {
-            $message->subject('[Thư viện số HCMUE] Phê duyệt yêu cầu đặt phòng tự học');
+            $qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data={$this->booking->booking_code}";
+            $message->subject('[Thư viện số HCMUE] Phê duyệt yêu cầu đặt phòng tự học')
+                    ->greeting("Kính chào $studentName,")
+                    ->line("Yêu cầu đặt phòng tự học của bạn đã được phê duyệt thành công.")
+                    ->line("Thông tin phòng đặt:")
+                    ->line("- Phòng học: $roomName")
+                    ->line("- Ngày đặt: $dateStr")
+                    ->line("- Khung giờ: $timeStr")
+                    ->line("- Mã nhận phòng: {$this->booking->booking_code}")
+                    ->line(new \Illuminate\Support\HtmlString('<div style="text-align: center; margin: 20px 0;"><img src="'.$qrUrl.'" alt="Mã QR Nhận Phòng" style="border: 1px solid #e2e8f0; padding: 10px; border-radius: 8px;" /></div>'))
+                    ->line("Vui lòng đến đúng giờ và thực hiện quét mã check-in tại phòng để bắt đầu sử dụng.")
+                    ->action('Xem lịch sử đặt phòng', config('app.frontend_url', 'http://localhost:3000') . '/room-bookings');
         } elseif ($this->statusType === 'rejected') {
-            $message->subject('[Thư viện số HCMUE] Từ chối yêu cầu đặt phòng tự học');
+            $message->subject('[Thư viện số HCMUE] Từ chối yêu cầu đặt phòng tự học')
+                    ->greeting("Kính chào $studentName,")
+                    ->line("Yêu cầu đặt phòng tự học của bạn không được phê duyệt.")
+                    ->line("Thông tin chi tiết:")
+                    ->line("- Phòng: $roomName vào ngày $dateStr ($timeStr)");
+            if ($this->reason) {
+                $message->line("- Lý do từ chối: {$this->reason}");
+            }
+            $message->action('Đặt phòng khác', config('app.frontend_url', 'http://localhost:3000') . '/rooms');
         } elseif ($this->statusType === 'cancelled') {
-            $message->subject('[Thư viện số HCMUE] Xác nhận hủy đặt phòng tự học');
+            $message->subject('[Thư viện số HCMUE] Xác nhận hủy đặt phòng tự học')
+                    ->greeting("Kính chào $studentName,")
+                    ->line("Lịch đặt phòng tự học của bạn đã được hủy thành công.")
+                    ->line("Thông tin phòng đã hủy:")
+                    ->line("- Phòng: $roomName")
+                    ->line("- Thời gian: ngày $dateStr ($timeStr)")
+                    ->action('Đặt phòng khác', config('app.frontend_url', 'http://localhost:3000') . '/rooms');
         } elseif ($this->statusType === 'no_show') {
-            $message->subject('[Thư viện số HCMUE] Cảnh báo: Vắng mặt lịch đặt phòng tự học');
-        } else {
-            $message->subject('[Thư viện số HCMUE] Cập nhật lịch đặt phòng tự học');
+            $message->subject('[Thư viện số HCMUE] Cảnh báo: Vắng mặt lịch đặt phòng tự học')
+                    ->greeting("Kính chào $studentName,")
+                    ->line("Hệ thống ghi nhận bạn đã không đến check-in nhận phòng tự học đúng giờ quy định.")
+                    ->line("Chi tiết lịch đặt:")
+                    ->line("- Phòng: $roomName vào ngày $dateStr ($timeStr)")
+                    ->line("Lịch đặt của bạn đã bị hủy tự động do quá giờ check-in. Vui lòng lưu ý tuân thủ đúng thời gian quy định trong các lần đặt tiếp theo.");
+            if ($this->reason) {
+                $message->line("- Lý do: {$this->reason}");
+            }
+            $message->action('Xem lịch sử đặt phòng', config('app.frontend_url', 'http://localhost:3000') . '/room-bookings');
         }
 
-        $qrUrl = $this->statusType === 'approved' ? "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data={$this->booking->booking_code}" : null;
-        
-        $actionUrl = in_array($this->statusType, ['approved', 'no_show']) 
-            ? config('app.frontend_url', 'http://localhost:3000') . '/room-bookings'
-            : config('app.frontend_url', 'http://localhost:3000') . '/rooms';
-
-        return $message->view('emails.room_booking_status', [
-            'memberName' => $studentName,
-            'roomName' => $roomName,
-            'dateStr' => $dateStr,
-            'timeStr' => $timeStr,
-            'bookingCode' => $this->booking->booking_code,
-            'statusType' => $this->statusType,
-            'reason' => $this->reason,
-            'qrUrl' => $qrUrl,
-            'actionUrl' => $actionUrl
-        ]);
+        return $message;
     }
 
     /**

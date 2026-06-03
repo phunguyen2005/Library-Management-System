@@ -1,23 +1,31 @@
-@extends('emails.layouts.master')
-
-@section('title', 'Khôi phục mật khẩu - Thư viện số HCMUE')
-
-@section('content')
-    <div class="text-center">
-        <h1>Khôi phục mật khẩu</h1>
-        <p>Xin chào,</p>
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Khôi phục mật khẩu</title>
+    <style>
+        body { font-family: sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; text-align: center; }
+        .otp-box { background-color: #f4f4f4; border: 1px solid #ddd; padding: 15px; font-size: 24px; letter-spacing: 5px; font-weight: bold; color: #d32f2f; display: inline-block; margin: 20px 0; border-radius: 8px; }
+        .footer { margin-top: 30px; font-size: 12px; color: #777; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div style="margin-bottom: 25px;">
+            <img src="https://raw.githubusercontent.com/phunguyen2005/Library-Management-System/main/BE/public/logo.png" alt="HCMUE Logo" style="height: 70px; width: auto; display: block; margin: 0 auto; object-fit: contain;">
+        </div>
+        <h2>Xin chào,</h2>
         <p>Chúng tôi nhận được yêu cầu khôi phục mật khẩu cho tài khoản của bạn tại <strong>Thư viện số HCMUE</strong>.</p>
         <p>Vui lòng sử dụng mã OTP dưới đây để đặt lại mật khẩu:</p>
         
-        <div style="background-color: #fef2f2; border: 2px dashed #fca5a5; padding: 20px; font-size: 32px; letter-spacing: 8px; font-weight: 700; color: #ef4444; display: inline-block; margin: 25px 0; border-radius: 12px;">
-            {{ $otp }}
-        </div>
+        <div class="otp-box">{{ $otp }}</div>
         
-        <p style="color: #64748b; font-size: 14px;">
-            Mã này có hiệu lực trong vòng <strong>60 giây</strong>. <span style="color: #ef4444; font-weight: 600;">Tuyệt đối không chia sẻ mã này cho bất kỳ ai.</span>
-        </p>
-        <p style="color: #64748b; font-size: 13px; margin-top: 20px;">
-            Nếu bạn không thực hiện yêu cầu này, vui lòng bỏ qua email và kiểm tra lại bảo mật tài khoản.
-        </p>
+        <p>Mã này có hiệu lực trong vòng 60 giây. <strong>Tuyệt đối không chia sẻ mã này cho bất kỳ ai.</strong></p>
+        
+        <div class="footer">
+            <p>Nếu bạn không thực hiện yêu cầu này, vui lòng bỏ qua email và kiểm tra lại bảo mật tài khoản.</p>
+            <p>Trân trọng,<br>Thư viện số HCMUE</p>
+        </div>
     </div>
-@endsection
+</body>
+</html>

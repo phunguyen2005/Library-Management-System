@@ -33,29 +33,44 @@ class FineStatusNotification extends Notification implements ShouldQueue
      */
     public function toMail(object $notifiable): MailMessage
     {
+        $message = new MailMessage();
         $bookTitle = $this->fine->borrowing?->book?->title ?? 'Tài liệu';
         $amount = number_format((float) $this->fine->amount).' VND';
         $studentName = $notifiable->name ?? 'Bạn';
-        $reason = $this->fine->reason === 'overdue' ? 'Trả sách quá hạn' : 'Hư hỏng/Mất sách';
 
-        $message = new MailMessage();
+        $message->salutation("Trân trọng,\nThư viện số HCMUE");
 
         if ($this->statusType === 'paid') {
-            $message->subject('[Thư viện số HCMUE] Xác nhận thanh toán khoản phạt');
+            $message->subject('[Thư viện số HCMUE] Xác nhận thanh toán khoản phạt')
+                    ->greeting("Kính chào $studentName,")
+                    ->line("Hệ thống thư viện xác nhận bạn đã thanh toán thành công khoản phạt.")
+                    ->line("Thông tin chi tiết:")
+                    ->line("- Tên tài liệu: $bookTitle")
+                    ->line("- Số tiền phạt: $amount")
+                    ->line("- Trạng thái: Đã thanh toán")
+                    ->action('Xem chi tiết tài khoản', config('app.frontend_url', 'http://localhost:3000') . '/history');
         } elseif ($this->statusType === 'waived') {
-            $message->subject('[Thư viện số HCMUE] Thông báo miễn giảm khoản phạt');
+            $message->subject('[Thư viện số HCMUE] Thông báo miễn giảm khoản phạt')
+                    ->greeting("Kính chào $studentName,")
+                    ->line("Hệ thống thư viện thông báo: Khoản phạt của bạn đã được miễn giảm bởi thủ thư.")
+                    ->line("Thông tin chi tiết:")
+                    ->line("- Tên tài liệu: $bookTitle")
+                    ->line("- Số tiền phạt: $amount")
+                    ->line("- Trạng thái: Đã miễn phạt")
+                    ->action('Xem chi tiết tài khoản', config('app.frontend_url', 'http://localhost:3000') . '/history');
         } else {
-            $message->subject('[Thư viện số HCMUE] Thông báo khoản phạt mới phát sinh');
+            $message->subject('[Thư viện số HCMUE] Thông báo khoản phạt mới phát sinh')
+                    ->greeting("Kính chào $studentName,")
+                    ->line("Hệ thống thư viện thông báo bạn có một khoản phạt mới phát sinh.")
+                    ->line("Thông tin chi tiết:")
+                    ->line("- Tên tài liệu: $bookTitle")
+                    ->line("- Số tiền phạt: $amount")
+                    ->line("- Lý do phạt: " . ($this->fine->reason === 'overdue' ? 'Trả sách quá hạn' : 'Hư hỏng/Mất sách'))
+                    ->line("Vui lòng thanh toán khoản phạt sớm để tránh ảnh hưởng đến quyền lợi mượn sách tiếp theo.")
+                    ->action('Thanh toán khoản phạt', config('app.frontend_url', 'http://localhost:3000') . '/history');
         }
 
-        return $message->view('emails.fine_status', [
-            'memberName' => $studentName,
-            'bookTitle' => $bookTitle,
-            'amount' => $amount,
-            'statusType' => $this->statusType,
-            'reason' => $reason,
-            'actionUrl' => config('app.frontend_url', 'http://localhost:3000') . '/history'
-        ]);
+        return $message;
     }
 
     public function toArray(object $notifiable): array
