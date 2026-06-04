@@ -141,9 +141,10 @@ export async function waiveFine(fineId: number, reason: string) {
   });
 }
 
-export async function applyFineWaiver(fineId: number) {
+export async function applyFineWaiver(fineId: number, ticketId?: number) {
   return apiRequest<{ message: string; fine: FineEntry }>(`/fines/${fineId}/apply-waiver`, {
     method: 'POST',
+    body: ticketId ? { ticket_id: ticketId } : undefined,
   });
 }
 

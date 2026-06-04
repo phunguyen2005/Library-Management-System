@@ -40,6 +40,7 @@ export default function StudentFines() {
   const [isWaiverLoading, setIsWaiverLoading] = useState(false);
   const [currentPaymentId, setCurrentPaymentId] = useState<number | null>(null);
   const [isQrZoomed, setIsQrZoomed] = useState(false);
+  const [selectedTicketId, setSelectedTicketId] = useState<number | null>(null);
 
   const fetchFines = React.useCallback(() => {
     setIsLoading(true);
@@ -263,15 +264,35 @@ export default function StudentFines() {
     setIsQrZoomed(false);
   };
 
+  const getEligibleWaiverTickets = React.useCallback((fineAmount: number | string) => {
+    return activeTickets
+      .filter(
+        (t) =>
+          t.status === 'active' &&
+          t.reward?.benefit_type === 'fine_waiver' &&
+          Number(fineAmount) <= Number(t.reward.benefit_value) &&
+          (t.expires_at === null || new Date(t.expires_at) > new Date())
+      )
+      .sort((a, b) => Number(a.reward?.benefit_value || 0) - Number(b.reward?.benefit_value || 0));
+  }, [activeTickets]);
+
   const getEligibleWaiverTicket = (fineAmount: number | string) => {
-    return activeTickets.find(
-      (t) =>
-        t.status === 'active' &&
-        t.reward?.benefit_type === 'fine_waiver' &&
-        Number(fineAmount) <= Number(t.reward.benefit_value) &&
-        (t.expires_at === null || new Date(t.expires_at) > new Date())
-    );
+    const tickets = getEligibleWaiverTickets(fineAmount);
+    return tickets.length > 0 ? tickets[0] : undefined;
   };
+
+  useEffect(() => {
+    if (guideFine) {
+      const tickets = getEligibleWaiverTickets(guideFine.amount);
+      if (tickets.length > 0) {
+        setSelectedTicketId(tickets[0].id);
+      } else {
+        setSelectedTicketId(null);
+      }
+    } else {
+      setSelectedTicketId(null);
+    }
+  }, [guideFine, getEligibleWaiverTickets]);
 
   const handleApplyWaiver = async (fineId: number, ticket: MemberRewardRecord) => {
     if (!window.confirm(t('studentFines.confirmApplyTicket', { name: ticket.reward?.name }))) {
@@ -279,7 +300,7 @@ export default function StudentFines() {
     }
     setIsWaiverLoading(true);
     try {
-      const response = await applyFineWaiver(fineId);
+      const response = await applyFineWaiver(fineId, ticket.id);
       emitToast({
         tone: 'success',
         title: t('studentFines.toastWaiverSuccess'),
@@ -563,30 +584,55 @@ export default function StudentFines() {
                 </button>
               </div>
               <div className="space-y-3 text-sm text-slate-700">
-                {getEligibleWaiverTicket(guideFine.amount) && (
-                  <div className="rounded-xl border border-amber-300 bg-amber-50/50 p-3 border-dashed">
-                    <p className="font-bold text-amber-800 flex items-center gap-1.5">
-                      <span className="material-symbols-outlined text-sm">local_activity</span>
-                      {t('studentFines.ticketTitle')}
-                    </p>
-                    <p className="mt-1 text-xs text-amber-700 leading-relaxed" dangerouslySetInnerHTML={{
-                      __html: t('studentFines.ticketDesc', { name: getEligibleWaiverTicket(guideFine.amount)?.reward?.name })
-                    }} />
-                    <button
-                      type="button"
-                      disabled={isWaiverLoading}
-                      onClick={() => handleApplyWaiver(guideFine.fine_id, getEligibleWaiverTicket(guideFine.amount)!)}
-                      className="mt-3 w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 disabled:opacity-50 text-white font-bold py-2.5 text-xs shadow-md shadow-amber-600/10 transition-all cursor-pointer"
-                    >
-                      {isWaiverLoading ? (
-                        <span className="animate-spin h-3.5 w-3.5 border-2 border-white border-t-transparent rounded-full"></span>
-                      ) : (
-                        <span className="material-symbols-outlined text-sm">confirmation_number</span>
+                {getEligibleWaiverTickets(guideFine.amount).length > 0 && (() => {
+                  const eligibleTickets = getEligibleWaiverTickets(guideFine.amount);
+                  const selectedTicket = eligibleTickets.find(t => t.id === selectedTicketId) || eligibleTickets[0];
+
+                  return (
+                    <div className="rounded-xl border border-amber-300 bg-amber-50/50 p-3 border-dashed">
+                      <p className="font-bold text-amber-800 flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-sm">local_activity</span>
+                        {t('studentFines.ticketTitle')}
+                      </p>
+                      
+                      {eligibleTickets.length > 1 && (
+                        <div className="mt-2.5">
+                          <label className="text-[11px] font-bold uppercase tracking-wider text-amber-800 block mb-1">
+                            {t('studentFines.selectTicketLabel', 'Chọn vé miễn phạt:')}
+                          </label>
+                          <select
+                            value={selectedTicketId || ''}
+                            onChange={(e) => setSelectedTicketId(Number(e.target.value))}
+                            className="w-full rounded-lg border border-amber-300 bg-white p-2 text-xs font-semibold text-slate-700 focus:border-amber-500 focus:outline-none"
+                          >
+                            {eligibleTickets.map((t) => (
+                              <option key={t.id} value={t.id}>
+                                {t.reward?.name} ({t.reward?.description || `Mức miễn tối đa ${formatDisplayCurrency(t.reward?.benefit_value || 0)}`})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
                       )}
-                      {t('studentFines.btnApplyTicket')}
-                    </button>
-                  </div>
-                )}
+
+                      <p className="mt-2 text-xs text-amber-700 leading-relaxed" dangerouslySetInnerHTML={{
+                        __html: t('studentFines.ticketDesc', { name: selectedTicket?.reward?.name })
+                      }} />
+                      <button
+                        type="button"
+                        disabled={isWaiverLoading || !selectedTicket}
+                        onClick={() => handleApplyWaiver(guideFine.fine_id, selectedTicket)}
+                        className="mt-3 w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 disabled:opacity-50 text-white font-bold py-2.5 text-xs shadow-md shadow-amber-600/10 transition-all cursor-pointer"
+                      >
+                        {isWaiverLoading ? (
+                          <span className="animate-spin h-3.5 w-3.5 border-2 border-white border-t-transparent rounded-full"></span>
+                        ) : (
+                          <span className="material-symbols-outlined text-sm">confirmation_number</span>
+                        )}
+                        {t('studentFines.btnApplyTicket')}
+                      </button>
+                    </div>
+                  );
+                })()}
 
                 <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-3">
                   <p className="font-bold text-emerald-800 flex items-center gap-1">

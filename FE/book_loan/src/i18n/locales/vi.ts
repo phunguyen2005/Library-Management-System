@@ -740,6 +740,7 @@ export const vi = {
       "toastWaiverSuccess": "Thành công",
       "toastWaiverError": "Lỗi",
       "confirmApplyTicket": "Bạn có chắc chắn muốn dùng vé miễn phạt \"{{name}}\" để xóa khoản phạt này?",
+      "selectTicketLabel": "Chọn vé miễn phạt:",
       "toastErrorLoad": "Không thể tải khoản phạt",
       "zoomedTitle": "Mã QR phiếu phạt #{{id}}",
       "zoomedSubtitle": "Đưa cho thủ thư quét để thu tiền nhanh tại quầy",

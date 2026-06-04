@@ -326,7 +326,7 @@ class FineController extends Controller
     {
         $member = $request->user();
 
-        $fine = DB::transaction(function () use ($fineId, $member) {
+        $fine = DB::transaction(function () use ($fineId, $member, $request) {
             $fine = Fine::query()
                 ->with(['member', 'borrowing.book'])
                 ->lockForUpdate()
@@ -353,17 +353,52 @@ class FineController extends Controller
             }
 
             // Find an active fine_waiver ticket
-            $activeTicket = $member->rewards()
-                ->where('status', 'active')
-                ->whereHas('reward', function ($query) {
-                    $query->where('benefit_type', 'fine_waiver');
-                })
-                ->where(function ($query) {
-                    $query->whereNull('expires_at')
-                          ->orWhere('expires_at', '>', now());
-                })
-                ->with('reward')
-                ->first();
+            $ticketId = $request->input('ticket_id');
+            $activeTicket = null;
+
+            if ($ticketId) {
+                $activeTicket = $member->rewards()
+                    ->where('id', $ticketId)
+                    ->where('status', 'active')
+                    ->whereHas('reward', function ($query) {
+                        $query->where('benefit_type', 'fine_waiver');
+                    })
+                    ->where(function ($query) {
+                        $query->whereNull('expires_at')
+                              ->orWhere('expires_at', '>', now());
+                    })
+                    ->with('reward')
+                    ->first();
+            } else {
+                // Find first ticket that actually covers the fine
+                $activeTicket = $member->rewards()
+                    ->where('status', 'active')
+                    ->whereHas('reward', function ($query) use ($fine) {
+                        $query->where('benefit_type', 'fine_waiver')
+                              ->where('benefit_value', '>=', $fine->amount);
+                    })
+                    ->where(function ($query) {
+                        $query->whereNull('expires_at')
+                              ->orWhere('expires_at', '>', now());
+                    })
+                    ->with('reward')
+                    ->first();
+
+                // If none cover it, get the first active ticket to show the benefit_value validation error
+                if (! $activeTicket) {
+                    $activeTicket = $member->rewards()
+                        ->where('status', 'active')
+                        ->whereHas('reward', function ($query) {
+                            $query->where('benefit_type', 'fine_waiver');
+                        })
+                        ->where(function ($query) {
+                            $query->whereNull('expires_at')
+                                  ->orWhere('expires_at', '>', now());
+                        })
+                        ->with('reward')
+                        ->first();
+                }
+            }
 
             if (! $activeTicket) {
                 abort(response()->json(['message' => 'Bạn không có vé miễn phạt khả dụng.'], 400));

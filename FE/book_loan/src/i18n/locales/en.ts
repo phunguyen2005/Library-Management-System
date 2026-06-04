@@ -743,6 +743,7 @@ export const en = {
       "toastWaiverSuccess": "Success",
       "toastWaiverError": "Error",
       "confirmApplyTicket": "Are you sure you want to use the waiver ticket \"{{name}}\" to clear this fine?",
+      "selectTicketLabel": "Select waiver ticket:",
       "toastErrorLoad": "Unable to load fines",
       "zoomedTitle": "QR Code for Fine #{{id}}",
       "zoomedSubtitle": "Show to the librarian at the desk to pay",
