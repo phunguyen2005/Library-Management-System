@@ -649,17 +649,7 @@ export default function ReadingRoom({ document, onClose, onProgressSaved }: Read
       </header>
 
       {/* Progress Sync Info Bar */}
-      {isAudio ? (
-        <section className="flex items-center justify-between border-b border-stone-800 bg-stone-950 px-6 py-3">
-          <div className="flex items-center gap-2 text-xs font-bold text-stone-300">
-            <span className="material-symbols-outlined text-[16px] text-primary animate-pulse">headphones</span>
-            <span>{localT.audioProgress.replace('{{percent}}', String(progressPercent))}</span>
-          </div>
-          <span aria-live="polite" className="text-xs font-semibold text-stone-500">
-            {isSavingProgress ? localT.audioAutoSaving : localT.audioSynced}
-          </span>
-        </section>
-      ) : (
+      {!isAudio && (
         <section className="flex flex-wrap items-center gap-3 border-b border-stone-800 bg-stone-950 px-6 py-3">
           <label className="flex items-center gap-2 text-xs font-semibold text-stone-300">
             <span>{localT.pageLabel}</span>
