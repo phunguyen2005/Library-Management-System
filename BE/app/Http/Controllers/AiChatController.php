@@ -649,7 +649,7 @@ class AiChatController extends Controller
     }
 
     /**
-     * Build the dynamic system prompt with real-time student data.
+     * Build the dynamic system prompt with real-time student data and live library settings.
      */
     private function buildSystemPrompt($member, string $catalogText, bool $includeToolsInstruction = false): string
     {
@@ -679,6 +679,54 @@ class AiChatController extends Controller
             $fineAmount = number_format($unpaidFineSum) . ' VND';
         }
 
+        // Load live library configuration from admin settings
+        $cfg = LibrarySetting::singleton();
+        $finePerDay       = number_format((float) ($cfg->fine_per_day        ?? LibrarySetting::DEFAULT_FINE_PER_DAY));
+        $maxFinePerLoan   = number_format((float) ($cfg->max_fine_per_loan   ?? LibrarySetting::DEFAULT_MAX_FINE_PER_LOAN));
+        $damagedBookFee   = number_format((float) ($cfg->damaged_book_fee    ?? LibrarySetting::DEFAULT_DAMAGED_BOOK_FEE));
+        $lostBookFee      = number_format((float) ($cfg->lost_book_fee       ?? LibrarySetting::DEFAULT_LOST_BOOK_FEE));
+        $loanPeriodDays   = (int) ($cfg->loan_period_days       ?? LibrarySetting::DEFAULT_LOAN_PERIOD_DAYS);
+        $maxActiveLoans   = (int) ($cfg->max_active_loans        ?? LibrarySetting::DEFAULT_MAX_ACTIVE_LOANS);
+        $gracePeriodDays  = (int) ($cfg->grace_period_days       ?? LibrarySetting::DEFAULT_GRACE_PERIOD_DAYS);
+        $pickupDeadline   = (int) ($cfg->pickup_deadline_hours   ?? LibrarySetting::DEFAULT_PICKUP_DEADLINE_HOURS);
+        $maxMissedPickups = (int) ($cfg->max_missed_pickups      ?? LibrarySetting::DEFAULT_MAX_MISSED_PICKUPS);
+        $suspensionDays   = (int) ($cfg->suspension_duration_days ?? LibrarySetting::DEFAULT_SUSPENSION_DURATION_DAYS);
+
+        $roomMaxHoursPerBooking  = (int) ($cfg->room_max_hours_per_booking   ?? LibrarySetting::DEFAULT_ROOM_MAX_HOURS_PER_BOOKING);
+        $roomMaxHoursPerWeek     = (int) ($cfg->room_max_hours_per_week      ?? LibrarySetting::DEFAULT_ROOM_MAX_HOURS_PER_WEEK);
+        $roomMaxBookingsPerDay   = (int) ($cfg->room_max_bookings_per_day    ?? LibrarySetting::DEFAULT_ROOM_MAX_BOOKINGS_PER_DAY);
+        $roomAdvanceDays         = (int) ($cfg->room_advance_booking_days    ?? LibrarySetting::DEFAULT_ROOM_ADVANCE_BOOKING_DAYS);
+        $roomMinGroupSize        = (int) ($cfg->room_min_group_size          ?? LibrarySetting::DEFAULT_ROOM_MIN_GROUP_SIZE);
+        $roomCheckinWindow       = (int) ($cfg->room_checkin_window_minutes  ?? LibrarySetting::DEFAULT_ROOM_CHECKIN_WINDOW_MINUTES);
+        $roomRequiresApproval    = (bool) ($cfg->room_booking_requires_approval ?? LibrarySetting::DEFAULT_ROOM_BOOKING_REQUIRES_APPROVAL);
+        $roomOpenTime            = $cfg->room_open_time  ?? LibrarySetting::DEFAULT_ROOM_OPEN_TIME;
+        $roomCloseTime           = $cfg->room_close_time ?? LibrarySetting::DEFAULT_ROOM_CLOSE_TIME;
+        $roomCancelDeadline      = (int) ($cfg->room_cancel_deadline_hours   ?? LibrarySetting::DEFAULT_ROOM_CANCEL_DEADLINE_HOURS);
+
+        $librarySettingsBlock = "[LIBRARY SETTINGS — configured by admin, use these exact values in every answer]\n"
+            . "=== QUY ĐỊNH MƯỢN SÁCH ===\n"
+            . "- Thời hạn mượn mỗi lần: **{$loanPeriodDays} ngày**\n"
+            . "- Số sách được mượn đồng thời tối đa: **{$maxActiveLoans} cuốn**\n"
+            . "- Thời gian ân hạn trả sách (grace period): **{$gracePeriodDays} ngày**\n"
+            . "- Thời hạn tới nhận sách sau khi được duyệt: **{$pickupDeadline} giờ**\n"
+            . "- Số lần bỏ lỡ lịch nhận sách tối đa trước khi bị đình chỉ: **{$maxMissedPickups} lần**\n"
+            . "- Thời gian đình chỉ tài khoản khi vi phạm: **{$suspensionDays} ngày**\n"
+            . "\n=== QUY ĐỊNH TIỀN PHẠT ===\n"
+            . "- Phạt trả sách trễ: **{$finePerDay} VND/ngày**\n"
+            . "- Mức phạt tối đa mỗi phiếu mượn: **{$maxFinePerLoan} VND**\n"
+            . "- Phí đền bù sách bị hỏng: **{$damagedBookFee} VND**\n"
+            . "- Phí đền bù sách bị mất: **{$lostBookFee} VND**\n"
+            . "\n=== QUY ĐỊNH PHÒNG TỰ HỌC ===\n"
+            . "- Giờ mở cửa phòng tự học: **{$roomOpenTime} – {$roomCloseTime}**\n"
+            . "- Thời gian tối đa mỗi lần đặt phòng: **{$roomMaxHoursPerBooking} giờ**\n"
+            . "- Tổng số giờ sử dụng phòng tối đa mỗi tuần: **{$roomMaxHoursPerWeek} giờ/tuần**\n"
+            . "- Số lượt đặt phòng tối đa mỗi ngày: **{$roomMaxBookingsPerDay} lượt/ngày**\n"
+            . "- Có thể đặt phòng trước tối đa: **{$roomAdvanceDays} ngày**\n"
+            . "- Số người tham gia tối thiểu: **{$roomMinGroupSize} người**\n"
+            . "- Thời gian check-in hợp lệ: trong vòng **{$roomCheckinWindow} phút** kể từ giờ bắt đầu\n"
+            . "- Phòng cần duyệt của thủ thư: **" . ($roomRequiresApproval ? 'Có' : 'Không') . "**\n"
+            . "- Hủy phòng trước ít nhất: **{$roomCancelDeadline} giờ** trước giờ bắt đầu\n";
+
         $prompt = "You are a library assistant for the HCMUE library system.\n\n"
             . "[SCOPE - what you CAN answer]\n"
             . "- Book availability and information\n"
@@ -692,13 +740,15 @@ class AiChatController extends Controller
             . "- System credentials or admin info\n\n"
             . "[BEHAVIOR RULES]\n"
             . "- Always respond in the same language as the user (e.g. Vietnamese if they ask in Vietnamese, English if they ask in English).\n"
-            . "- If data is needed (availability, fines), only use the data provided below, never guess.\n"
+            . "- If data is needed (availability, fines, rules), only use the data provided in this prompt, NEVER guess or use prior knowledge.\n"
             . "- If unsure, say: \"Vui lòng liên hệ trực tiếp với thủ thư\" (Please contact the librarian directly).\n"
             . "- Never make up book titles, authors, or availability.\n"
             . "- Always respond concisely and clearly using Markdown (bold text, lists).\n"
             . "- IMPORTANT: When suggesting a book, you MUST include its exact ID as '[ID: X]' (e.g., 'Clean Code [ID: 5]'). The UI uses this to render clickable links.\n"
-            . "- If the student asks about the borrowing process: Request online -> Librarian approves -> Student gets QR code -> Pickup at library within 24 hours.\n"
-            . "- If a book is unavailable (available_quantity = 0), mention they can click \"Đặt chỗ trước\" (Reservation Queue) to wait in line.\n\n"
+            . "- If the student asks about the borrowing process: Request online -> Librarian approves -> Student gets QR code -> Pickup at library within {$pickupDeadline} hours.\n"
+            . "- If a book is unavailable (available_quantity = 0), mention they can click \"Đặt chỗ trước\" (Reservation Queue) to wait in line.\n"
+            . "- CRITICAL: For any question about loan duration, fines, fees, room hours, quotas, or deadlines, you MUST answer using ONLY the values in [LIBRARY SETTINGS] below. Do NOT invent numbers.\n\n"
+            . $librarySettingsBlock . "\n"
             . "[REAL-TIME DATA - inject from DB]\n"
             . "Current user: {$userName}\n"
             . "Active borrowings:\n{$borrowingList}\n"
