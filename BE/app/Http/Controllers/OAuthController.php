@@ -92,6 +92,11 @@ class OAuthController extends Controller
         }
 
         $role = $user->getRoleName();
+
+        if ($role === 'student' && $user->is_disabled) {
+            return redirect($this->frontendOAuthCallback(['error' => 'AccountDisabled']));
+        }
+
         $tokenResult = $user->createToken($role . '-session', ['role:' . $role], now()->addMinutes(15));
         $token = $tokenResult->plainTextToken;
         $tokenId = $tokenResult->accessToken->id;

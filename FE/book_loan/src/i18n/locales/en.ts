@@ -181,6 +181,14 @@ export const en = {
         "supportEmail": "Support Email: thuvien@hcmue.edu.vn",
         "supportHotline": "Technical Hotline: (028) 3835 2020",
         "close": "Close help"
+      },
+      "oauthErrors": {
+        "AccountDisabled": "This account has been disabled. Please contact the library for assistance.",
+        "EmailDomainNotAllowed": "Your email domain is not allowed to login to the system.",
+        "InvalidProvider": "Invalid authentication provider.",
+        "InvalidState": "Invalid or expired security state.",
+        "Unauthorized": "Authentication failed.",
+        "generic": "Authentication failed: {{error}}"
       }
     },
     "landing": {

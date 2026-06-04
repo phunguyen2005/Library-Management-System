@@ -113,6 +113,11 @@ class AdminMemberController extends Controller
             // Revoke all active access tokens so the user is immediately logged out
             $member->tokens()->delete();
 
+            // Revoke all active refresh tokens so they cannot refresh their token
+            \App\Models\RefreshToken::where('user_id', $member->member_id)
+                ->where('user_type', 'student')
+                ->delete();
+
             \App\Services\AuditLoggerService::log(
                 'member_disabled',
                 "Vô hiệu hóa tài khoản thành viên: {$member->name} (ID: {$member->member_id})."

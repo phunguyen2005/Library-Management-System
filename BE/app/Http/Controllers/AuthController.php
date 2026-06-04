@@ -321,6 +321,13 @@ class AuthController extends Controller
             return response()->json(['message' => 'User not found.'], 401);
         }
 
+        if ($role === 'student' && $user->is_disabled) {
+            $refreshTokenModel->delete();
+            return response()->json([
+                'message' => __('messages.auth.account_disabled'),
+            ], 403);
+        }
+
         $refreshTokenModel->delete();
         
         $newPlainRefreshToken = \Illuminate\Support\Str::random(64);

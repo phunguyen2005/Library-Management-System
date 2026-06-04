@@ -180,6 +180,14 @@ export const vi = {
         "supportEmail": "Email hỗ trợ: thuvien@hcmue.edu.vn",
         "supportHotline": "Hotline kỹ thuật: (028) 3835 2020",
         "close": "Đóng trợ giúp"
+      },
+      "oauthErrors": {
+        "AccountDisabled": "Tài khoản này đã bị vô hiệu hóa. Vui lòng liên hệ thư viện để được hỗ trợ.",
+        "EmailDomainNotAllowed": "Tên miền email của bạn không được phép đăng nhập vào hệ thống.",
+        "InvalidProvider": "Nhà cung cấp dịch vụ xác thực không hợp lệ.",
+        "InvalidState": "Yêu cầu xác thực không hợp lệ hoặc đã hết hạn.",
+        "Unauthorized": "Xác thực không thành công.",
+        "generic": "Đăng nhập thất bại: {{error}}"
       }
     },
     "landing": {

@@ -160,4 +160,42 @@ class RefreshTokenTest extends TestCase
             'token_hash' => hash('sha256', $plainRefreshToken),
         ]);
     }
+
+    public function test_refresh_token_fails_when_member_is_disabled(): void
+    {
+        $password = 'Library@2026';
+        $member = Member::query()->findOrFail(1);
+        $member->forceFill([
+            'email' => 'student-disabled-refresh@example.com',
+            'email_verified_at' => now(),
+            'password' => Hash::make($password),
+            'is_disabled' => false,
+        ])->save();
+
+        $response = $this->postJson('/api/login', [
+            'identifier' => 'student-disabled-refresh@example.com',
+            'password' => $password,
+        ]);
+
+        $response->assertOk();
+        $plainRefreshToken = $response->json('refresh_token');
+
+        // Disable user
+        $member->is_disabled = true;
+        $member->save();
+
+        // Call /refresh with the refresh token
+        $refreshResponse = $this->withHeader('Accept-Language', 'en')
+            ->postJson('/api/refresh', [
+                'refresh_token' => $plainRefreshToken,
+            ]);
+
+        $refreshResponse->assertStatus(403)
+            ->assertJsonFragment(['message' => 'This account has been disabled. Please contact the library for assistance.']);
+
+        // Refresh token should be deleted
+        $this->assertDatabaseMissing('refresh_tokens', [
+            'token_hash' => hash('sha256', $plainRefreshToken),
+        ]);
+    }
 }

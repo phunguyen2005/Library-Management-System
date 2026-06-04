@@ -2,12 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
 import { API_BASE_URL } from '../../api/client';
+import { useTranslation } from 'react-i18next';
 
 export default function OAuthCallback() {
   const navigate = useNavigate();
   const location = useLocation();
   const { setSession } = useAuth();
   const [errorMsg, setErrorMsg] = useState('');
+  const { t } = useTranslation();
 
   useEffect(() => {
     const processOAuth = async () => {
@@ -18,7 +20,13 @@ export default function OAuthCallback() {
       const error = params.get('error');
 
       if (error) {
-        setErrorMsg(`Đăng nhập thất bại: ${error}`);
+        let msg = '';
+        if (['AccountDisabled', 'EmailDomainNotAllowed', 'InvalidProvider', 'InvalidState', 'Unauthorized'].includes(error)) {
+          msg = t(`auth.oauthErrors.${error}`);
+        } else {
+          msg = t('auth.oauthErrors.generic', { error });
+        }
+        setErrorMsg(msg);
         setTimeout(() => navigate('/login'), 3000);
         return;
       }
