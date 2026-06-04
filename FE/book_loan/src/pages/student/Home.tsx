@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'motion/react';
 import { fetchBorrowableBooks } from '../../api/bookApi';
 import { getMyRequests } from '../../api/borrowApi';
@@ -10,6 +11,7 @@ import { applyImageFallback } from '../../lib/display';
 import { getErrorMessage } from '../../lib/errors';
 import { emitToast } from '../../notifications/events';
 import { FormattedBook } from '../../types/book';
+import { getIntlLocale } from '../../i18n';
 
 type HomeStats = {
   activeLoans: number;
@@ -26,6 +28,7 @@ const INITIAL_STATS: HomeStats = {
 };
 
 export default function Home() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [newBooks, setNewBooks] = useState<FormattedBook[]>([]);
@@ -84,11 +87,11 @@ export default function Home() {
         setAiRecs(recsResponse);
         setFineSummary(fineSummaryResponse);
       } catch (error: unknown) {
-        const message = getErrorMessage(error, 'Không thể tải dữ liệu trang chủ.');
+        const message = getErrorMessage(error, t('studentHome.loadError'));
 
         if (isActive) {
           setLoadError(message);
-          emitToast({ tone: 'error', title: 'Không thể tải trang chủ', message });
+          emitToast({ tone: 'error', title: t('studentHome.loadError'), message });
         }
       } finally {
         if (isActive) {
@@ -140,28 +143,28 @@ export default function Home() {
 
   const statCards = [
     {
-      label: 'Sách đang mượn',
+      label: t('studentHome.activeLoans'),
       value: isLoadingStats ? '—' : stats.activeLoans,
       accent: 'bg-primary-container text-on-primary-container',
       icon: 'auto_stories',
       onClick: () => navigate('/my-books'),
     },
     {
-      label: 'Sách chờ duyệt',
+      label: t('studentHome.pendingRequests'),
       value: isLoadingStats ? '—' : stats.pendingRequests,
       accent: 'bg-tertiary-container text-on-tertiary-container',
       icon: 'pending_actions',
       onClick: () => navigate('/requests'),
     },
     {
-      label: 'Sách quá hạn',
+      label: t('studentHome.overdueLoans'),
       value: isLoadingStats ? '—' : stats.overdueLoans,
       accent: 'bg-surface-container text-on-surface',
       icon: 'event_busy',
       onClick: () => navigate('/history'),
     },
     {
-      label: 'Tổng đầu sách',
+      label: t('studentHome.catalogCount'),
       value: isLoadingStats ? '—' : stats.catalogCount,
       accent: 'bg-surface-bright text-on-surface',
       icon: 'library_books',
@@ -172,7 +175,7 @@ export default function Home() {
   return (
     <div className="space-y-6 md:space-y-10 p-4 md:p-8">
       {loadError ? (
-        <EmptyState icon="error" title="Không thể tải đầy đủ dữ liệu" message={loadError} />
+        <EmptyState icon="error" title={t('studentHome.loadError')} message={loadError} />
       ) : null}
 
       {fineSummary.has_unpaid ? (
@@ -180,10 +183,10 @@ export default function Home() {
           <span className="material-symbols-outlined text-3xl text-red-600">warning</span>
           <div className="flex-1">
             <p className="text-sm font-bold">
-              Bạn có {fineSummary.count} khoản phạt chưa thanh toán
+              {t('studentHome.fineWarning', { count: fineSummary.count })}
             </p>
             <p className="mt-1 text-xs text-red-700">
-              Tổng nợ hiện tại: <strong>{fineSummary.total_unpaid.toLocaleString('vi-VN')} VND</strong>.
+              {t('studentHome.totalUnpaid', { amount: fineSummary.total_unpaid.toLocaleString(getIntlLocale()) })}
             </p>
           </div>
           <button
@@ -191,7 +194,7 @@ export default function Home() {
             onClick={() => navigate('/fines')}
             className="w-fit rounded-lg bg-red-600 px-4 py-2 text-xs font-bold text-white hover:bg-red-700"
           >
-            Xem chi tiết
+            {t('studentHome.viewDetails')}
           </button>
         </section>
       ) : null}
@@ -225,7 +228,7 @@ export default function Home() {
         ) : bannerBooks.length === 0 ? (
           <div className="scholar-shadow flex min-h-[480px] md:min-h-[360px] w-full flex-col items-center justify-center overflow-hidden rounded-2xl bg-surface-container text-on-surface-variant">
             <span className="material-symbols-outlined mb-2 text-4xl">auto_stories</span>
-            <p>Chưa có sách nổi bật</p>
+            <p>{t('studentHome.noFeatured')}</p>
           </div>
         ) : (
           <div className="relative w-full min-h-[480px] md:min-h-[360px] overflow-hidden rounded-2xl border border-surface-container-high/60 bg-gradient-to-br from-surface-bright/50 via-surface-container-low/40 to-primary-container/15 backdrop-blur-md scholar-shadow">
@@ -243,7 +246,7 @@ export default function Home() {
                     <motion.article
                       key={book.id}
                       role="article"
-                      aria-label={`Sach noi bat: ${book.title}`}
+                      aria-label={`${t('studentHome.borrowableBook')}: ${book.title}`}
                       initial={{ opacity: 0, x: 25 }}
                       animate={{ opacity: 1, x: 0 }}
                       exit={{ opacity: 0, x: -25 }}
@@ -258,7 +261,7 @@ export default function Home() {
                       <div className="max-w-2xl text-left flex flex-col justify-center">
                         <span className="mb-3 inline-flex w-fit items-center gap-1.5 rounded-full border border-primary/20 bg-primary/8 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-primary">
                           <span className="material-symbols-outlined text-sm">local_library</span>
-                          Sách có thể mượn
+                          {t('studentHome.borrowableBook')}
                         </span>
                         
                         <h2 className="mb-2 line-clamp-2 text-2xl font-bold leading-tight text-on-surface md:text-4xl lg:text-5xl tracking-tight">
@@ -266,14 +269,14 @@ export default function Home() {
                         </h2>
                         
                         <p className="mb-4 line-clamp-1 text-sm text-on-surface-variant md:text-lg">
-                          Tác giả: <strong className="font-semibold text-on-surface">{book.author}</strong>
+                          {t('studentHome.author')}: <strong className="font-semibold text-on-surface">{book.author}</strong>
                         </p>
                         
                         {/* Tags Info row */}
                         <div className="mb-6 flex flex-wrap gap-2 text-[10px] font-bold uppercase tracking-wide text-on-surface-variant">
                           <span className="inline-flex items-center gap-1 rounded-full border border-green-500/20 bg-green-500/10 px-3 py-1 text-green-700 dark:text-green-400">
                             <span className="material-symbols-outlined text-xs">check_circle</span>
-                            Còn {book.available_quantity} bản
+                            {t('studentHome.copiesLeft', { count: book.available_quantity })}
                           </span>
                           <span className="inline-flex items-center gap-1 rounded-full border border-surface-container-high bg-surface-container-low px-3 py-1">
                             <span className="material-symbols-outlined text-xs">category</span>
@@ -289,26 +292,26 @@ export default function Home() {
                         <div className="flex flex-wrap gap-2 md:gap-3">
                           <button
                             type="button"
-                            aria-label={`Muon sach ${book.title}`}
+                            aria-label={`${t('studentHome.borrowNow')} ${book.title}`}
                             onClick={() => navigate(`/catalog?book=${book.id}`)}
                             className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-xs font-bold text-white transition-all hover:bg-primary/90 hover:scale-[1.02] hover:-translate-y-0.5 active:scale-[0.98] md:px-6 md:py-3 md:text-sm cursor-pointer shadow-md shadow-primary/20"
                           >
-                            Mượn ngay
+                            {t('studentHome.borrowNow')}
                           </button>
                           <button
                             type="button"
-                            aria-label={`Xem chi tiet ${book.title}`}
+                            aria-label={`${t('studentHome.viewDetails')} ${book.title}`}
                             onClick={() => navigate(`/catalog?q=${encodeURIComponent(book.title)}`)}
                             className="inline-flex items-center gap-2 rounded-xl border border-surface-container-high/80 bg-surface-bright/70 backdrop-blur-sm px-5 py-2.5 text-xs font-semibold text-on-surface transition-all hover:border-primary/30 hover:bg-primary/5 hover:text-primary hover:scale-[1.02] hover:-translate-y-0.5 active:scale-[0.98] md:px-6 md:py-3 md:text-sm cursor-pointer"
                           >
-                            Xem chi tiết
+                            {t('studentHome.viewDetails')}
                           </button>
                         </div>
                       </div>
 
                       {/* Right Cover panel with exact test labels and motion levitation */}
                       <motion.figure
-                        aria-label={`Bia sach noi bat: ${book.title}`}
+                        aria-label={`${t('studentHome.borrowableBook')}: ${book.title}`}
                         animate={{ y: [0, -8, 0] }}
                         transition={{ repeat: Infinity, duration: 4.5, ease: "easeInOut" }}
                         className="relative w-28 mx-auto md:ml-auto md:mr-4 md:w-44 lg:w-52 flex flex-col items-center"
@@ -337,7 +340,7 @@ export default function Home() {
               type="button"
               onClick={() => scrollBanner('left')}
               className="absolute left-4 top-1/2 z-30 -translate-y-1/2 hidden md:flex h-10 w-10 items-center justify-center rounded-full bg-black/20 hover:bg-black/40 text-white backdrop-blur-md opacity-0 group-hover:opacity-100 transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer"
-              aria-label="Sach truoc"
+              aria-label={t('studentHome.prevBook')}
             >
               <span className="material-symbols-outlined text-2xl">chevron_left</span>
             </button>
@@ -345,7 +348,7 @@ export default function Home() {
               type="button"
               onClick={() => scrollBanner('right')}
               className="absolute right-4 top-1/2 z-30 -translate-y-1/2 hidden md:flex h-10 w-10 items-center justify-center rounded-full bg-black/20 hover:bg-black/40 text-white backdrop-blur-md opacity-0 group-hover:opacity-100 transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer"
-              aria-label="Sach tiep theo"
+              aria-label={t('studentHome.nextBook')}
             >
               <span className="material-symbols-outlined text-2xl">chevron_right</span>
             </button>
@@ -363,7 +366,7 @@ export default function Home() {
                         ? 'w-6 bg-primary' 
                         : 'w-2 bg-outline-variant/60 hover:bg-outline-variant dark:bg-outline-variant/30 dark:hover:bg-outline-variant/80'
                     }`}
-                    aria-label={`Chuyển tới slide ${idx + 1}`}
+                    aria-label={t('studentHome.goToSlide', { idx: idx + 1, defaultValue: `Chuyển tới slide ${idx + 1}` })}
                   />
                 ))}
               </div>
@@ -378,10 +381,10 @@ export default function Home() {
           <div>
             <div className="flex items-center gap-2">
               <span className="material-symbols-outlined text-primary text-2xl animate-pulse">sparkles</span>
-              <h3 className="text-2xl font-bold text-on-surface">Gợi ý từ Thủ thư AI HCMUE</h3>
+              <h3 className="text-2xl font-bold text-on-surface">{t('studentHome.aiRecsTitle')}</h3>
             </div>
             <p className="text-sm text-on-surface-variant mt-1">
-              Các tựa sách được đề xuất cá nhân hóa dựa trên lịch sử đọc và sở thích của bạn
+              {t('studentHome.aiRecsSubtitle')}
             </p>
           </div>
         </div>
@@ -402,8 +405,8 @@ export default function Home() {
         ) : aiRecs.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-surface-container-high p-8 text-center text-on-surface-variant bg-surface-bright">
             <span className="material-symbols-outlined text-4xl mb-2 text-outline">smart_toy</span>
-            <p className="text-sm font-semibold">Thủ thư AI chưa thể gợi ý sách cho bạn</p>
-            <p className="text-xs mt-1 text-on-surface-variant">Hãy mượn thêm sách hoặc đưa sách vào danh mục Yêu thích để AI hiểu gu đọc của bạn nhé!</p>
+            <p className="text-sm font-semibold">{t('studentHome.aiRecErrorTitle')}</p>
+            <p className="text-xs mt-1 text-on-surface-variant">{t('studentHome.aiRecErrorDesc')}</p>
           </div>
         ) : (
           <div className="flex overflow-x-auto gap-4 scrollbar-none snap-x snap-mandatory pb-4 md:grid md:grid-cols-3 md:gap-5">
@@ -434,7 +437,7 @@ export default function Home() {
                     {/* AI Choice badge */}
                     <span className="inline-flex w-fit items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-primary border border-primary/20">
                       <span className="material-symbols-outlined text-[10px]">auto_awesome</span>
-                      AI gợi ý
+                      {t('studentHome.aiChoice')}
                     </span>
 
                     {/* Category */}
@@ -454,7 +457,7 @@ export default function Home() {
 
                     {/* Availability */}
                     <span className={`mt-auto w-fit rounded-full px-2 py-0.5 text-[9px] font-bold uppercase ${item.book.is_available ? 'bg-green-500/10 text-green-600 border border-green-500/20' : 'bg-tertiary/10 text-tertiary border border-tertiary/20'}`}>
-                      {item.book.is_available ? '● Còn sách' : '○ Hết sách'}
+                      {item.book.is_available ? `● ${t('studentHome.inStock')}` : `○ ${t('studentHome.outOfStock')}`}
                     </span>
                   </div>
                 </div>
@@ -462,7 +465,7 @@ export default function Home() {
                 {/* AI Reason quote */}
                 <div className="mx-4 mb-3 rounded-xl bg-primary/5 border border-primary/10 p-3 relative">
                   <span className="absolute -top-2 left-3 rounded bg-surface-bright border border-primary/20 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-primary">
-                    Thủ thư khuyên
+                    {t('studentHome.aiLibrarianSuggests')}
                   </span>
                   <p className="mt-1 text-[11px] italic leading-relaxed text-on-surface-variant line-clamp-3">
                     "{item.reason.replace(/^[""]|[""]$/g, '').replace(/^"|"$/g, '')}"
@@ -477,7 +480,7 @@ export default function Home() {
                     className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary/10 border border-primary/20 px-4 py-2 text-xs font-bold text-primary transition-all duration-200 hover:bg-primary hover:text-white cursor-pointer"
                   >
                     <span className="material-symbols-outlined text-sm">auto_stories</span>
-                    Xem & Mượn ngay
+                    {t('studentHome.viewDetails')}
                   </button>
                 </div>
               </div>
@@ -488,21 +491,21 @@ export default function Home() {
 
       <section className="space-y-6">
         <div className="flex items-center justify-between">
-          <h3 className="text-2xl font-bold text-on-surface">Sách mới về</h3>
+          <h3 className="text-2xl font-bold text-on-surface">{t('studentHome.newArrivals')}</h3>
           <button
             onClick={() => navigate('/catalog')}
             className="flex items-center gap-1 font-medium text-primary hover:underline"
           >
-            Xem tất cả <span className="material-symbols-outlined text-sm">arrow_forward</span>
+            {t('studentHome.viewAll')} <span className="material-symbols-outlined text-sm">arrow_forward</span>
           </button>
         </div>
         {isLoadingStats ? (
-          <EmptyState icon="hourglass_empty" title="Đang tải sách mới..." />
+          <EmptyState icon="hourglass_empty" title={t('studentHome.loading')} />
         ) : newBooks.length === 0 ? (
           <EmptyState
             icon="library_books"
-            title="Chưa có sách để hiển thị"
-            message="Danh mục sẽ xuất hiện khi kết nối được với API thư viện."
+            title={t('studentHome.noFeatured')}
+            message={t('studentHome.loadError')}
           />
         ) : (
           <div className="flex overflow-x-auto gap-4 scrollbar-none snap-x snap-mandatory pb-4 md:grid md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 md:gap-8">
@@ -548,16 +551,16 @@ export default function Home() {
       </section>
 
       <footer className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-surface-container-high pt-8 text-sm text-on-surface-variant md:flex-row">
-        <p>© 2024 Ho Chi Minh City University of Education Digital Library. All rights reserved.</p>
+        <p>{t('studentHome.copyright')}</p>
         <div className="flex gap-6">
           <button type="button" onClick={() => navigate('/requests')} className="transition-colors hover:text-primary">
-            Điều khoản mượn trả
+            {t('studentHome.termsOfBorrow')}
           </button>
           <button type="button" onClick={() => navigate('/settings')} className="transition-colors hover:text-primary">
-            Chính sách bảo mật
+            {t('studentHome.privacyPolicy')}
           </button>
           <a href="mailto:library-support@hcmue.edu.vn" className="transition-colors hover:text-primary">
-            Hỗ trợ sinh viên
+            {t('studentHome.studentSupport')}
           </a>
         </div>
       </footer>

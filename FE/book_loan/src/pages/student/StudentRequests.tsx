@@ -12,17 +12,18 @@ import { applyImageFallback, formatDisplayDate, getCoverUrl } from '../../lib/di
 import { getErrorMessage } from '../../lib/errors';
 import { emitToast } from '../../notifications/events';
 import type { MemberBorrowRequest } from '../../types/request';
+import { getIntlLocale } from '../../i18n';
 
 const STATUS_MAP: Record<
   MemberBorrowRequest['status'],
-  { label: string; color: string }
+  { color: string }
 > = {
-  pending: { label: 'Chờ duyệt', color: 'text-blue-600 bg-blue-50 border-blue-200' },
-  approved: { label: 'Chờ nhận sách', color: 'text-amber-600 bg-amber-50 border-amber-200' },
-  borrowed: { label: 'Đang mượn', color: 'text-green-600 bg-green-50 border-green-200' },
-  returned: { label: 'Đã trả', color: 'text-slate-500 bg-slate-100 border-slate-200' },
-  rejected: { label: 'Từ chối', color: 'text-red-600 bg-red-50 border-red-200' },
-  cancelled: { label: 'Đã hủy', color: 'text-slate-400 bg-slate-100 border-slate-200' },
+  pending: { color: 'text-blue-600 bg-blue-50 border-blue-200' },
+  approved: { color: 'text-amber-600 bg-amber-50 border-amber-200' },
+  borrowed: { color: 'text-green-600 bg-green-50 border-green-200' },
+  returned: { color: 'text-slate-500 bg-slate-100 border-slate-200' },
+  rejected: { color: 'text-red-600 bg-red-50 border-red-200' },
+  cancelled: { color: 'text-slate-400 bg-slate-100 border-slate-200' },
 };
 
 type RequestRow = {
@@ -83,7 +84,6 @@ export default function StudentRequests() {
       .then(([borrowData, resData, summaryData]) => {
         const mapped = borrowData.map((r) => {
           const cfg = STATUS_MAP[r.status] || {
-            label: r.status,
             color: 'text-slate-500 bg-slate-100 border-slate-200',
           };
 
@@ -93,9 +93,9 @@ export default function StudentRequests() {
             author: r.author,
             cover: getCoverUrl(r.cover),
             date: formatDisplayDate(r.status === 'rejected' || r.status === 'cancelled' ? r.rejected_at || r.borrow_date : r.borrow_date),
-            dateLabel: r.status === 'rejected' || r.status === 'cancelled' ? 'Ngày hủy' : 'Ngày mượn',
+            dateLabel: r.status === 'rejected' || r.status === 'cancelled' ? t('adminRequests.tabCancelled') : t('studentRequests.dateBorrowed', 'Ngày mượn'),
             rawStatus: r.status,
-            statusLabel: cfg.label,
+            statusLabel: t('status.' + r.status),
             statusColor: cfg.color,
             rejectionReason: r.rejection_reason || null,
             dueDate: r.due_date || null,
@@ -109,9 +109,9 @@ export default function StudentRequests() {
         setFineSummary(summaryData);
       })
       .catch((error: unknown) => {
-        const message = getErrorMessage(error, 'Không thể tải dữ liệu.');
+        const message = getErrorMessage(error, t('studentRequests.loadError', 'Không thể tải dữ liệu.'));
         setError(message);
-        emitToast({ tone: 'error', title: 'Lỗi đồng bộ', message });
+        emitToast({ tone: 'error', title: t('studentRequests.syncError', 'Lỗi đồng bộ'), message });
       })
       .finally(() => setIsLoading(false));
   };
@@ -185,28 +185,28 @@ export default function StudentRequests() {
     try {
       await cancelReservation(reservationId);
       setMyReservations((prev) => prev.filter((r) => r.reservation_id !== reservationId));
-      emitToast({ tone: 'success', title: 'Thành công', message: 'Hủy đặt chỗ thành công' });
+      emitToast({ tone: 'success', title: t('studentRequests.success', 'Thành công'), message: t('studentRequests.cancelReservationSuccess', 'Hủy đặt chỗ thành công') });
     } catch (error: unknown) {
-      const message = getErrorMessage(error, 'Không thể hủy đặt chỗ.');
-      emitToast({ tone: 'error', title: 'Hủy đặt chỗ thất bại', message });
+      const message = getErrorMessage(error, t('studentRequests.cancelReservationError', 'Không thể hủy đặt chỗ.'));
+      emitToast({ tone: 'error', title: t('studentRequests.cancelReservationFailed', 'Hủy đặt chỗ thất bại'), message });
     }
   };
 
   const handleCancelBorrow = async (loanId: number, bookTitle: string) => {
-    if (!window.confirm(`Bạn có chắc muốn hủy yêu cầu mượn sách "${bookTitle}" không?`)) return;
+    if (!window.confirm(t('studentRequests.cancelConfirm', { title: bookTitle }))) return;
     try {
       await cancelBorrow(loanId);
       setAllRequests((prev) =>
         prev.map((r) =>
           r.id === loanId
-            ? { ...r, rawStatus: 'cancelled', statusLabel: 'Đã hủy', statusColor: 'text-slate-400 bg-slate-100 border-slate-200' }
+            ? { ...r, rawStatus: 'cancelled', statusLabel: t('status.cancelled'), statusColor: 'text-slate-400 bg-slate-100 border-slate-200' }
             : r,
         ),
       );
-      emitToast({ tone: 'success', title: 'Đã hủy', message: 'Yêu cầu mượn sách đã được hủy.' });
+      emitToast({ tone: 'success', title: t('status.cancelled'), message: t('studentRequests.cancelSuccess') });
     } catch (error: unknown) {
-      const message = getErrorMessage(error, 'Không thể hủy yêu cầu.');
-      emitToast({ tone: 'error', title: 'Hủy thất bại', message });
+      const message = getErrorMessage(error, t('studentRequests.cancelBorrowError', 'Không thể hủy yêu cầu.'));
+      emitToast({ tone: 'error', title: t('common.error'), message });
     }
   };
 
@@ -216,23 +216,23 @@ export default function StudentRequests() {
     activeTab === 'all' ? allRequests : allRequests.filter((r) => r.rawStatus === activeTab);
 
   const tabs = [
-    { key: 'all', label: `Tất cả (${allRequests.length})` },
-    { key: 'pending', label: `Chờ duyệt (${countOf('pending')})` },
-    { key: 'approved', label: `Chờ nhận sách (${countOf('approved')})` },
-    { key: 'borrowed', label: `Đang mượn (${countOf('borrowed')})` },
-    { key: 'returned', label: `Đã trả (${countOf('returned')})` },
-    { key: 'rejected', label: `Từ chối (${countOf('rejected')})` },
-    { key: 'cancelled', label: `Đã hủy (${countOf('cancelled')})` },
-    { key: 'reservations', label: `Đặt chỗ (${myReservations.length})` },
+    { key: 'all', label: `${t('adminDashboard.inventoryManage.filterAll')} (${allRequests.length})` },
+    { key: 'pending', label: `${t('status.pending')} (${countOf('pending')})` },
+    { key: 'approved', label: `${t('status.approved')} (${countOf('approved')})` },
+    { key: 'borrowed', label: `${t('status.borrowed')} (${countOf('borrowed')})` },
+    { key: 'returned', label: `${t('status.returned')} (${countOf('returned')})` },
+    { key: 'rejected', label: `${t('status.rejected')} (${countOf('rejected')})` },
+    { key: 'cancelled', label: `${t('status.cancelled')} (${countOf('cancelled')})` },
+    { key: 'reservations', label: `${t('studentRequests.reservationsTab', 'Đặt chỗ')} (${myReservations.length})` },
   ] as const;
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6 p-4 md:p-8">
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
         <div>
-          <h2 className="text-3xl font-bold text-on-surface">Yêu cầu mượn sách</h2>
+          <h2 className="text-3xl font-bold text-on-surface">{t('studentRequests.title')}</h2>
           <p className="mt-1 text-sm text-on-surface-variant">
-            Theo dõi quá trình phê duyệt các đơn mượn sách của bạn
+            {t('studentRequests.subtitle')}
           </p>
         </div>
       </div>
@@ -242,12 +242,10 @@ export default function StudentRequests() {
           <span className="material-symbols-outlined text-red-600 text-3xl">warning</span>
           <div className="flex-1">
             <h4 className="font-bold text-sm">
-              Bạn có {fineSummary.count} khoản phạt chưa thanh toán
+              {t('studentHome.fineWarning', { count: fineSummary.count })}
             </h4>
             <p className="text-xs text-red-700 mt-0.5">
-              Bạn đang có khoản nợ phí phạt quá hạn tổng cộng{' '}
-              <strong className="text-red-950 font-extrabold">{fineSummary.total_unpaid.toLocaleString('vi-VN')} VND</strong>. 
-              Vui lòng đến quầy thủ thư để thanh toán phí phạt trước khi tiếp tục mượn sách.
+              {t('studentHome.totalUnpaid', { amount: fineSummary.total_unpaid.toLocaleString(getIntlLocale()) })}
             </p>
           </div>
           <button
@@ -255,7 +253,7 @@ export default function StudentRequests() {
             onClick={() => navigate('/fines')}
             className="w-fit rounded-lg bg-red-600 px-4 py-2 text-xs font-bold text-white hover:bg-red-700"
           >
-            Xem chi tiết
+            {t('studentHome.viewDetails')}
           </button>
         </div>
       )}
@@ -281,19 +279,19 @@ export default function StudentRequests() {
           {isLoading ? (
             <div className="p-10 text-center text-slate-400">
               <span className="material-symbols-outlined mb-3 text-4xl">hourglass_empty</span>
-              <p>Đang tải dữ liệu...</p>
+              <p>{t('common.loading')}</p>
             </div>
           ) : error ? (
             <div className="p-5">
-              <EmptyState icon="error" title="Không thể tải dữ liệu" message={error} />
+              <EmptyState icon="error" title={t('studentHome.loadError')} message={error} />
             </div>
           ) : activeTab === 'reservations' ? (
             myReservations.length === 0 ? (
               <div className="p-5">
                 <EmptyState
                   icon="bookmark"
-                  title="Không có lượt đặt chỗ"
-                  message="Bạn chưa đăng ký đặt chỗ cho bất kỳ sách nào."
+                  title={t('studentRequests.noReservations')}
+                  message={t('studentRequests.noReservationsDesc')}
                 />
               </div>
             ) : (
@@ -319,22 +317,22 @@ export default function StudentRequests() {
                         <span
                           className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-amber-600"
                         >
-                          Đang xếp hàng
+                          {t('studentRequests.queueWaiting')}
                         </span>
                         <span
                           className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-primary"
                         >
-                          Hàng chờ: #{res.position}
+                          {t('studentRequests.queuePosition', { position: res.position })}
                         </span>
                       </div>
-                      <h4 className="truncate text-sm md:text-base font-bold text-on-surface">{res.book?.title || 'Sách không rõ'}</h4>
-                      <p className="text-xs text-on-surface-variant">{res.book?.author || 'Tác giả không rõ'}</p>
+                      <h4 className="truncate text-sm md:text-base font-bold text-on-surface">{res.book?.title || t('common.notAvailable')}</h4>
+                      <p className="text-xs text-on-surface-variant">{res.book?.author || t('common.notAvailable')}</p>
                     </div>
                   </div>
                   <div className="flex items-center justify-between md:flex-col md:items-end gap-2 border-t border-outline-variant pt-3 md:border-t-0 md:pt-0">
                     <div className="text-left md:text-right">
                       <p className="text-[10px] font-bold uppercase tracking-widest text-outline">
-                        Ngày đăng ký
+                        {t('studentRequests.dateBorrowed', 'Ngày đăng ký')}
                       </p>
                       <p className="text-xs md:text-sm font-medium text-slate-700">{formatDisplayDate(res.created_at)}</p>
                     </div>
@@ -343,7 +341,7 @@ export default function StudentRequests() {
                       className="flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-100 hover:text-red-700 transition-colors cursor-pointer"
                     >
                       <span className="material-symbols-outlined text-sm">cancel</span>
-                      Hủy đặt chỗ
+                      {t('studentRequests.cancelReservation')}
                     </button>
                   </div>
                 </div>
@@ -353,8 +351,8 @@ export default function StudentRequests() {
             <div className="p-5">
               <EmptyState
                 icon="pending_actions"
-                title="Không có yêu cầu phù hợp"
-                message="Các yêu cầu mượn, phiếu đang mượn và lịch sử xử lý sẽ xuất hiện tại đây."
+                title={t('studentRequests.noMatchingRequests')}
+                message={t('studentRequests.noMatchingRequestsDesc')}
               />
             </div>
           ) : (
@@ -387,7 +385,7 @@ export default function StudentRequests() {
                     <p className="text-xs text-on-surface-variant">{request.author}</p>
                     {(request.rawStatus === 'rejected' || request.rawStatus === 'cancelled') && request.rejectionReason ? (
                       <p className="mt-1 text-xs text-red-600">
-                        Lý do: {request.rejectionReason}
+                        {t('adminRequests.rejectionReasonLabel', { reason: request.rejectionReason })}
                       </p>
                     ) : null}
                   </div>
@@ -404,7 +402,7 @@ export default function StudentRequests() {
                       <div 
                         onClick={() => setZoomQrCode({ id: request.id.toString(), title: request.book })}
                         className="rounded bg-white p-1 shadow-sm border border-slate-200 cursor-zoom-in hover:border-primary/50 transition-colors"
-                        title="Phóng to mã QR"
+                        title={t('studentRequests.zoomQrCodeAria', 'Phóng to mã QR')}
                       >
                         <QRCodeSVG value={request.id.toString()} size={36} />
                       </div>
@@ -414,7 +412,7 @@ export default function StudentRequests() {
                         className="flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-[10px] font-bold text-red-600 transition-colors hover:bg-red-100 cursor-pointer"
                       >
                         <span className="material-symbols-outlined text-xs">cancel</span>
-                        Hủy
+                        {t('common.cancel')}
                       </button>
                     </div>
                   ) : request.rawStatus !== 'cancelled' ? (
@@ -422,7 +420,7 @@ export default function StudentRequests() {
                       <div 
                         onClick={() => setZoomQrCode({ id: request.id.toString(), title: request.book })}
                         className="rounded bg-white p-1 shadow-sm border border-slate-200 cursor-zoom-in hover:border-primary/50 transition-colors"
-                        title="Phóng to mã QR"
+                        title={t('studentRequests.zoomQrCodeAria', 'Phóng to mã QR')}
                       >
                         <QRCodeSVG value={request.id.toString()} size={36} />
                       </div>
@@ -445,7 +443,7 @@ export default function StudentRequests() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-lg font-bold text-slate-800">Mã QR Giao dịch</h3>
+              <h3 className="text-lg font-bold text-slate-800">{t('studentRequests.qrModalTitle')}</h3>
               <button 
                 type="button" 
                 onClick={() => setZoomQrCode(null)}
@@ -461,7 +459,7 @@ export default function StudentRequests() {
 
             <div className="space-y-1">
               <p className="text-sm font-bold text-slate-800 line-clamp-1">{zoomQrCode.title}</p>
-              <p className="text-xs text-slate-500 font-mono">Mã giao dịch: #{zoomQrCode.id}</p>
+              <p className="text-xs text-slate-500 font-mono">{t('studentRequests.transactionCode')}: #{zoomQrCode.id}</p>
             </div>
 
             <button
@@ -469,7 +467,7 @@ export default function StudentRequests() {
               onClick={() => setZoomQrCode(null)}
               className="w-full rounded-xl bg-primary py-2.5 text-sm font-bold text-white hover:bg-primary-hover transition-colors shadow-md shadow-primary/10"
             >
-              Đóng
+              {t('studentRequests.close')}
             </button>
           </div>
         </div>

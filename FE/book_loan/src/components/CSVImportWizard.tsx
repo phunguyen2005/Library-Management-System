@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import { emitToast } from '../notifications/events';
 import { getErrorMessage } from '../lib/errors';
 
@@ -21,6 +22,254 @@ type CSVImportWizardProps = {
   sampleFileName: string;
 };
 
+const TRANSLATIONS = {
+  vi: {
+    unsupportedFormatTitle: 'Định dạng tệp không được hỗ trợ',
+    unsupportedFormatMessage: 'Vui lòng chọn tệp tin định dạng CSV (.csv)',
+    emptyCsvTitle: 'Tệp CSV trống',
+    emptyCsvMessage: 'Tệp CSV đã chọn không chứa bất kỳ dữ liệu nào.',
+    missingRequiredMappingTitle: 'Ánh xạ thiếu trường bắt buộc',
+    missingRequiredMappingMessage: 'Vui lòng liên kết cột cho: ',
+    validationFailedTitle: 'Xác thực thất bại',
+    validationFailedDefault: 'Lỗi xác thực dữ liệu.',
+    importSuccessTitle: 'Nhập dữ liệu thành công',
+    importExecutionError: 'Lỗi thực thi dữ liệu.',
+    importFailedTitle: 'Thất bại',
+    importFailedDefault: 'Không thể nhập dữ liệu.',
+    title: 'Nhập từ tệp CSV',
+    descriptionBooks: 'Phân tích và nhập danh sách sách & tài liệu số',
+    descriptionMembers: 'Phân tích và nhập danh sách thành viên học giả',
+    close: 'Đóng',
+    stepSelectFile: 'Chọn tệp CSV',
+    stepColumnMapping: 'Đối chiếu cột',
+    stepVerifyFinish: 'Kiểm tra & Hoàn tất',
+    sampleFileTitle: 'Tệp tin CSV Mẫu',
+    sampleFileDesc: 'Tải tệp tin CSV mẫu có chứa các trường thông tin chuẩn của hệ thống.',
+    downloadSample: 'Tải tệp mẫu',
+    selectFileLabel: 'Chọn tệp tin CSV (.csv) từ máy của bạn:',
+    dropAreaPlaceholder: 'Kéo thả tệp tin hoặc nhấp vào đây để chọn',
+    fileLimitHint: 'Chỉ chấp nhận tệp tin định dạng .csv tối đa 4MB',
+    previewTitle: 'Xem trước tệp dữ liệu ({{count}} dòng mẫu):',
+    emptyValue: 'trống',
+    mappingInstructions: '💡 Hướng dẫn khớp cột: Đối chiếu các trường thông tin của thư viện (bên trái) với các cột dữ liệu tương ứng có trong tệp CSV của bạn (bên phải).',
+    systemFieldHeader: 'Trường hệ thống (Thư viện)',
+    csvColumnHeader: 'Cột dữ liệu của bạn (CSV)',
+    requiredField: '* Bắt buộc nhập',
+    optionalField: 'Không bắt buộc',
+    selectColumnPlaceholder: '-- Bỏ qua hoặc Không ánh xạ --',
+    configValidationTitle: 'Cấu hình xác thực & Nhập',
+    allowPartialLabel: 'Chấp nhận nhập bản ghi đúng, bỏ qua bản ghi lỗi (Partial Import)',
+    reRunDryRun: 'Chạy lại xác thực ảo',
+    validatingMessage: 'Hệ thống đang chạy thử validation tệp tin dữ liệu...',
+    dryRunErrorTitle: 'Phát hiện một số lỗi trong tệp dữ liệu!',
+    dryRunSuccessTitle: 'Tuyệt vời! Dữ liệu hoàn toàn hợp lệ.',
+    dryRunSummary: 'Phát hiện {{successCount}} dòng hợp lệ sẵn sàng nhập và {{errorCount}} dòng lỗi cần kiểm tra lại.',
+    errorLogTitle: 'Nhật ký lỗi chi tiết:',
+    back: 'Quay lại',
+    cancel: 'Hủy',
+    continueMapping: 'Tiếp tục (Khớp cột)',
+    runDryRun: 'Chạy thử Xác thực',
+    processing: 'Đang xử lý...',
+    officialImport: 'Nhập dữ liệu chính thức'
+  },
+  en: {
+    unsupportedFormatTitle: 'Unsupported file format',
+    unsupportedFormatMessage: 'Please select a CSV (.csv) file',
+    emptyCsvTitle: 'Empty CSV file',
+    emptyCsvMessage: 'The selected CSV file does not contain any data.',
+    missingRequiredMappingTitle: 'Missing required field mapping',
+    missingRequiredMappingMessage: 'Please link columns for: ',
+    validationFailedTitle: 'Validation failed',
+    validationFailedDefault: 'Data validation error.',
+    importSuccessTitle: 'Data imported successfully',
+    importExecutionError: 'Data execution error.',
+    importFailedTitle: 'Failed',
+    importFailedDefault: 'Could not import data.',
+    title: 'Import from CSV',
+    descriptionBooks: 'Analyze and import book & digital resource lists',
+    descriptionMembers: 'Analyze and import student & scholar lists',
+    close: 'Close',
+    stepSelectFile: 'Select CSV File',
+    stepColumnMapping: 'Column Mapping',
+    stepVerifyFinish: 'Verify & Finish',
+    sampleFileTitle: 'Sample CSV File',
+    sampleFileDesc: 'Download sample CSV file containing standard system fields.',
+    downloadSample: 'Download sample',
+    selectFileLabel: 'Choose CSV (.csv) file from your computer:',
+    dropAreaPlaceholder: 'Drag and drop file or click here to select',
+    fileLimitHint: 'Only accepts .csv files up to 4MB',
+    previewTitle: 'Data Preview ({{count}} sample rows):',
+    emptyValue: 'empty',
+    mappingInstructions: '💡 Column Mapping Instructions: Match library system fields (left) with the corresponding columns in your CSV file (right).',
+    systemFieldHeader: 'System Field (Library)',
+    csvColumnHeader: 'Your Data Column (CSV)',
+    requiredField: '* Required',
+    optionalField: 'Optional',
+    selectColumnPlaceholder: '-- Skip or Unmapped --',
+    configValidationTitle: 'Validation & Import Configuration',
+    allowPartialLabel: 'Allow partial import (import valid rows, skip errors)',
+    reRunDryRun: 'Re-run dry run validation',
+    validatingMessage: 'System is dry-running data file validation...',
+    dryRunErrorTitle: 'Some errors were found in the data file!',
+    dryRunSuccessTitle: 'Excellent! All data is valid.',
+    dryRunSummary: 'Found {{successCount}} valid rows ready for import and {{errorCount}} error rows that need checking.',
+    errorLogTitle: 'Detailed error log:',
+    back: 'Back',
+    cancel: 'Cancel',
+    continueMapping: 'Continue (Map Columns)',
+    runDryRun: 'Run Dry Run Validation',
+    processing: 'Processing...',
+    officialImport: 'Official Import'
+  },
+  zh: {
+    unsupportedFormatTitle: '不支持的文件格式',
+    unsupportedFormatMessage: '请选择CSV (.csv) 格式的文件',
+    emptyCsvTitle: '空CSV文件',
+    emptyCsvMessage: '选定的CSV文件不包含任何数据。',
+    missingRequiredMappingTitle: '缺少必填字段映射',
+    missingRequiredMappingMessage: '请为以下项关联列：',
+    validationFailedTitle: '验证失败',
+    validationFailedDefault: '数据验证错误。',
+    importSuccessTitle: '成功导入数据',
+    importExecutionError: '数据执行错误。',
+    importFailedTitle: '失败',
+    importFailedDefault: '无法导入数据。',
+    title: '从CSV文件导入',
+    descriptionBooks: '分析并导入图书与数字资源列表',
+    descriptionMembers: '分析并导入学者会员列表',
+    close: '关闭',
+    stepSelectFile: '选择CSV文件',
+    stepColumnMapping: '列对齐',
+    stepVerifyFinish: '检查并完成',
+    sampleFileTitle: 'CSV样例文件',
+    sampleFileDesc: '下载包含系统标准信息字段 of CSV样例文件。',
+    downloadSample: '下载样例文件',
+    selectFileLabel: '从您的电脑选择CSV (.csv) 文件：',
+    dropAreaPlaceholder: '拖拽文件或点击此处选择',
+    fileLimitHint: '仅支持最大4MB的.csv文件',
+    previewTitle: '数据预览（{{count}}行示例）：',
+    emptyValue: '空',
+    mappingInstructions: '💡 列映射指南：将图书馆系统字段（左侧）与您的CSV文件中的对应列（右侧）进行比对。',
+    systemFieldHeader: '系统字段 (图书馆)',
+    csvColumnHeader: '您的数据列 (CSV)',
+    requiredField: '* 必填',
+    optionalField: '选填',
+    selectColumnPlaceholder: '-- 忽略或未映射 --',
+    configValidationTitle: '验证与导入配置',
+    allowPartialLabel: '接受导入正确记录，忽略错误记录 (部分导入)',
+    reRunDryRun: '重新运行虚拟验证',
+    validatingMessage: '系统正在试运行数据文件验证...',
+    dryRunErrorTitle: '在数据文件中发现一些错误！',
+    dryRunSuccessTitle: '太棒了！数据完全有效。',
+    dryRunSummary: '发现 {{successCount}} 行有效数据已准备好导入，以及 {{errorCount}} 行错误数据需要检查。',
+    errorLogTitle: '详细错误日志：',
+    back: '返回',
+    cancel: '取消',
+    continueMapping: '继续（对齐列）',
+    runDryRun: '进行虚拟验证',
+    processing: '处理中...',
+    officialImport: '正式导入数据'
+  },
+  ja: {
+    unsupportedFormatTitle: 'サポートされていないファイル形式',
+    unsupportedFormatMessage: 'CSV形式（.csv）のファイルを選択してください',
+    emptyCsvTitle: '空のCSVファイル',
+    emptyCsvMessage: '選択されたCSVファイルにはデータが含まれていません。',
+    missingRequiredMappingTitle: '必須フィールドのマッピング不足',
+    missingRequiredMappingMessage: '次の列を関連付けてください：',
+    validationFailedTitle: '検証失敗',
+    validationFailedDefault: 'データ検証エラー。',
+    importSuccessTitle: 'データのインポートに成功しました',
+    importExecutionError: 'データ実行エラー。',
+    importFailedTitle: '失敗',
+    importFailedDefault: 'データをインポートできませんでした。',
+    title: 'CSVファイルからインポート',
+    descriptionBooks: '書籍およびデジタルリソースのリストを解析してインポート',
+    descriptionMembers: '学者メンバーのリストを解析してインポート',
+    close: '閉じる',
+    stepSelectFile: 'CSVファイルを選択',
+    stepColumnMapping: '列のマッピング',
+    stepVerifyFinish: '確認して完了',
+    sampleFileTitle: 'サンプルCSVファイル',
+    sampleFileDesc: 'システムの標準情報フィールドを含むサンプルCSVファイルをダウンロードします。',
+    downloadSample: 'サンプルをダウンロード',
+    selectFileLabel: 'お使いのコンピュータからCSV（.csv）ファイルを選択してください：',
+    dropAreaPlaceholder: 'ファイルをドラッグ＆ドロップするか、ここをクリックして選択してください',
+    fileLimitHint: '最大4MBの.csvファイルのみ対応',
+    previewTitle: 'データプレビュー（{{count}}行のサンプル）：',
+    emptyValue: '空',
+    mappingInstructions: '💡 マッピング手順：図書館システムフィールド（左）とCSVファイルの対応する列（右）を対照します。',
+    systemFieldHeader: 'システムフィールド（図書館）',
+    csvColumnHeader: 'CSVのデータ列',
+    requiredField: '* 必須',
+    optionalField: '任意',
+    selectColumnPlaceholder: '-- スキップまたは未マッピング --',
+    configValidationTitle: '検証とインポートの設定',
+    allowPartialLabel: '正しいレコードのインポートを許可し、エラーレコードを無視する (部分インポート)',
+    reRunDryRun: '仮想検証を再実行',
+    validatingMessage: 'システムがデータファイルの検証を実行中...',
+    dryRunErrorTitle: 'データファイルにいくつかエラーが検出されました！',
+    dryRunSuccessTitle: '素晴らしい！すべてのデータが有効です。',
+    dryRunSummary: 'インポート準備完了の有効な行が {{successCount}} 行、確認が必要なエラー行が {{errorCount}} 行検出されました。',
+    errorLogTitle: '詳細エラーログ：',
+    back: '戻る',
+    cancel: 'キャンセル',
+    continueMapping: '続行（列をマッピング）',
+    runDryRun: '仮想検証を実行',
+    processing: '処理中...',
+    officialImport: 'データを正式にインポート'
+  },
+  ko: {
+    unsupportedFormatTitle: '지원되지 않는 파일 형식',
+    unsupportedFormatMessage: 'CSV (.csv) 형식의 파일을 선택하십시오',
+    emptyCsvTitle: '빈 CSV 파일',
+    emptyCsvMessage: '선택한 CSV 파일에 데이터가 없습니다.',
+    missingRequiredMappingTitle: '필수 필드 매핑 누락',
+    missingRequiredMappingMessage: '다음 필드에 대한 열을 연결하십시오: ',
+    validationFailedTitle: '검증 실패',
+    validationFailedDefault: '데이터 검증 오류.',
+    importSuccessTitle: '데이터 가져오기 성공',
+    importExecutionError: '데이터 실행 오류.',
+    importFailedTitle: '실패',
+    importFailedDefault: '데이터를 가져올 수 없습니다.',
+    title: 'CSV 파일에서 가져오기',
+    descriptionBooks: '도서 및 디지털 자원 리스트 분석 및 가져오기',
+    descriptionMembers: '학자 회원 리스트 분석 및 가져오기',
+    close: '닫기',
+    stepSelectFile: 'CSV 파일 선택',
+    stepColumnMapping: '열 매핑',
+    stepVerifyFinish: '검사 및 완료',
+    sampleFileTitle: '샘플 CSV 파일',
+    sampleFileDesc: '시스템 표준 정보 필드가 포함된 샘플 CSV 파일을 다운로드합니다.',
+    downloadSample: '샘플 다운로드',
+    selectFileLabel: '컴퓨터에서 CSV (.csv) 파일을 선택하세요:',
+    dropAreaPlaceholder: '파일을 드래그 앤 드롭하거나 여기를 클릭하여 선택하세요',
+    fileLimitHint: '최대 4MB의 .csv 파일만 지원됨',
+    previewTitle: '데이터 미리보기 ({{count}}개 샘플 행):',
+    emptyValue: '비어 있음',
+    mappingInstructions: '💡 열 매핑 안내: 도서관 시스템 필드(왼쪽)와 CSV 파일의 해당 열(오른쪽)을 비교하여 대응하십시오.',
+    systemFieldHeader: '시스템 필드 (도서관)',
+    csvColumnHeader: 'CSV 데이터 열',
+    requiredField: '* 필수 입력',
+    optionalField: '선택 사항',
+    selectColumnPlaceholder: '-- 무시 또는 매핑되지 않음 --',
+    configValidationTitle: '검증 및 가져오기 설정',
+    allowPartialLabel: '올바른 레코드만 가져오고 오류 레코드는 무시 (부분 가져오기)',
+    reRunDryRun: '가상 검증 재실행',
+    validatingMessage: '시스템이 데이터 파일 가상 검증을 실행 중입니다...',
+    dryRunErrorTitle: '데이터 파일에서 일부 오류가 발견되었습니다!',
+    dryRunSuccessTitle: '훌륭합니다! 모든 데이터가 유효합니다.',
+    dryRunSummary: '가져올 준비가 된 유효한 행 {{successCount}}개와 확인이 필요한 오류 행 {{errorCount}}개를 발견했습니다.',
+    errorLogTitle: '상세 오류 로그:',
+    back: '이전',
+    cancel: '취소',
+    continueMapping: '계속 (열 매핑)',
+    runDryRun: '가상 검증 실행',
+    processing: '처리 중...',
+    officialImport: '데이터 공식 가져오기'
+  }
+};
+
 export default function CSVImportWizard({
   isOpen,
   onClose,
@@ -31,6 +280,13 @@ export default function CSVImportWizard({
   sampleCSV,
   sampleFileName,
 }: CSVImportWizardProps) {
+  const { t, i18n } = useTranslation();
+  const currentLang = (i18n.language || 'vi').startsWith('en') ? 'en' :
+                      (i18n.language || 'vi').startsWith('zh') ? 'zh' :
+                      (i18n.language || 'vi').startsWith('ja') ? 'ja' :
+                      (i18n.language || 'vi').startsWith('ko') ? 'ko' : 'vi';
+  const localT = TRANSLATIONS[currentLang];
+
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [file, setFile] = useState<File | null>(null);
   const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
@@ -101,8 +357,8 @@ export default function CSVImportWizard({
     if (!selectedFile.name.endsWith('.csv') && selectedFile.type !== 'text/csv') {
       emitToast({
         tone: 'error',
-        title: 'Định dạng tệp không được hỗ trợ',
-        message: 'Vui lòng chọn tệp tin định dạng CSV (.csv)',
+        title: localT.unsupportedFormatTitle,
+        message: localT.unsupportedFormatMessage,
       });
       return;
     }
@@ -126,8 +382,8 @@ export default function CSVImportWizard({
       if (lines.length === 0) {
         emitToast({
           tone: 'error',
-          title: 'Tệp CSV trống',
-          message: 'Tệp CSV đã chọn không chứa bất kỳ dữ liệu nào.',
+          title: localT.emptyCsvTitle,
+          message: localT.emptyCsvMessage,
         });
         setFile(null);
         return;
@@ -181,8 +437,8 @@ export default function CSVImportWizard({
     if (unmappedRequired.length > 0) {
       emitToast({
         tone: 'error',
-        title: 'Ánh xạ thiếu trường bắt buộc',
-        message: `Vui lòng liên kết cột cho: ${unmappedRequired.map(f => f.label).join(', ')}`,
+        title: localT.missingRequiredMappingTitle,
+        message: `${localT.missingRequiredMappingMessage}${unmappedRequired.map(f => f.label).join(', ')}`,
       });
       return;
     }
@@ -209,8 +465,8 @@ export default function CSVImportWizard({
       });
       setDryRunExecuted(true);
     } catch (err) {
-      const message = getErrorMessage(err, 'Lỗi xác thực dữ liệu.');
-      emitToast({ tone: 'error', title: 'Xác thực thất bại', message });
+      const message = getErrorMessage(err, localT.validationFailedDefault);
+      emitToast({ tone: 'error', title: localT.validationFailedTitle, message });
     } finally {
       setIsProcessing(false);
     }
@@ -230,7 +486,7 @@ export default function CSVImportWizard({
 
       emitToast({
         tone: 'success',
-        title: 'Nhập dữ liệu thành công',
+        title: localT.importSuccessTitle,
         message: response.message,
       });
       onImportSuccess();
@@ -239,13 +495,13 @@ export default function CSVImportWizard({
       const errDetails = (error as any).details;
       if (errDetails && Array.isArray(errDetails.errors)) {
         setDryRunResults({
-          message: 'Lỗi thực thi dữ liệu.',
+          message: localT.importExecutionError,
           success_count: 0,
           errors: errDetails.errors,
         });
       } else {
-        const message = getErrorMessage(error, 'Không thể nhập dữ liệu.');
-        emitToast({ tone: 'error', title: 'Thất bại', message });
+        const message = getErrorMessage(error, localT.importFailedDefault);
+        emitToast({ tone: 'error', title: localT.importFailedTitle, message });
       }
     } finally {
       setIsProcessing(false);
@@ -279,17 +535,17 @@ export default function CSVImportWizard({
           <div>
             <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
               <span className="material-symbols-outlined text-primary text-[24px]">upload_file</span>
-              Nhập từ tệp CSV
+              {localT.title}
             </h3>
             <p className="text-xs text-slate-500 mt-1">
-              Phân tích và nhập danh sách {entityType === 'book' ? 'sách & tài liệu số' : 'thành viên học giả'}
+              {entityType === 'book' ? localT.descriptionBooks : localT.descriptionMembers}
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
             className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
-            aria-label="Đóng"
+            aria-label={localT.close}
           >
             <span className="material-symbols-outlined text-[20px]">close</span>
           </button>
@@ -299,17 +555,17 @@ export default function CSVImportWizard({
         <div className="flex border-b border-slate-100 bg-white px-8 py-3.5 justify-between text-xs font-bold text-slate-400">
           <div className={`flex items-center gap-2 ${step === 1 ? 'text-primary' : step > 1 ? 'text-emerald-600' : ''}`}>
             <span className={`h-5 w-5 rounded-full flex items-center justify-center text-[11px] font-extrabold ${step === 1 ? 'bg-primary text-white' : step > 1 ? 'bg-emerald-600 text-white' : 'bg-slate-100'}`}>1</span>
-            Chọn tệp CSV
+            {localT.stepSelectFile}
           </div>
           <div className="h-[1px] flex-1 bg-slate-100 mx-4 self-center" />
           <div className={`flex items-center gap-2 ${step === 2 ? 'text-primary' : step > 2 ? 'text-emerald-600' : ''}`}>
             <span className={`h-5 w-5 rounded-full flex items-center justify-center text-[11px] font-extrabold ${step === 2 ? 'bg-primary text-white' : step > 2 ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-400'}`}>2</span>
-            Đối chiếu cột
+            {localT.stepColumnMapping}
           </div>
           <div className="h-[1px] flex-1 bg-slate-100 mx-4 self-center" />
           <div className={`flex items-center gap-2 ${step === 3 ? 'text-primary' : ''}`}>
             <span className={`h-5 w-5 rounded-full flex items-center justify-center text-[11px] font-extrabold ${step === 3 ? 'bg-primary text-white' : 'bg-slate-100 text-slate-400'}`}>3</span>
-            Kiểm tra & Hoàn tất
+            {localT.stepVerifyFinish}
           </div>
         </div>
 
@@ -321,8 +577,8 @@ export default function CSVImportWizard({
             <div className="space-y-5">
               <div className="bg-slate-50 border border-slate-200/60 rounded-xl p-4 flex items-center justify-between">
                 <div className="space-y-1">
-                  <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Tệp tin CSV Mẫu</h4>
-                  <p className="text-[11px] text-slate-500">Tải tệp tin CSV mẫu có chứa các trường thông tin chuẩn của hệ thống.</p>
+                  <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">{localT.sampleFileTitle}</h4>
+                  <p className="text-[11px] text-slate-500">{localT.sampleFileDesc}</p>
                 </div>
                 <button
                   type="button"
@@ -330,12 +586,12 @@ export default function CSVImportWizard({
                   className="rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-4 py-2 text-xs font-bold text-slate-700 flex items-center gap-1.5 transition-all shadow-sm shrink-0 cursor-pointer"
                 >
                   <span className="material-symbols-outlined text-[15px]">download</span>
-                  Tải tệp mẫu
+                  {localT.downloadSample}
                 </button>
               </div>
 
               <div className="space-y-2">
-                <label className="block text-xs font-bold text-slate-600">Chọn tệp tin CSV (.csv) từ máy của bạn:</label>
+                <label className="block text-xs font-bold text-slate-600">{localT.selectFileLabel}</label>
                 <div className="border-2 border-dashed border-slate-200 hover:border-primary/50 transition-colors rounded-xl p-8 text-center cursor-pointer relative group bg-slate-50/20">
                   <input
                     type="file"
@@ -348,10 +604,10 @@ export default function CSVImportWizard({
                       cloud_upload
                     </span>
                     <p className="text-sm font-semibold text-slate-700">
-                      {file ? file.name : 'Kéo thả tệp tin hoặc nhấp vào đây để chọn'}
+                      {file ? file.name : localT.dropAreaPlaceholder}
                     </p>
                     <p className="text-xs text-slate-400">
-                      {file ? `${(file.size / 1024).toFixed(1)} KB` : 'Chỉ chấp nhận tệp tin định dạng .csv tối đa 4MB'}
+                      {file ? `${(file.size / 1024).toFixed(1)} KB` : localT.fileLimitHint}
                     </p>
                   </div>
                 </div>
@@ -360,7 +616,7 @@ export default function CSVImportWizard({
               {/* Show CSV parsing preview if file loaded */}
               {file && csvHeaders.length > 0 && (
                 <div className="space-y-2.5">
-                  <h4 className="text-xs font-bold text-slate-700">Xem trước tệp dữ liệu ({csvRowsPreview.length} dòng mẫu):</h4>
+                  <h4 className="text-xs font-bold text-slate-700">{localT.previewTitle.replace('{{count}}', String(csvRowsPreview.length))}</h4>
                   <div className="overflow-x-auto border border-slate-200/80 rounded-xl max-h-48">
                     <table className="w-full text-left text-xs border-collapse">
                       <thead>
@@ -375,7 +631,7 @@ export default function CSVImportWizard({
                           <tr key={rowIndex} className="hover:bg-slate-50/30">
                             {csvHeaders.map((_, colIndex) => (
                               <td key={colIndex} className="px-4 py-2 border-r border-slate-100 whitespace-nowrap text-slate-600 max-w-[150px] truncate">
-                                {row[colIndex] || <em className="text-slate-300">trống</em>}
+                                {row[colIndex] || <em className="text-slate-300">{localT.emptyValue}</em>}
                               </td>
                             ))}
                           </tr>
@@ -392,13 +648,23 @@ export default function CSVImportWizard({
           {step === 2 && (
             <div className="space-y-4">
               <div className="bg-slate-50 border border-slate-200/50 rounded-xl p-4 text-xs text-slate-600">
-                💡 <strong>Hướng dẫn khớp cột:</strong> Đối chiếu các trường thông tin của thư viện (bên trái) với các cột dữ liệu tương ứng có trong tệp CSV của bạn (bên phải).
+                {(() => {
+                  const parts = localT.mappingInstructions.split(':');
+                  if (parts.length > 1) {
+                    return (
+                      <>
+                        <strong>{parts[0]}:</strong>{parts.slice(1).join(':')}
+                      </>
+                    );
+                  }
+                  return localT.mappingInstructions;
+                })()}
               </div>
 
               <div className="border border-slate-200 rounded-2xl overflow-hidden divide-y divide-slate-100 bg-white">
                 <div className="grid grid-cols-2 bg-slate-50/50 p-4 text-xs font-bold text-slate-500">
-                  <div>Trường hệ thống (Thư viện)</div>
-                  <div>Cột dữ liệu của bạn (CSV)</div>
+                  <div>{localT.systemFieldHeader}</div>
+                  <div>{localT.csvColumnHeader}</div>
                 </div>
                 {expectedFields.map((field) => (
                   <div key={field.key} className="grid grid-cols-2 p-4 items-center gap-4 hover:bg-slate-50/30">
@@ -406,15 +672,15 @@ export default function CSVImportWizard({
                       <span className="text-xs font-bold text-slate-700 block">{field.label}</span>
                       <span className="text-[10px] text-slate-400 block mt-0.5">
                         {field.required ? (
-                          <span className="text-red-500 font-extrabold font-mono">* Bắt buộc nhập</span>
+                          <span className="text-red-500 font-extrabold font-mono">{localT.requiredField}</span>
                         ) : (
-                          'Không bắt buộc'
+                          localT.optionalField
                         )}
                       </span>
                     </div>
                     <div>
                       <select
-                        aria-label={`Ghép cột ${field.label}`}
+                        aria-label={`${localT.stepColumnMapping} ${field.label}`}
                         value={columnMapping[field.key] || ''}
                         onChange={(e) => setColumnMapping({
                           ...columnMapping,
@@ -422,7 +688,7 @@ export default function CSVImportWizard({
                         })}
                         className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20"
                       >
-                        <option value="">-- Bỏ qua hoặc Không ánh xạ --</option>
+                        <option value="">{localT.selectColumnPlaceholder}</option>
                         {csvHeaders.map((header, i) => (
                           <option key={i} value={header}>{header}</option>
                         ))}
@@ -439,7 +705,7 @@ export default function CSVImportWizard({
             <div className="space-y-5">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-slate-50 border border-slate-200/60 rounded-xl p-4 gap-4">
                 <div className="space-y-1">
-                  <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Cấu hình xác thực & Nhập</h4>
+                  <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">{localT.configValidationTitle}</h4>
                   <div className="flex items-center gap-2 mt-1">
                     <input
                       id="allow-partial-checkbox"
@@ -449,7 +715,7 @@ export default function CSVImportWizard({
                       className="rounded border-slate-300 text-primary focus:ring-primary"
                     />
                     <label htmlFor="allow-partial-checkbox" className="text-xs text-slate-600 font-semibold select-none cursor-pointer">
-                      Chấp nhận nhập bản ghi đúng, bỏ qua bản ghi lỗi (Partial Import)
+                      {localT.allowPartialLabel}
                     </label>
                   </div>
                 </div>
@@ -460,7 +726,7 @@ export default function CSVImportWizard({
                   className="rounded-xl bg-purple-600 hover:bg-purple-700 px-4 py-2 text-xs font-bold text-white shadow-md shadow-purple-600/10 flex items-center gap-1.5 transition-all shrink-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <span className="material-symbols-outlined text-[15px]">verified</span>
-                  Chạy lại xác thực ảo
+                  {localT.reRunDryRun}
                 </button>
               </div>
 
@@ -468,7 +734,7 @@ export default function CSVImportWizard({
               {isProcessing && !dryRunExecuted && (
                 <div className="flex flex-col items-center justify-center py-16 gap-3">
                   <div className="w-8 h-8 border-3 border-primary border-t-transparent rounded-full animate-spin" />
-                  <p className="text-xs text-slate-500 animate-pulse font-semibold">Hệ thống đang chạy thử validation tệp tin dữ liệu...</p>
+                  <p className="text-xs text-slate-500 animate-pulse font-semibold">{localT.validatingMessage}</p>
                 </div>
               )}
 
@@ -486,12 +752,13 @@ export default function CSVImportWizard({
                     <div>
                       <h4 className="font-extrabold text-sm leading-snug">
                         {dryRunResults.errors.length > 0
-                          ? 'Phát hiện một số lỗi trong tệp dữ liệu!'
-                          : 'Tuyệt vời! Dữ liệu hoàn toàn hợp lệ.'}
+                          ? localT.dryRunErrorTitle
+                          : localT.dryRunSuccessTitle}
                       </h4>
                       <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                        Phát hiện <strong>{dryRunResults.success_count} dòng hợp lệ</strong> sẵn sàng nhập 
-                        và <strong>{dryRunResults.errors.length} dòng lỗi</strong> cần kiểm tra lại.
+                        {localT.dryRunSummary
+                          .replace('{{successCount}}', String(dryRunResults.success_count))
+                          .replace('{{errorCount}}', String(dryRunResults.errors.length))}
                       </p>
                     </div>
                   </div>
@@ -501,7 +768,7 @@ export default function CSVImportWizard({
                     <div className="space-y-2">
                       <h5 className="text-xs font-bold text-red-800 flex items-center gap-1">
                         <span className="material-symbols-outlined text-[15px] font-bold">error</span>
-                        Nhật ký lỗi chi tiết:
+                        {localT.errorLogTitle}
                       </h5>
                       <div className="border border-red-100 bg-red-50/30 rounded-xl p-3.5 max-h-48 overflow-y-auto space-y-1.5 text-xs text-red-700">
                         {dryRunResults.errors.map((err, i) => (
@@ -530,7 +797,7 @@ export default function CSVImportWizard({
                 disabled={isProcessing}
                 className="rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-5 py-2.5 font-bold text-slate-600 transition-colors shadow-sm cursor-pointer disabled:opacity-50"
               >
-                Quay lại
+                {localT.back}
               </button>
             )}
           </div>
@@ -542,7 +809,7 @@ export default function CSVImportWizard({
               disabled={isProcessing}
               className="rounded-xl bg-slate-100 hover:bg-slate-200 px-5 py-2.5 font-bold text-slate-600 transition-colors cursor-pointer disabled:opacity-50"
             >
-              Hủy
+              {localT.cancel}
             </button>
 
             {step === 1 && (
@@ -552,7 +819,7 @@ export default function CSVImportWizard({
                 disabled={!file}
                 className="rounded-xl bg-primary px-5 py-2.5 font-bold text-white shadow-md shadow-primary/10 transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
               >
-                Tiếp tục (Khớp cột)
+                {localT.continueMapping}
               </button>
             )}
 
@@ -562,7 +829,7 @@ export default function CSVImportWizard({
                 onClick={handleNextToStep3}
                 className="rounded-xl bg-primary px-5 py-2.5 font-bold text-white shadow-md shadow-primary/10 transition-opacity hover:opacity-90 cursor-pointer"
               >
-                Chạy thử Xác thực
+                {localT.runDryRun}
               </button>
             )}
 
@@ -576,12 +843,12 @@ export default function CSVImportWizard({
                 {isProcessing ? (
                   <>
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Đang xử lý...
+                    {localT.processing}
                   </>
                 ) : (
                   <>
                     <span className="material-symbols-outlined text-[16px]">check_circle</span>
-                    Nhập dữ liệu chính thức
+                    {localT.officialImport}
                   </>
                 )}
               </button>

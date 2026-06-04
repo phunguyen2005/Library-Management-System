@@ -16,6 +16,7 @@ import {
 import { emitToast } from '../../notifications/events';
 import { getErrorMessage } from '../../lib/errors';
 import PageLoader from '../../components/PageLoader';
+import { getIntlLocale } from '../../i18n';
 
 export default function Gamification() {
   const { t } = useTranslation();
@@ -43,7 +44,7 @@ export default function Gamification() {
       emitToast({
         tone: 'error',
         title: t('common.error'),
-        message: getErrorMessage(err, 'Không thể tải dữ liệu gamification.'),
+        message: getErrorMessage(err, t('gamify.loadDataError', 'Không thể tải dữ liệu gamification.')),
       });
     } finally {
       setIsLoading(false);
@@ -72,7 +73,7 @@ export default function Gamification() {
       emitToast({
         tone: 'error',
         title: t('common.error'),
-        message: getErrorMessage(err, 'Điểm danh thất bại.'),
+        message: getErrorMessage(err, t('gamify.checkInError', 'Điểm danh thất bại.')),
       });
     } finally {
       setIsActionPending(false);
@@ -96,7 +97,7 @@ export default function Gamification() {
       emitToast({
         tone: 'error',
         title: t('common.error'),
-        message: getErrorMessage(err, 'Đổi phần thưởng thất bại.'),
+        message: getErrorMessage(err, t('gamify.redeemError', 'Đổi phần thưởng thất bại.')),
       });
     } finally {
       setIsActionPending(false);
@@ -185,7 +186,7 @@ export default function Gamification() {
             <div className="space-y-2 mt-6 z-10">
               <div className="flex justify-between text-xs font-semibold text-on-surface-variant">
                 <span>{xpInCurrentLevel} / 200 XP</span>
-                <span>{progressPercent}% đến Lvl {level + 1}</span>
+                <span>{progressPercent}% {t('gamify.toLevel', 'đến Cấp')} {level + 1}</span>
               </div>
               <div className="h-3 w-full bg-surface-container-high rounded-full overflow-hidden">
                 <motion.div
@@ -200,7 +201,7 @@ export default function Gamification() {
             {/* Check-in Actions */}
             <div className="mt-6 flex flex-wrap gap-4 items-center justify-between z-10">
               <p className="text-xs text-on-surface-variant italic">
-                {isCheckedInToday ? t('gamify.alreadyCheckedIn') : 'Hãy điểm danh ngay hôm nay để duy trì streak!'}
+                {isCheckedInToday ? t('gamify.alreadyCheckedIn') : t('gamify.checkInPrompt', 'Hãy điểm danh ngay hôm nay để duy trì chuỗi!')}
               </p>
               <button
                 type="button"
@@ -215,7 +216,7 @@ export default function Gamification() {
                 <span className="material-symbols-outlined text-lg">
                   {isCheckedInToday ? 'check_circle' : 'calendar_today'}
                 </span>
-                {isCheckedInToday ? 'Đã điểm danh (Xem chi tiết)' : t('gamify.checkInButton')}
+                {isCheckedInToday ? t('gamify.alreadyCheckedInBtn', 'Đã điểm danh (Xem chi tiết)') : t('gamify.checkInButton')}
               </button>
             </div>
           </div>
@@ -247,7 +248,7 @@ export default function Gamification() {
                       <span className="inline-block text-[10px] font-bold text-primary mt-2 uppercase tracking-wide bg-primary/10 px-2 py-0.5 rounded-md">
                         {ticket.expires_at
                           ? t('gamify.ticketExpiresAt', {
-                              date: new Date(ticket.expires_at).toLocaleDateString('vi-VN'),
+                              date: new Date(ticket.expires_at).toLocaleDateString(getIntlLocale()),
                             })
                           : t('gamify.ticketActive')}
                       </span>
@@ -334,7 +335,7 @@ export default function Gamification() {
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
           {badges.map((badge) => {
             const earnDate = badge.earned_at
-              ? new Date(badge.earned_at).toLocaleDateString('vi-VN')
+              ? new Date(badge.earned_at).toLocaleDateString(getIntlLocale())
               : null;
             return (
               <motion.div
@@ -430,7 +431,7 @@ export default function Gamification() {
                       ? t('gamify.storeRedeeming')
                       : hasEnoughPoints
                       ? t('gamify.storeRedeem')
-                      : 'Không đủ điểm 🪙'}
+                      : t('gamify.insufficientPoints', 'Không đủ điểm 🪙')}
                   </button>
                 </div>
               </div>
@@ -456,7 +457,7 @@ export default function Gamification() {
                 <div>
                   <h4 className="text-sm font-bold text-on-surface">{log.description}</h4>
                   <span className="text-[10px] text-on-surface-variant">
-                    {new Date(log.created_at).toLocaleString('vi-VN')}
+                    {new Date(log.created_at).toLocaleString(getIntlLocale())}
                   </span>
                 </div>
                 <div className="text-right font-bold text-xs shrink-0">
@@ -513,30 +514,38 @@ export default function Gamification() {
               </div>
 
               <h3 className="text-xl font-extrabold text-green-600 leading-tight">
-                {isCheckedInToday ? 'Thông tin điểm danh' : 'Điểm danh thành công! 🎉'}
+                {isCheckedInToday ? t('gamify.modalInfoTitle', 'Thông tin điểm danh') : t('gamify.modalSuccessTitle', 'Điểm danh thành công! 🎉')}
               </h3>
               <p className="text-sm text-on-surface-variant mt-2 px-1">
                 {isCheckedInToday 
-                  ? 'Hôm nay bạn đã hoàn thành điểm danh chuyên cần.' 
-                  : 'Hệ thống đã ghi nhận lịch trình điểm danh chuyên cần của bạn ngày hôm nay.'}
+                  ? t('gamify.modalInfoDesc', 'Hôm nay bạn đã hoàn thành điểm danh chuyên cần.') 
+                  : t('gamify.modalSuccessDesc', 'Hệ thống đã ghi nhận lịch trình điểm danh chuyên cần của bạn ngày hôm nay.')}
               </p>
 
               <div className="mt-4 flex flex-col gap-1 items-center justify-center">
-                <p className="text-sm font-bold text-green-600">+20 XP Kinh nghiệm</p>
+                <p className="text-sm font-bold text-green-600">
+                  {t('gamify.xpGainMsg', '+{{count}} XP Kinh nghiệm', { count: 20 })}
+                </p>
                 <p className="text-sm font-bold text-primary">
-                  +{profile?.history?.find(log => log.event_type === 'check_in')?.points_changed || 10} Điểm thưởng 🪙
+                  {t('gamify.pointsGainMsg', '+{{count}} Điểm thưởng 🪙', {
+                    count: profile?.history?.find(log => log.event_type === 'check_in')?.points_changed || 10
+                  })}
                 </p>
               </div>
 
               {/* 7-day Progress Journey Map */}
               <div className="mt-4 w-full bg-surface-container-low border border-surface-container-high rounded-xl p-3">
-                <p className="text-[10px] font-black text-on-surface-variant uppercase tracking-wider mb-2 text-left">Hành trình 7 ngày</p>
+                <p className="text-[10px] font-black text-on-surface-variant uppercase tracking-wider mb-2 text-left">
+                  {t('gamify.journeyMapTitle', 'Hành trình 7 ngày')}
+                </p>
                 <div className="flex justify-between items-center gap-1">
                   {daysOfJourney.map((day) => {
                     const isDayDone = day.isCompleted || day.isToday;
                     return (
                       <div key={day.dayNum} className="flex flex-col items-center shrink-0 min-w-[36px]">
-                        <span className="text-[9px] font-bold text-on-surface-variant mb-1">N{day.dayNum}</span>
+                        <span className="text-[9px] font-bold text-on-surface-variant mb-1">
+                          {t('gamify.dayAbbrev', 'N{{day}}', { day: day.dayNum })}
+                        </span>
                         <div
                           className={`h-8 w-8 rounded-full flex items-center justify-center text-[10px] font-black transition-all relative ${
                             isDayDone
@@ -560,7 +569,7 @@ export default function Gamification() {
 
               {profile?.daily_streak !== undefined && (
                 <p className="mt-4 text-xs font-semibold text-on-surface-variant bg-surface-container-low px-3 py-1 rounded-full border border-surface-container-high">
-                  Chuỗi hiện tại: <strong className="text-primary">{profile.daily_streak} ngày 🔥</strong>
+                  {t('gamify.currentStreak', 'Chuỗi hiện tại: {{count}} ngày 🔥', { count: profile.daily_streak })}
                 </p>
               )}
 
@@ -570,7 +579,7 @@ export default function Gamification() {
                   onClick={() => setShowSuccessModal(false)}
                   className="w-full py-3 rounded-xl bg-green-600 text-white font-bold hover:bg-green-700 shadow-md hover:shadow-lg transition-all cursor-pointer transform hover:-translate-y-0.5"
                 >
-                  Đóng
+                  {t('gamify.closeBtn', 'Đóng')}
                 </button>
               </div>
             </motion.div>

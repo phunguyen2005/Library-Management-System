@@ -1,10 +1,67 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { getNotifications, markAllNotificationsAsRead, markNotificationAsRead, type AppNotification } from '../api/notificationApi';
 import { useAuth } from '../auth/AuthContext';
 import { emitToast } from '../notifications/events';
 import { echoClient } from '../lib/echo';
+import { getIntlLocale } from '../i18n';
+
+const TRANSLATIONS = {
+  vi: {
+    newNotification: 'Thông báo mới',
+    errorTitle: 'Lỗi',
+    markAsReadError: 'Không thể đánh dấu đã đọc.',
+    markAllAsReadError: 'Không thể đánh dấu tất cả đã đọc.',
+    title: 'Thông báo',
+    markAllRead: 'Đánh dấu tất cả đã đọc',
+    emptyState: 'Không có thông báo nào.'
+  },
+  en: {
+    newNotification: 'New notification',
+    errorTitle: 'Error',
+    markAsReadError: 'Could not mark notification as read.',
+    markAllAsReadError: 'Could not mark all notifications as read.',
+    title: 'Notifications',
+    markAllRead: 'Mark all as read',
+    emptyState: 'No notifications.'
+  },
+  zh: {
+    newNotification: '新通知',
+    errorTitle: '错误',
+    markAsReadError: '无法标记通知为已读。',
+    markAllAsReadError: '无法将所有通知标记为已读。',
+    title: '通知',
+    markAllRead: '全部标记为已读',
+    emptyState: '没有新通知。'
+  },
+  ja: {
+    newNotification: '新しい通知',
+    errorTitle: 'エラー',
+    markAsReadError: '通知を既読にできませんでした。',
+    markAllAsReadError: 'すべての通知を既読にできませんでした。',
+    title: '通知',
+    markAllRead: 'すべて既読にする',
+    emptyState: '通知はありません。'
+  },
+  ko: {
+    newNotification: '새 알림',
+    errorTitle: '오류',
+    markAsReadError: '알림을 읽음으로 표시할 수 없습니다.',
+    markAllAsReadError: '모든 알림을 읽음으로 표시할 수 없습니다.',
+    title: '알림',
+    markAllRead: '모두 읽음으로 표시',
+    emptyState: '알림이 없습니다.'
+  }
+};
 
 export default function NotificationDropdown() {
+  const { t, i18n } = useTranslation();
+  const currentLang = (i18n.language || 'vi').startsWith('en') ? 'en' :
+                      (i18n.language || 'vi').startsWith('zh') ? 'zh' :
+                      (i18n.language || 'vi').startsWith('ja') ? 'ja' :
+                      (i18n.language || 'vi').startsWith('ko') ? 'ko' : 'vi';
+  const localT = TRANSLATIONS[currentLang];
+
   const { user } = useAuth();
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [isOpen, setIsOpen] = useState(false);
@@ -39,7 +96,7 @@ export default function NotificationDropdown() {
         read_at: null,
         created_at: new Date().toISOString(),
         data: {
-          message: notification.message || notification.data?.message || 'Thông báo mới',
+          message: notification.message || notification.data?.message || localT.newNotification,
           ...notification
         }
       };
@@ -54,7 +111,7 @@ export default function NotificationDropdown() {
       // Screen Toast notification
       emitToast({
         tone: 'info',
-        title: 'Thông báo mới',
+        title: localT.newNotification,
         message: newNotification.data.message
       });
     });
@@ -62,7 +119,7 @@ export default function NotificationDropdown() {
     return () => {
       echoClient.leave(channelName);
     };
-  }, [user]);
+  }, [user, localT.newNotification]);
 
   useEffect(() => {
     const handler = (event: MouseEvent) => {
@@ -90,7 +147,7 @@ export default function NotificationDropdown() {
       );
       setUnreadCount((prev) => Math.max(0, prev - 1));
     } catch {
-      emitToast({ tone: 'error', title: 'Lỗi', message: 'Không thể đánh dấu đã đọc.' });
+      emitToast({ tone: 'error', title: localT.errorTitle, message: localT.markAsReadError });
     }
   };
 
@@ -102,7 +159,7 @@ export default function NotificationDropdown() {
       );
       setUnreadCount(0);
     } catch {
-      emitToast({ tone: 'error', title: 'Lỗi', message: 'Không thể đánh dấu tất cả đã đọc.' });
+      emitToast({ tone: 'error', title: localT.errorTitle, message: localT.markAllAsReadError });
     }
   };
 
@@ -129,13 +186,13 @@ export default function NotificationDropdown() {
       {isOpen && (
         <div className="absolute left-4 right-4 top-14 md:absolute md:left-auto md:right-0 md:top-full z-50 mt-2 w-auto md:w-80 overflow-hidden rounded-xl border border-surface-container-low bg-surface-bright shadow-2xl animate-in fade-in slide-in-from-top-2 duration-200 md:animate-none">
           <div className="flex items-center justify-between border-b border-surface-container-low px-4 py-3">
-            <h3 className="text-sm font-bold text-on-surface">Thông báo</h3>
+            <h3 className="text-sm font-bold text-on-surface">{localT.title}</h3>
             {unreadCount > 0 && (
               <button
                 onClick={handleMarkAllAsRead}
                 className="text-xs font-semibold text-primary hover:underline"
               >
-                Đánh dấu tất cả đã đọc
+                {localT.markAllRead}
               </button>
             )}
           </div>
@@ -155,7 +212,7 @@ export default function NotificationDropdown() {
                       )}
                     </div>
                     <span className="text-[10px] text-outline">
-                      {new Date(notification.created_at).toLocaleString('vi-VN')}
+                      {new Date(notification.created_at).toLocaleString(getIntlLocale())}
                     </span>
                   </>
                 );
@@ -183,7 +240,7 @@ export default function NotificationDropdown() {
               })
             ) : (
               <div className="p-8 text-center text-sm text-on-surface-variant">
-                Không có thông báo nào.
+                {localT.emptyState}
               </div>
             )}
           </div>

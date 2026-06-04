@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { fetchFavoriteBooks, removeFavoriteBook } from '../../api/favoriteApi';
 import EmptyState from '../../components/EmptyState';
 import { applyImageFallback } from '../../lib/display';
@@ -8,6 +9,7 @@ import { emitToast } from '../../notifications/events';
 import type { FormattedBook } from '../../types/book';
 
 export default function Favorites() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [books, setBooks] = useState<FormattedBook[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -32,11 +34,11 @@ export default function Favorites() {
           return;
         }
 
-        const message = getErrorMessage(error, 'Không thể tải sách yêu thích.');
+        const message = getErrorMessage(error, t('studentFavorites.loadError'));
 
         if (isActive) {
           setLoadError(message);
-          emitToast({ tone: 'error', title: 'Không thể tải sách yêu thích', message });
+          emitToast({ tone: 'error', title: t('studentFavorites.loadError'), message });
         }
       } finally {
         if (isActive) {
@@ -50,7 +52,7 @@ export default function Favorites() {
     return () => {
       isActive = false;
     };
-  }, []);
+  }, [t]);
 
   const handleRemove = async (book: FormattedBook) => {
     setRemovingId(book.id);
@@ -60,7 +62,7 @@ export default function Favorites() {
       setBooks((current) => current.filter((item) => item.id !== book.id));
       emitToast({
         tone: 'success',
-        title: 'Đã bỏ khỏi yêu thích',
+        title: t('studentFavorites.removeSuccess'),
         message: response.message,
       });
     } catch (error: unknown) {
@@ -68,8 +70,8 @@ export default function Favorites() {
         return;
       }
 
-      const message = getErrorMessage(error, 'Không thể cập nhật sách yêu thích.');
-      emitToast({ tone: 'error', title: 'Không thể bỏ yêu thích', message });
+      const message = getErrorMessage(error, t('studentFavorites.removeError'));
+      emitToast({ tone: 'error', title: t('studentFavorites.removeError'), message });
     } finally {
       setRemovingId(null);
     }
@@ -80,11 +82,11 @@ export default function Favorites() {
       <header className="flex flex-col gap-2.5 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-xs font-bold uppercase tracking-widest text-outline">
-            Bộ sưu tập cá nhân
+            {t('studentFavorites.eyebrow')}
           </p>
-          <h2 className="mt-2 text-3xl font-bold text-on-surface">Sách yêu thích</h2>
+          <h2 className="mt-2 text-3xl font-bold text-on-surface">{t('studentFavorites.title')}</h2>
           <p className="mt-2 max-w-2xl text-sm text-on-surface-variant">
-            Lưu lại những đầu sách bạn muốn mượn sau và dùng làm tín hiệu gợi ý sách.
+            {t('studentFavorites.subtitle')}
           </p>
         </div>
         <button
@@ -93,7 +95,7 @@ export default function Favorites() {
           className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-bold text-white shadow-lg shadow-primary/20 transition-transform hover:scale-[1.02] active:scale-95"
         >
           <span className="material-symbols-outlined text-[18px]">search</span>
-          Tìm thêm sách
+          {t('studentFavorites.findMore')}
         </button>
       </header>
 
@@ -109,7 +111,7 @@ export default function Favorites() {
       ) : loadError ? (
         <EmptyState
           icon="error"
-          title="Không thể tải sách yêu thích"
+          title={t('studentFavorites.loadError')}
           message={loadError}
           action={
             <button
@@ -117,22 +119,22 @@ export default function Favorites() {
               onClick={() => window.location.reload()}
               className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white"
             >
-              Thử lại
+              {t('studentFavorites.retry')}
             </button>
           }
         />
       ) : books.length === 0 ? (
         <EmptyState
           icon="favorite"
-          title="Chưa có sách yêu thích"
-          message="Đánh dấu sách trong danh mục để tạo danh sách đọc riêng của bạn."
+          title={t('studentFavorites.emptyTitle')}
+          message={t('studentFavorites.emptyDesc')}
           action={
             <button
               type="button"
               onClick={() => navigate('/catalog')}
               className="rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white"
             >
-              Mở danh mục
+              {t('studentFavorites.openCatalog')}
             </button>
           }
         />
@@ -182,7 +184,7 @@ export default function Favorites() {
                       }
                       className="rounded-lg bg-primary-container px-3 py-1.5 text-xs font-bold text-primary cursor-pointer"
                     >
-                      {book.is_digital ? 'Đọc ngay' : 'Chi tiết'}
+                      {book.is_digital ? t('studentFavorites.readNow') : t('studentFavorites.details')}
                     </button>
                     <button
                       type="button"
@@ -232,8 +234,8 @@ export default function Favorites() {
                     </p>
                   </div>
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between text-[10px] md:text-xs text-on-surface-variant gap-1">
-                    <span>{book.is_digital ? 'Tài nguyên trực tuyến' : `${book.available_quantity} bản sẵn sàng`}</span>
-                    <span className="hidden sm:inline">{Number(book.favorite_count ?? 0)} lượt thích</span>
+                    <span>{book.is_digital ? t('studentFavorites.onlineResource') : t('studentFavorites.copiesAvailable', { count: book.available_quantity })}</span>
+                    <span className="hidden sm:inline">{t('studentFavorites.likes', { count: Number(book.favorite_count ?? 0) })}</span>
                   </div>
                   <div className="flex items-center gap-2 md:gap-3">
                     <button
@@ -245,13 +247,13 @@ export default function Favorites() {
                       }
                       className="flex-1 rounded-lg bg-primary-container py-1.5 md:py-2 text-xs md:text-sm font-bold text-primary cursor-pointer"
                     >
-                      {book.is_digital ? 'Đọc ngay' : 'Chi tiết'}
+                      {book.is_digital ? t('studentFavorites.readNow') : t('studentFavorites.details')}
                     </button>
                     <button
                       type="button"
                       onClick={() => handleRemove(book)}
                       disabled={removingId === book.id}
-                      aria-label={`Bỏ yêu thích ${book.title}`}
+                      aria-label={t('studentFavorites.removeAria', { title: book.title })}
                       className="flex h-8 w-8 md:h-10 md:w-10 shrink-0 items-center justify-center rounded-lg border border-surface-container-high text-error transition-colors hover:bg-red-50 disabled:cursor-wait disabled:opacity-60 cursor-pointer"
                     >
                       <span className="material-symbols-outlined filled text-[18px] md:text-[20px]">favorite</span>

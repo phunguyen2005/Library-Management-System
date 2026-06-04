@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { fetchDigitalDocuments, type DigitalDocument } from '../../api/bookApi';
 import { fetchReadingProgress } from '../../api/readingProgressApi';
 import { fetchFavoriteBooks, addFavoriteBook, removeFavoriteBook } from '../../api/favoriteApi';
@@ -11,6 +12,7 @@ import { emitToast } from '../../notifications/events';
 import { useAuth } from '../../auth/AuthContext';
 
 export default function Digital() {
+  const { t } = useTranslation();
   const { user, role } = useAuth();
   const userLevel = typeof user?.level === 'number' ? user.level : 1;
   const canDownload = role === 'admin' || role === 'librarian' || userLevel >= 5;
@@ -52,10 +54,10 @@ export default function Digital() {
     try {
       if (currentIsFavorite) {
         await removeFavoriteBook(documentId);
-        emitToast({ tone: 'success', title: 'Đã bỏ yêu thích', message: 'Tài liệu đã được xóa khỏi danh sách yêu thích.' });
+        emitToast({ tone: 'success', title: t('studentFavorites.removeSuccess'), message: t('studentFavorites.removeSuccess') });
       } else {
         await addFavoriteBook(documentId);
-        emitToast({ tone: 'success', title: 'Đã yêu thích', message: 'Tài liệu đã được thêm vào danh sách yêu thích.' });
+        emitToast({ tone: 'success', title: t('studentCatalog.favoriteAdd'), message: t('studentCatalog.favoriteAdd') });
       }
       setDocuments((current) =>
         current.map((doc) =>
@@ -63,8 +65,8 @@ export default function Digital() {
         )
       );
     } catch (error: unknown) {
-      const message = getErrorMessage(error, 'Không thể cập nhật yêu thích.');
-      emitToast({ tone: 'error', title: 'Lỗi', message });
+      const message = getErrorMessage(error, t('studentCatalog.favoriteError'));
+      emitToast({ tone: 'error', title: t('common.error'), message });
     }
   };
 
@@ -92,9 +94,9 @@ export default function Digital() {
         );
       })
       .catch((error: unknown) => {
-        const message = getErrorMessage(error, 'Không thể tải tài liệu số.');
+        const message = getErrorMessage(error, t('studentDigital.loadError'));
         setError(message);
-        emitToast({ tone: 'error', title: 'Không thể tải tài liệu số', message });
+        emitToast({ tone: 'error', title: t('studentDigital.loadError'), message });
       })
       .finally(() => setIsLoading(false));
   }, [role]);
@@ -114,9 +116,9 @@ export default function Digital() {
     <div className="flex h-full flex-col space-y-6 p-4 md:p-8 animate-fade-in">
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
         <div>
-          <h2 className="text-3xl font-bold text-on-surface">Tài liệu số</h2>
+          <h2 className="text-3xl font-bold text-on-surface">{t('studentDigital.title')}</h2>
           <p className="mt-1 text-sm text-on-surface-variant">
-            Truy cập bộ sưu tập E-Book, Audio và bài giảng điện tử 24/7
+            {t('studentDigital.subtitle')}
           </p>
         </div>
       </div>
@@ -132,7 +134,7 @@ export default function Digital() {
             type="text"
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
-            placeholder="Tìm theo tên tài liệu, tác giả, tag..."
+            placeholder={t('studentDigital.searchPlaceholder')}
             className="w-full pl-10 pr-9 py-2 rounded-xl bg-surface-bright border border-surface-container-high text-sm text-on-surface placeholder:text-outline outline-none focus:ring-2 focus:ring-primary/20 transition-all"
           />
           {searchQuery && (
@@ -155,7 +157,7 @@ export default function Digital() {
               onChange={(e) => setGenreFilter(e.target.value)}
               className="w-full pl-3 pr-9 py-2 rounded-xl bg-surface-bright border border-surface-container-high text-xs font-bold text-on-surface-variant outline-none focus:ring-2 focus:ring-primary/20 appearance-none transition-all cursor-pointer shadow-xs"
             >
-              <option value="ALL">Tất cả thể loại</option>
+              <option value="ALL">{t('studentCatalog.allCategories')}</option>
               {availableGenres.map((genre) => (
                 <option key={genre} value={genre}>
                   {genre}
@@ -172,9 +174,9 @@ export default function Digital() {
             {(['ALL', 'PDF', 'EPUB', 'AUDIO', 'SLIDES'] as const).map((filter) => {
               const label =
                 filter === 'ALL'
-                  ? 'Tất cả'
+                  ? t('studentDigital.allTab')
                   : filter === 'AUDIO'
-                    ? 'Audiobook'
+                    ? t('studentDigital.audioTab')
                     : filter;
               const isActive = formatFilter === filter;
               return (
@@ -199,18 +201,18 @@ export default function Digital() {
       <div className="grid auto-rows-max grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
         {isLoading ? (
           <div className="col-span-full py-12 text-center font-medium text-on-surface-variant animate-pulse">
-            Đang tải tài liệu...
+            {t('studentDigital.loading')}
           </div>
         ) : error ? (
           <div className="col-span-full">
-            <EmptyState icon="error" title="Không thể tải tài liệu số" message={error} />
+            <EmptyState icon="error" title={t('studentDigital.loadError')} message={error} />
           </div>
         ) : displayDocuments.length === 0 ? (
           <div className="col-span-full">
             <EmptyState
               icon="folder_open"
-              title="Không có tài liệu số phù hợp"
-              message="Thử chọn định dạng khác hoặc quay lại sau khi thư viện cập nhật thêm tài liệu."
+              title={t('studentDigital.emptyTitle')}
+              message={t('studentDigital.emptyDesc')}
             />
           </div>
         ) : (
@@ -241,7 +243,7 @@ export default function Digital() {
                   type="button"
                   onClick={() => handleToggleFavorite(resource.id, !!resource.is_favorite)}
                   className="absolute right-2.5 top-2.5 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-xs transition-all hover:scale-110 active:scale-95 cursor-pointer hover:bg-black/60"
-                  title={resource.is_favorite ? 'Bỏ yêu thích' : 'Yêu thích'}
+                  title={resource.is_favorite ? t('studentCatalog.favoriteRemove') : t('studentCatalog.favoriteAdd')}
                 >
                   <span
                     className={`material-symbols-outlined text-[18px] transition-colors ${
@@ -268,7 +270,7 @@ export default function Digital() {
                   <p className="line-clamp-1 text-xs text-on-surface-variant">{resource.author}</p>
                   <div className="flex items-center gap-1 rounded-md bg-surface-container-low px-2 py-0.5 text-xs text-on-surface-variant">
                     <span className="material-symbols-outlined text-[14px]">cloud_download</span>
-                    <span className="font-medium">{resource.downloads}</span>
+                    <span className="font-medium">{t('studentDigital.downloadCount', { count: resource.downloads })}</span>
                   </div>
                 </div>
 
@@ -282,12 +284,12 @@ export default function Digital() {
                     {resource.format.toUpperCase() === 'AUDIO' ? (
                       <>
                         <span className="material-symbols-outlined text-[13px]">headphones</span>
-                        <span>Nghe</span>
+                        <span>{t('studentDigital.listenNow')}</span>
                       </>
                     ) : (
                       <>
                         <span className="material-symbols-outlined text-[13px]">menu_book</span>
-                        <span>Mở đọc</span>
+                        <span>{t('studentDigital.readNow')}</span>
                       </>
                     )}
                   </button>
@@ -298,8 +300,8 @@ export default function Digital() {
                       if (!canDownload) {
                         emitToast({
                           tone: 'warning',
-                          title: 'Yêu cầu cấp độ 5',
-                          message: 'Bạn phải đạt cấp độ 5 trở lên trong hệ thống học giả để tải tài liệu số.',
+                          title: t('studentSettings.toastOtpError', { defaultValue: 'Yêu cầu cấp độ 5' }),
+                          message: t('studentDigital.levelRequirementDesc', { defaultValue: 'Bạn phải đạt cấp độ 5 trở lên trong hệ thống học giả để tải tài liệu số.' }),
                         });
                         return;
                       }
@@ -309,12 +311,12 @@ export default function Digital() {
                     }}
                     className="rounded-lg border border-surface-container-high px-2 py-2 text-[11px] font-bold text-on-surface transition-colors hover:bg-surface-container-low disabled:cursor-not-allowed disabled:text-outline cursor-pointer"
                   >
-                    Tải về
+                    {t('studentFines.tableHeaderAction', { defaultValue: 'Tải về' })}
                   </button>
                 </div>
                 {!resource.hasAttachedFile ? (
                   <p className="mt-2 text-[10px] text-on-surface-variant">
-                    Bản ghi này đang dùng tệp xem trước cho đến khi thủ thư gắn tài liệu thật.
+                    {t('studentDigital.previewNotice', 'Bản ghi này đang dùng tệp xem trước cho đến khi thủ thư gắn tài liệu thật.')}
                   </p>
                 ) : null}
 
@@ -327,7 +329,7 @@ export default function Digital() {
                       className="flex items-center gap-1 rounded-md bg-primary/10 hover:bg-primary/15 px-2 py-0.5 text-[10px] font-bold text-primary transition-colors cursor-pointer"
                     >
                       <span className="material-symbols-outlined text-[13px]">smart_toy</span>
-                      <span>Tóm tắt AI</span>
+                      <span>{t('studentCatalog.aiSummaryTitle', 'Tóm tắt AI')}</span>
                     </button>
                   )}
                   {resource.format.toUpperCase() !== 'AUDIO' && resource.aiTags?.slice(0, 2).map((tag) => (
@@ -352,7 +354,7 @@ export default function Digital() {
             <div className="flex items-center justify-between border-b border-surface-container-high pb-3">
               <div className="flex items-center gap-2 text-primary">
                 <span className="material-symbols-outlined text-2xl">smart_toy</span>
-                <h3 className="font-bold text-lg">Tóm tắt AI: {activeSummaryDoc.title}</h3>
+                <h3 className="font-bold text-lg">{t('studentCatalog.aiSummaryTitle', 'Tóm tắt AI')}: {activeSummaryDoc.title}</h3>
               </div>
               <button
                 type="button"
@@ -371,7 +373,7 @@ export default function Digital() {
                 onClick={() => setActiveSummaryDoc(null)}
                 className="rounded-lg bg-primary px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-primary/95 cursor-pointer"
               >
-                Đóng
+                {t('studentRequests.close', { defaultValue: 'Đóng' })}
               </button>
             </div>
           </div>

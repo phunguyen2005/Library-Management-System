@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Scanner } from '@yudiel/react-qr-scanner';
 import {
   getAdminFines,
@@ -23,20 +24,20 @@ function formatCurrency(value: string | number) {
   return Number(value || 0).toLocaleString('vi-VN') + ' VND';
 }
 
-function statusConfig(status: FineStatus) {
+function statusConfig(status: FineStatus, t: any) {
   if (status === 'paid') {
-    return { label: 'Đã trả', className: 'border-emerald-200 bg-emerald-50 text-emerald-700' };
+    return { label: t('status.paid', 'Paid'), className: 'border-emerald-200 bg-emerald-50 text-emerald-700' };
   }
 
   if (status === 'waived') {
-    return { label: 'Đã miễn', className: 'border-sky-200 bg-sky-50 text-sky-700' };
+    return { label: t('status.waived', 'Waived'), className: 'border-sky-200 bg-sky-50 text-sky-700' };
   }
 
   if (status === 'cancelled') {
-    return { label: 'Đã hủy', className: 'border-slate-200 bg-slate-100 text-slate-600' };
+    return { label: t('status.cancelled', 'Cancelled'), className: 'border-slate-200 bg-slate-100 text-slate-600' };
   }
 
-  return { label: 'Chưa trả', className: 'border-red-200 bg-red-50 text-red-700' };
+  return { label: t('status.unpaid', 'Unpaid'), className: 'border-red-200 bg-red-50 text-red-700' };
 }
 
 const emptyStats: FineStatistics = {
@@ -48,6 +49,7 @@ const emptyStats: FineStatistics = {
 };
 
 export default function AdminFines() {
+  const { t } = useTranslation();
   const { hasPermission } = useAuth();
   const [fines, setFines] = useState<FineEntry[]>([]);
   const [stats, setStats] = useState<FineStatistics>(emptyStats);
@@ -108,7 +110,7 @@ export default function AdminFines() {
       setMemberLoans(loans);
     } catch (err: unknown) {
       console.error(err);
-      emitToast({ tone: 'error', title: 'Lỗi tải lịch sử mượn', message: 'Không thể tải lịch sử mượn của độc giả.' });
+      emitToast({ tone: 'error', title: t('adminFines.loadHistoryErrorTitle', 'Error loading history'), message: t('adminFines.loadHistoryError', 'Could not load reader loan history.') });
     } finally {
       setIsLoadingLoans(false);
     }
@@ -116,11 +118,11 @@ export default function AdminFines() {
 
   const handleCreateFineSubmit = async () => {
     if (!selectedMember) {
-      setCreateFineError('Vui lòng chọn thành viên.');
+      setCreateFineError(t('adminFines.selectMemberError', 'Please select a member.'));
       return;
     }
     if (createForm.amount < 1000) {
-      setCreateFineError('Số tiền phạt tối thiểu là 1,000 VND.');
+      setCreateFineError(t('adminFines.minFineAmountError', 'Minimum fine amount is 1,000 VND.'));
       return;
     }
     setIsSubmittingFine(true);
@@ -133,11 +135,11 @@ export default function AdminFines() {
         reason: createForm.reason,
         notes: createForm.notes.trim() || undefined,
       });
-      emitToast({ tone: 'success', title: 'Tạo khoản phạt thành công', message: `Đã tạo khoản phạt cho độc giả ${selectedMember.name}.` });
+      emitToast({ tone: 'success', title: t('adminFines.createFineSuccessTitle', 'Fine Created'), message: t('adminFines.createFineSuccess', { name: selectedMember.name }) });
       setShowCreateModal(false);
       await loadData(false);
     } catch (err: unknown) {
-      const msg = getErrorMessage(err, 'Tạo khoản phạt thất bại.');
+      const msg = getErrorMessage(err, t('adminFines.createFineError', 'Failed to create fine.'));
       setCreateFineError(msg);
     } finally {
       setIsSubmittingFine(false);
@@ -162,9 +164,9 @@ export default function AdminFines() {
         return;
       }
 
-      const message = getErrorMessage(error, 'Không thể tải danh sách khoản phạt.');
+      const message = getErrorMessage(error, t('adminFines.loadError', 'Unable to load fines list.'));
       setLoadError(message);
-      emitToast({ tone: 'error', title: 'Không thể tải khoản phạt', message });
+      emitToast({ tone: 'error', title: t('adminFines.loadFinesErrorTitle', 'Unable to load fines'), message });
     } finally {
       if (showLoader) {
         setIsLoading(false);
@@ -178,12 +180,12 @@ export default function AdminFines() {
 
   const statCards = useMemo(
     () => [
-      { label: 'Tổng thu', value: stats.total_collected, className: 'border-emerald-100 bg-emerald-50 text-emerald-800' },
-      { label: 'Còn tồn', value: stats.total_unpaid, className: 'border-red-100 bg-red-50 text-red-800' },
-      { label: 'Đã miễn', value: stats.total_waived, className: 'border-sky-100 bg-sky-50 text-sky-800' },
-      { label: 'Tháng này', value: stats.this_month_collected, className: 'border-indigo-100 bg-indigo-50 text-indigo-800' },
+      { label: t('adminFines.statsCollected', 'Total Collected'), value: stats.total_collected, className: 'border-emerald-100 bg-emerald-50 text-emerald-800' },
+      { label: t('adminFines.statsUnpaid', 'Pending'), value: stats.total_unpaid, className: 'border-red-100 bg-red-50 text-red-800' },
+      { label: t('adminFines.statsWaived', 'Waived'), value: stats.total_waived, className: 'border-sky-100 bg-sky-50 text-sky-800' },
+      { label: t('adminFines.statsMonthCollected', 'This Month'), value: stats.this_month_collected, className: 'border-indigo-100 bg-indigo-50 text-indigo-800' },
     ],
-    [stats],
+    [stats, t],
   );
 
   const handleApplyFilters = (event: React.FormEvent) => {
@@ -205,13 +207,13 @@ export default function AdminFines() {
         method: 'cash',
         note: payNote.trim() || undefined,
       });
-      emitToast({ tone: 'success', title: 'Đã thu phí', message: 'Đã xác nhận thanh toán tiền mặt.' });
+      emitToast({ tone: 'success', title: t('adminFines.payConfirmSuccessTitle', 'Fee Collected'), message: t('adminFines.payConfirmSuccess', 'Cash payment recorded successfully.') });
       setPayTarget(null);
       setPayNote('');
       await loadData(false);
     } catch (error: unknown) {
-      const message = getErrorMessage(error, 'Không thể thu phí phạt.');
-      emitToast({ tone: 'error', title: 'Thu phí thất bại', message });
+      const message = getErrorMessage(error, t('adminFines.payConfirmError', 'Could not collect cash payment.'));
+      emitToast({ tone: 'error', title: `${t('adminFines.btnConfirmCash')} ${t('common.error', 'Error')}`, message });
     } finally {
       setActiveFineId(null);
     }
@@ -227,7 +229,7 @@ export default function AdminFines() {
     const reason = waiveReason.trim();
 
     if (reason.length < 10) {
-      setWaiveError('Lý do miễn phạt cần ít nhất 10 ký tự.');
+      setWaiveError(t('adminFines.waiveReasonMinLengthError', 'Waiver reason must be at least 10 characters.'));
       return;
     }
 
@@ -235,22 +237,20 @@ export default function AdminFines() {
 
     try {
       await waiveFine(waiveTarget.fine_id, reason);
-      emitToast({ tone: 'success', title: 'Đã miễn phạt', message: 'Khoản phạt đã được miễn.' });
+      emitToast({ tone: 'success', title: t('adminFines.toastSuccess', 'Success'), message: t('adminFines.waiveSuccessMsg', 'Fine has been waived.') });
       setWaiveTarget(null);
       setWaiveReason('');
       setWaiveError(null);
       await loadData(false);
     } catch (error: unknown) {
-      const message = getErrorMessage(error, 'Không thể miễn khoản phạt.');
-      emitToast({ tone: 'error', title: 'Miễn phạt thất bại', message });
+      const message = getErrorMessage(error, t('adminFines.waiveErrorMsg', 'Unable to waive fine.'));
+      emitToast({ tone: 'error', title: `${t('adminFines.btnWaive')} ${t('common.error', 'Error')}`, message });
     } finally {
       setActiveFineId(null);
     }
   };
 
   const handleQrScan = (rawValue: string) => {
-    // Định dạng QR từ sinh viên: "fine:{fine_id};loan:{loan_id};amount:{amount}"
-    // Hoặc chuỗi số ID thuần túy
     let fineId: number | null = null;
     if (rawValue.startsWith('fine:')) {
       const match = rawValue.match(/fine:(\d+)/);
@@ -270,39 +270,35 @@ export default function AdminFines() {
         setShowScanner(false);
         if (found.status === 'unpaid') {
           setPayTarget(found);
-          setPayNote('Thu phí nhanh qua quét mã QR.');
+          setPayNote(t('adminFines.payNoteQR', 'Quick cash payment via QR code scan.'));
           emitToast({
             tone: 'success',
-            title: 'Tìm thấy khoản phạt',
-            message: `Mã phiếu phạt #${fineId} của độc giả ${found.member?.name || 'thành viên'}.`,
+            title: t('adminFines.fineFoundTitle', 'Fine Found'),
+            message: t('adminFines.fineFoundMsg', { id: fineId, name: found.member?.name || t('common.user', 'member') }),
           });
         } else {
           emitToast({
             tone: 'info',
-            title: 'Khoản phạt đã xử lý',
-            message: `Khoản phạt #${fineId} đã ở trạng thái: ${found.status === 'paid' ? 'Đã đóng' : 'Đã miễn'}.`,
+            title: t('adminFines.fineProcessedTitle', 'Processed Fine'),
+            message: t('adminFines.fineProcessedMsg', { id: fineId, status: found.status === 'paid' ? t('adminFines.statusPaid', 'Paid') : t('adminFines.statusWaived', 'Waived') }),
           });
         }
       } else {
-        // Nếu không có trong danh sách hiện tại, thử tìm kiếm bằng bộ lọc
         setShowScanner(false);
         setFilters((current) => ({ ...current, query: String(fineId) }));
         emitToast({
           tone: 'info',
-          title: 'Đang lọc tìm kiếm',
-          message: `Đang lọc danh sách tìm kiếm khoản phạt #${fineId}...`,
+          title: t('adminFines.filteringTitle', 'Filtering search'),
+          message: t('adminFines.filteringFineMsg', { id: fineId }),
         });
-        // Tự động reload với bộ lọc mới
         setTimeout(() => {
           void loadData(false).then(() => {
-            // Sau khi load xong, nếu tìm thấy thì mở luôn popup thu phí
-            // Sử dụng set timeout nhỏ để chờ React cập nhật state fines
             setTimeout(() => {
               setFines((latestFines) => {
                 const updatedFound = latestFines.find((f) => f.fine_id === fineId);
                 if (updatedFound && updatedFound.status === 'unpaid') {
                   setPayTarget(updatedFound);
-                  setPayNote('Thu phí nhanh qua quét mã QR.');
+                  setPayNote(t('adminFines.payNoteQR', 'Quick cash payment via QR code scan.'));
                 }
                 return latestFines;
               });
@@ -313,8 +309,8 @@ export default function AdminFines() {
     } else {
       emitToast({
         tone: 'error',
-        title: 'Mã không hợp lệ',
-        message: 'Mã QR không khớp với định dạng phiếu phạt thư viện.',
+        title: t('adminFines.invalidQrTitle', 'Invalid Code'),
+        message: t('adminFines.invalidQrMsg', 'The QR code does not match the library fine format.'),
       });
     }
   };
@@ -323,9 +319,9 @@ export default function AdminFines() {
     <div className="mx-auto w-full max-w-7xl space-y-8 p-8">
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
         <div>
-          <h2 className="text-3xl font-bold text-on-surface">Quản lý khoản phạt</h2>
+          <h2 className="text-3xl font-bold text-on-surface">{t('adminFines.title', 'Fine Management')}</h2>
           <p className="mt-1 text-sm text-on-surface-variant">
-            Theo dõi công nợ, thu phí tại quầy và miễn giảm theo quyết định thủ thư.
+            {t('adminFines.subtitle', 'Track debts, collect payments at the counter and process waivers.')}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -336,7 +332,7 @@ export default function AdminFines() {
               className="flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-semibold text-white shadow-md shadow-indigo-600/20 transition-all hover:-translate-y-0.5 hover:shadow-lg cursor-pointer"
             >
               <span className="material-symbols-outlined text-[16px]">qr_code_scanner</span>
-              Quét mã QR thu phí
+              {t('adminFines.btnQrScan', 'Scan QR Payment')}
             </button>
           )}
           {hasPermission('manage_fines') && (
@@ -360,7 +356,7 @@ export default function AdminFines() {
               className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-semibold text-white shadow-md shadow-emerald-600/20 transition-all hover:-translate-y-0.5 hover:shadow-lg cursor-pointer"
             >
               <span className="material-symbols-outlined text-[16px]">add_circle</span>
-              Tạo khoản phạt
+              {t('adminFines.btnCreateManual', 'Create Fine')}
             </button>
           )}
         </div>
@@ -380,38 +376,38 @@ export default function AdminFines() {
         className="grid grid-cols-1 gap-4 rounded-2xl border border-surface-container-low bg-surface-bright p-5 scholar-shadow md:grid-cols-[180px_160px_1fr_auto]"
       >
         <label className="space-y-1">
-          <span className="text-xs font-bold uppercase tracking-widest text-slate-500">Trạng thái</span>
+          <span className="text-xs font-bold uppercase tracking-widest text-slate-500">{t('adminFines.filterStatus', 'Status')}</span>
           <select
             value={filters.status || ''}
             onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value as FineStatus | '' }))}
             className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20"
           >
-            <option value="">Tất cả</option>
-            <option value="unpaid">Chưa trả</option>
-            <option value="paid">Đã trả</option>
-            <option value="waived">Đã miễn</option>
-            <option value="cancelled">Đã hủy</option>
+            <option value="">{t('adminFines.filterAll', 'All')}</option>
+            <option value="unpaid">{t('status.unpaid', 'Unpaid')}</option>
+            <option value="paid">{t('status.paid', 'Paid')}</option>
+            <option value="waived">{t('status.waived', 'Waived')}</option>
+            <option value="cancelled">{t('status.cancelled', 'Cancelled')}</option>
           </select>
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-bold uppercase tracking-widest text-slate-500">Thành viên</span>
+          <span className="text-xs font-bold uppercase tracking-widest text-slate-500">{t('adminFines.filterMember', 'Member ID')}</span>
           <input
             type="number"
             min={1}
             value={filters.member_id || ''}
             onChange={(event) => setFilters((current) => ({ ...current, member_id: event.target.value }))}
             className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20"
-            placeholder="Mã SV"
+            placeholder={t('adminFines.filterMemberPlaceholder', 'Reader ID')}
           />
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-bold uppercase tracking-widest text-slate-500">Tìm kiếm</span>
+          <span className="text-xs font-bold uppercase tracking-widest text-slate-500">{t('adminFines.filterQuery', 'Search')}</span>
           <input
             type="search"
             value={filters.query || ''}
             onChange={(event) => setFilters((current) => ({ ...current, query: event.target.value }))}
             className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20"
-            placeholder="Tên sinh viên, sách, trạng thái..."
+            placeholder={t('adminFines.filterQueryPlaceholder', 'Name, book...')}
           />
         </label>
         <div className="flex items-end">
@@ -419,7 +415,7 @@ export default function AdminFines() {
             type="submit"
             className="h-10 rounded-lg bg-primary px-5 text-sm font-bold text-white shadow-sm shadow-primary/20"
           >
-            Lọc
+            {t('common.filter', 'Filter')}
           </button>
         </div>
       </form>
@@ -429,37 +425,37 @@ export default function AdminFines() {
           <table className="w-full min-w-[1000px] text-left">
             <thead className="border-b border-surface-container bg-surface-container-low text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
               <tr>
-                <th className="px-6 py-4">Mã phạt</th>
-                <th className="px-6 py-4">Sinh viên</th>
-                <th className="px-6 py-4">Tài liệu</th>
-                <th className="px-6 py-4">Quá hạn</th>
-                <th className="px-6 py-4">Số tiền</th>
-                <th className="px-6 py-4">Trạng thái</th>
-                <th className="px-6 py-4 text-right">Hành động</th>
+                <th className="px-6 py-4">{t('studentFines.idColumn', 'Fine ID')}</th>
+                <th className="px-6 py-4">{t('adminFines.tableHeaderMember', 'Reader')}</th>
+                <th className="px-6 py-4">{t('adminFines.tableHeaderBook', 'Book & Loan ID')}</th>
+                <th className="px-6 py-4">{t('adminFines.tableHeaderDays', 'Days Late')}</th>
+                <th className="px-6 py-4">{t('adminFines.tableHeaderAmount', 'Fine Amount')}</th>
+                <th className="px-6 py-4">{t('adminFines.tableHeaderStatus', 'Status')}</th>
+                <th className="px-6 py-4 text-right">{t('adminFines.tableHeaderActions', 'Actions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-surface-container">
               {isLoading ? (
                 <tr>
                   <td colSpan={7} className="px-6 py-10 text-center text-slate-500">
-                    Đang tải khoản phạt...
+                    {t('adminFines.loading', 'Loading fines...')}
                   </td>
                 </tr>
               ) : loadError ? (
                 <tr>
                   <td colSpan={7} className="px-6 py-8">
-                    <EmptyState icon="error" title="Không thể tải dữ liệu" message={loadError} />
+                    <EmptyState icon="error" title={t('adminFines.loadFinesErrorTitle', 'Unable to load fines')} message={loadError} />
                   </td>
                 </tr>
               ) : fines.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-6 py-8">
-                    <EmptyState icon="payments" title="Không có khoản phạt" message="Các khoản phạt sẽ xuất hiện sau khi cron hoặc trả sách ghi nhận quá hạn." />
+                    <EmptyState icon="payments" title={t('adminFines.emptyTitle', 'No fines found')} message={t('adminFines.emptyDesc', 'No pending fine entries matched your criteria.')} />
                   </td>
                 </tr>
               ) : (
                 fines.map((fine) => {
-                  const status = statusConfig(fine.status);
+                  const status = statusConfig(fine.status, t);
                   const isBusy = activeFineId === fine.fine_id;
 
                   return (
@@ -470,15 +466,15 @@ export default function AdminFines() {
                         </span>
                       </td>
                       <td className="px-6 py-4">
-                        <p className="text-sm font-bold text-slate-800">{fine.member?.name || 'Không rõ'}</p>
+                        <p className="text-sm font-bold text-slate-800">{fine.member?.name || t('common.notAvailable', 'N/A')}</p>
                         <p className="text-xs text-slate-500">ID: {fine.member?.member_id ?? fine.member_id}</p>
                       </td>
                       <td className="px-6 py-4">
-                        <p className="text-sm font-bold text-slate-800">{fine.book_title || 'Không liên kết phiếu mượn'}</p>
+                        <p className="text-sm font-bold text-slate-800">{fine.book_title || t('adminFines.noLinkLoan', 'No linked loan')}</p>
                         {fine.due_date ? (
-                          <p className="text-xs text-slate-500">Hạn trả: {formatDisplayDate(fine.due_date)}</p>
+                          <p className="text-xs text-slate-500">{t('studentFines.dueDate', 'Due Date')}: {formatDisplayDate(fine.due_date)}</p>
                         ) : (
-                          <p className="text-xs text-slate-400 italic">Ngoại lệ / Phạt thủ công</p>
+                          <p className="text-xs text-slate-400 italic">{t('adminFines.manualNoLoan', 'Manual Fine')}</p>
                         )}
                         {fine.notes && (
                           <p className="text-[11px] text-amber-800 bg-amber-50/50 border border-amber-200/50 rounded-lg px-2 py-0.5 mt-1.5 font-medium inline-block max-w-[280px] truncate" title={fine.notes}>
@@ -486,7 +482,7 @@ export default function AdminFines() {
                           </p>
                         )}
                       </td>
-                      <td className="px-6 py-4 text-sm font-semibold text-slate-700">{fine.days_overdue} ngày</td>
+                      <td className="px-6 py-4 text-sm font-semibold text-slate-700">{fine.days_overdue} {t('studentRequests.daysOverdueSuffix', 'days')}</td>
                       <td className="px-6 py-4 text-sm font-extrabold text-red-700">{formatCurrency(fine.amount)}</td>
                       <td className="px-6 py-4">
                         <span className={`rounded-full border px-3 py-1 text-xs font-bold ${status.className}`}>
@@ -506,7 +502,7 @@ export default function AdminFines() {
                                 }}
                                 className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 disabled:cursor-wait disabled:opacity-60"
                               >
-                                Thu phí
+                                {t('adminFines.btnConfirmCash', 'Collect Cash')}
                               </button>
                             )}
                             {hasPermission('waive_fines') && (
@@ -520,15 +516,15 @@ export default function AdminFines() {
                                 }}
                                 className="rounded-lg border border-sky-200 px-3 py-1.5 text-xs font-bold text-sky-700 hover:bg-sky-50 disabled:cursor-wait disabled:opacity-60"
                               >
-                                Miễn phạt
+                                {t('adminFines.btnWaive', 'Waive')}
                               </button>
                             )}
                             {!hasPermission('manage_fines') && !hasPermission('waive_fines') && (
-                              <span className="text-xs italic text-slate-400">Không có quyền</span>
+                              <span className="text-xs italic text-slate-400">{t('adminFines.noPermission', 'No permission')}</span>
                             )}
                           </div>
                         ) : (
-                          <span className="text-xs font-semibold text-slate-400">Đã xử lý</span>
+                          <span className="text-xs font-semibold text-slate-400">{t('adminFines.statusProcessed', 'Processed')}</span>
                         )}
                       </td>
                     </tr>
@@ -544,28 +540,28 @@ export default function AdminFines() {
         <div role="dialog" aria-modal="true" aria-labelledby="collect-fine-title" className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
           <form onSubmit={handlePaySubmit} className="w-full max-w-md rounded-lg border border-surface-container bg-white p-6 shadow-xl">
             <h3 id="collect-fine-title" className="text-lg font-bold text-slate-900">
-              Thu phí phạt #{payTarget.fine_id}
+              {t('adminFines.btnConfirmCash')} #{payTarget.fine_id}
             </h3>
             <p className="mt-1 text-sm text-slate-600">
-              Xác nhận thu tiền mặt tại quầy: {formatCurrency(payTarget.amount)}
+              {t('adminFines.confirmCashPay', { amount: formatCurrency(payTarget.amount), name: payTarget.member?.name || t('common.user', 'member') })}
             </p>
             <label className="mt-5 block space-y-2">
-              <span className="text-xs font-bold uppercase tracking-widest text-slate-500">Ghi chú thu phí</span>
+              <span className="text-xs font-bold uppercase tracking-widest text-slate-500">{t('adminFines.payNoteLabel', 'Payment Note')}</span>
               <textarea
-                aria-label="Ghi chú thu phí"
+                aria-label={t('adminFines.payNoteLabel', 'Payment Note')}
                 value={payNote}
                 onChange={(event) => setPayNote(event.target.value)}
                 rows={3}
                 className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-                placeholder="Ví dụ: Sinh viên đóng tiền mặt tại quầy."
+                placeholder={t('adminFines.payNotePlaceholder', 'Optional note...')}
               />
             </label>
             <div className="mt-6 flex justify-end gap-2">
               <button type="button" onClick={() => setPayTarget(null)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50">
-                Hủy
+                {t('common.cancel', 'Cancel')}
               </button>
               <button type="submit" className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700">
-                Xác nhận thu phí
+                {t('adminFines.btnSubmitPay', 'Confirm Payment')}
               </button>
             </div>
           </form>
@@ -576,15 +572,15 @@ export default function AdminFines() {
         <div role="dialog" aria-modal="true" aria-labelledby="waive-fine-title" className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
           <form onSubmit={handleWaiveSubmit} className="w-full max-w-md rounded-lg border border-surface-container bg-white p-6 shadow-xl">
             <h3 id="waive-fine-title" className="text-lg font-bold text-slate-900">
-              Miễn phạt #{waiveTarget.fine_id}
+              {t('adminFines.btnWaive', 'Waive')} #{waiveTarget.fine_id}
             </h3>
             <p className="mt-1 text-sm text-slate-600">
-              Khoản phạt {formatCurrency(waiveTarget.amount)} sẽ chuyển sang trạng thái đã miễn.
+              {t('adminFines.waiveModalDesc', { amount: formatCurrency(waiveTarget.amount), name: waiveTarget.member?.name || t('common.user', 'member') })}
             </p>
             <label className="mt-5 block space-y-2">
-              <span className="text-xs font-bold uppercase tracking-widest text-slate-500">Lý do miễn phạt</span>
+              <span className="text-xs font-bold uppercase tracking-widest text-slate-500">{t('adminFines.waiveReasonLabel', 'Waiver Reason')}</span>
               <textarea
-                aria-label="Lý do miễn phạt"
+                aria-label={t('adminFines.waiveReasonLabel', 'Waiver Reason')}
                 value={waiveReason}
                 onChange={(event) => {
                   setWaiveReason(event.target.value);
@@ -592,16 +588,16 @@ export default function AdminFines() {
                 }}
                 rows={4}
                 className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-                placeholder="Nhập lý do miễn phạt từ 10 ký tự trở lên."
+                placeholder={t('adminFines.waiveReasonPlaceholder', 'Reason for waiver...')}
               />
             </label>
             {waiveError ? <p className="mt-2 text-sm text-red-600">{waiveError}</p> : null}
             <div className="mt-6 flex justify-end gap-2">
               <button type="button" onClick={() => setWaiveTarget(null)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50">
-                Hủy
+                {t('common.cancel', 'Cancel')}
               </button>
               <button type="submit" className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-bold text-white hover:bg-sky-700">
-                Xác nhận miễn phạt
+                {t('adminFines.btnSubmitWaive', 'Confirm Waiver')}
               </button>
             </div>
           </form>
@@ -613,7 +609,7 @@ export default function AdminFines() {
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/80 p-4 backdrop-blur-sm select-none">
           <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
-              <h3 className="text-lg font-bold text-slate-900">Quét mã QR Phiếu phạt</h3>
+              <h3 className="text-lg font-bold text-slate-900">{t('adminFines.scanQrTitle')}</h3>
               <button onClick={() => setShowScanner(false)} className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
                 <span className="material-symbols-outlined text-[20px]">close</span>
               </button>
@@ -629,7 +625,7 @@ export default function AdminFines() {
               />
             </div>
             <div className="bg-slate-50 p-4 text-center text-xs text-slate-500 leading-normal">
-              Đưa mã QR trên thiết bị của sinh viên vào khung camera để tự động định danh và mở nhanh hộp thoại xác nhận thu phí.
+              {t('adminFines.scanQrDesc')}
             </div>
           </div>
         </div>
@@ -641,7 +637,7 @@ export default function AdminFines() {
           <div className="w-full max-w-lg rounded-2xl border border-surface-container bg-white p-6 shadow-2xl overflow-y-auto max-h-[90vh]">
             <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-4">
               <h3 id="create-fine-title" className="text-lg font-black text-slate-900">
-                Tạo khoản phạt thủ công
+                {t('adminFines.btnCreateManualTitle')}
               </h3>
               <button onClick={() => setShowCreateModal(false)} className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
                 <span className="material-symbols-outlined text-[20px]">close</span>
@@ -658,7 +654,7 @@ export default function AdminFines() {
               {/* Member Selection */}
               <div>
                 <label className="block text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">
-                  Thành viên (Sinh viên)
+                  {t('common.student', 'Student')}
                 </label>
                 {!selectedMember ? (
                   <div className="relative">
@@ -670,7 +666,7 @@ export default function AdminFines() {
                         void handleSearchMembers(e.target.value);
                       }}
                       className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-                      placeholder="Tìm theo tên, email hoặc mã số..."
+                      placeholder={t('adminFines.searchPlaceholder')}
                     />
                     {isSearchingMembers && (
                       <div className="absolute right-3 top-3">
@@ -687,7 +683,7 @@ export default function AdminFines() {
                               className="w-full text-left px-4 py-2 hover:bg-slate-50 text-xs transition-colors"
                             >
                               <p className="font-bold text-slate-800">{member.name}</p>
-                              <p className="text-slate-500">Mã SV: {member.member_id} • {member.email}</p>
+                              <p className="text-slate-500">{t('adminFines.memberDetailsLabel', { memberId: member.member_id, email: member.email })}</p>
                             </button>
                           </li>
                         ))}
@@ -698,7 +694,7 @@ export default function AdminFines() {
                   <div className="flex items-center justify-between rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3">
                     <div>
                       <p className="text-sm font-bold text-slate-800">{selectedMember.name}</p>
-                      <p className="text-xs text-slate-500">Mã SV: {selectedMember.member_id} • {selectedMember.email}</p>
+                      <p className="text-xs text-slate-500">{t('adminFines.memberDetailsLabel', { memberId: selectedMember.member_id, email: selectedMember.email })}</p>
                     </div>
                     <button
                       type="button"
@@ -709,7 +705,7 @@ export default function AdminFines() {
                       }}
                       className="text-xs font-bold text-red-600 hover:text-red-800 transition-colors"
                     >
-                      Thay đổi
+                      {t('common.change')}
                     </button>
                   </div>
                 )}
@@ -719,22 +715,22 @@ export default function AdminFines() {
               {selectedMember && (
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">
-                    Liên kết phiếu mượn (Tùy chọn)
+                    {t('adminFines.linkBorrowLabel')}
                   </label>
                   {isLoadingLoans ? (
-                    <p className="text-xs text-slate-500 animate-pulse">Đang tải lịch sử mượn...</p>
+                    <p className="text-xs text-slate-500 animate-pulse">{t('adminFines.loadingHistoryLabel')}</p>
                   ) : memberLoans.length === 0 ? (
-                    <p className="text-xs text-slate-400 italic">Thành viên chưa có lịch sử mượn sách.</p>
+                    <p className="text-xs text-slate-400 italic">{t('adminFines.noHistoryLabel')}</p>
                   ) : (
                     <select
                       value={createForm.loan_id || ''}
                       onChange={(e) => setCreateForm(prev => ({ ...prev, loan_id: e.target.value ? Number(e.target.value) : null }))}
                       className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20"
                     >
-                      <option value="">Không liên kết phiếu mượn</option>
+                      <option value="">{t('adminFines.noLinkLoan')}</option>
                       {memberLoans.map((loan) => (
                         <option key={loan.id} value={loan.id}>
-                          {loan.book} (#{loan.id} — Trạng thái: {loan.status})
+                          {loan.book} (#{loan.id} — {t('adminRoomBookings.filterStatus', 'Status')}: {t(`status.${loan.status}`, loan.status)})
                         </option>
                       ))}
                     </select>
@@ -746,23 +742,23 @@ export default function AdminFines() {
                 {/* Reason */}
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">
-                    Lý do phạt
+                    {t('adminFines.fineReasonLabel')}
                   </label>
                   <select
                     value={createForm.reason}
                     onChange={(e) => setCreateForm(prev => ({ ...prev, reason: e.target.value as any }))}
                     className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20"
                   >
-                    <option value="damaged">Hư hỏng sách</option>
-                    <option value="lost">Mất sách</option>
-                    <option value="overdue">Quá hạn trả</option>
+                    <option value="damaged">{t('adminFines.reasonDamaged')}</option>
+                    <option value="lost">{t('adminFines.reasonLost')}</option>
+                    <option value="overdue">{t('adminRequests.dueOverdue')}</option>
                   </select>
                 </div>
 
                 {/* Amount */}
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">
-                    Số tiền phạt (VND)
+                    {t('adminFines.tableHeaderAmount')} (VND)
                   </label>
                   <input
                     type="number"
@@ -778,14 +774,14 @@ export default function AdminFines() {
               {/* Notes */}
               <div>
                 <label className="block text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">
-                  Chi tiết / Ghi chú lỗi hư hỏng
+                  {t('adminFines.noteLabel')}
                 </label>
                 <textarea
                   value={createForm.notes}
                   onChange={(e) => setCreateForm(prev => ({ ...prev, notes: e.target.value }))}
                   rows={3}
                   className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-                  placeholder="Ví dụ: Rách trang 14 và vẽ bậy bìa sau sách, mất đĩa đi kèm..."
+                  placeholder={t('adminFines.notePlaceholder')}
                 />
               </div>
             </div>
@@ -796,7 +792,7 @@ export default function AdminFines() {
                 onClick={() => setShowCreateModal(false)}
                 className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer"
               >
-                Hủy
+                {t('common.cancel')}
               </button>
               <button
                 type="button"
@@ -807,7 +803,7 @@ export default function AdminFines() {
                 {isSubmittingFine && (
                   <span className="animate-spin block h-4 w-4 border-2 border-white border-t-transparent rounded-full"></span>
                 )}
-                Xác nhận tạo phạt
+                {t('adminFines.btnCreateConfirm')}
               </button>
             </div>
           </div>

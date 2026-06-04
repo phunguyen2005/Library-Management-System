@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { getMyRequests } from '../../api/borrowApi';
 import EmptyState from '../../components/EmptyState';
 import { formatDisplayDate } from '../../lib/display';
@@ -12,21 +13,22 @@ type HistoryItem = {
   author: string;
   borrowDate: string;
   returnDate: string;
-  status: string;
+  statusKey: 'statusReturned' | 'statusOverdue' | 'statusOnTime';
   color: string;
 };
 
 function getCompletionStatus(returnDate?: string | null, dueDate?: string | null) {
   if (!returnDate || !dueDate) {
-    return { status: 'Đã trả', color: 'text-slate-600 bg-slate-100' };
+    return { statusKey: 'statusReturned' as const, color: 'text-slate-600 bg-slate-100' };
   }
 
   return new Date(returnDate) > new Date(dueDate)
-    ? { status: 'Trả quá hạn', color: 'text-red-600 bg-red-50' }
-    : { status: 'Đúng hạn', color: 'text-green-600 bg-green-50' };
+    ? { statusKey: 'statusOverdue' as const, color: 'text-red-600 bg-red-50' }
+    : { statusKey: 'statusOnTime' as const, color: 'text-green-600 bg-green-50' };
 }
 
 export default function History() {
+  const { t } = useTranslation();
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -48,27 +50,27 @@ export default function History() {
               author: r.author,
               borrowDate: formatDisplayDate(r.borrow_date),
               returnDate: formatDisplayDate(r.return_date),
-              status: completion.status,
+              statusKey: completion.statusKey,
               color: completion.color,
             };
           }),
         );
       })
       .catch((error: unknown) => {
-        const message = getErrorMessage(error, 'Không thể tải lịch sử mượn trả.');
+        const message = getErrorMessage(error, t('studentHistory.loadError'));
         setError(message);
-        emitToast({ tone: 'error', title: 'Không thể tải lịch sử', message });
+        emitToast({ tone: 'error', title: t('studentHistory.toastErrorTitle'), message });
       })
       .finally(() => setIsLoading(false));
-  }, []);
+  }, [t]);
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6 md:space-y-8 p-4 md:p-8">
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
         <div>
-          <h2 className="text-3xl font-bold text-on-surface">Lịch sử mượn trả</h2>
+          <h2 className="text-3xl font-bold text-on-surface">{t('studentHistory.title')}</h2>
           <p className="mt-1 text-sm text-on-surface-variant">
-            Danh sách chi tiết các tài liệu bạn đã từng mượn tại thư viện
+            {t('studentHistory.subtitle')}
           </p>
         </div>
       </div>
@@ -76,16 +78,16 @@ export default function History() {
       {/* Mobile Card List View */}
       <div className="block md:hidden space-y-4">
         {isLoading ? (
-          <div className="p-8 text-center text-on-surface-variant">Đang tải lịch sử...</div>
+          <div className="p-8 text-center text-on-surface-variant">{t('studentHistory.loading')}</div>
         ) : error ? (
           <div className="p-8">
-            <EmptyState icon="error" title="Không thể tải dữ liệu" message={error} />
+            <EmptyState icon="error" title={t('common.error')} message={error} />
           </div>
         ) : history.length === 0 ? (
           <EmptyState
             icon="history_edu"
-            title="Chưa có lịch sử mượn trả"
-            message="Các giao dịch đã hoàn tất sẽ xuất hiện tại đây."
+            title={t('studentHistory.emptyTitle')}
+            message={t('studentHistory.emptyDesc')}
           />
         ) : (
           history.map((item) => (
@@ -96,21 +98,21 @@ export default function History() {
                   <p className="text-xs text-on-surface-variant mt-0.5">{item.author}</p>
                 </div>
                 <span className={`shrink-0 rounded px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider ${item.color}`}>
-                  {item.status}
+                  {t(`studentHistory.${item.statusKey}`)}
                 </span>
               </div>
               
               <div className="grid grid-cols-3 gap-2 border-t border-outline-variant pt-2.5 text-[10px] text-on-surface-variant">
                 <div>
-                  <span className="text-outline uppercase text-[8px] font-bold block mb-0.5">Mã GD</span>
+                  <span className="text-outline uppercase text-[8px] font-bold block mb-0.5">{t('studentHistory.mobileId')}</span>
                   <span className="font-mono font-bold text-on-surface text-[10px]">{item.id}</span>
                 </div>
                 <div>
-                  <span className="text-outline uppercase text-[8px] font-bold block mb-0.5">Ngày mượn</span>
+                  <span className="text-outline uppercase text-[8px] font-bold block mb-0.5">{t('studentHistory.tableHeaderBorrowDate')}</span>
                   <span className="font-semibold text-on-surface">{item.borrowDate}</span>
                 </div>
                 <div>
-                  <span className="text-outline uppercase text-[8px] font-bold block mb-0.5">Ngày trả</span>
+                  <span className="text-outline uppercase text-[8px] font-bold block mb-0.5">{t('studentHistory.tableHeaderReturnDate')}</span>
                   <span className="font-semibold text-on-surface">{item.returnDate}</span>
                 </div>
               </div>
@@ -125,25 +127,25 @@ export default function History() {
           <table className="w-full min-w-[700px] text-left">
             <thead>
               <tr className="border-b border-surface-container bg-surface-container-low text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
-                <th className="px-6 py-4">Mã giao dịch</th>
-                <th className="px-6 py-4">Tài liệu</th>
-                <th className="px-6 py-4 text-center">Ngày mượn</th>
-                <th className="px-6 py-4 text-center">Ngày trả</th>
-                <th className="px-6 py-4 text-right">Trạng thái hoàn tất</th>
+                <th className="px-6 py-4">{t('studentHistory.tableHeaderId')}</th>
+                <th className="px-6 py-4">{t('studentHistory.tableHeaderBook')}</th>
+                <th className="px-6 py-4 text-center">{t('studentHistory.tableHeaderBorrowDate')}</th>
+                <th className="px-6 py-4 text-center">{t('studentHistory.tableHeaderReturnDate')}</th>
+                <th className="px-6 py-4 text-right">{t('studentHistory.tableHeaderStatus')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-surface-container">
               {isLoading ? (
                 <tr>
                   <td colSpan={5} className="px-6 py-10 text-center text-slate-400">
-                    Đang tải lịch sử...
+                    {t('studentHistory.loading')}
                   </td>
                 </tr>
               ) : (
                 error ? (
                   <tr>
                     <td colSpan={5} className="px-6 py-8">
-                      <EmptyState icon="error" title="Không thể tải dữ liệu" message={error} />
+                      <EmptyState icon="error" title={t('common.error')} message={error} />
                     </td>
                   </tr>
                 ) : history.length === 0 ? (
@@ -151,8 +153,8 @@ export default function History() {
                     <td colSpan={5} className="px-6 py-8">
                       <EmptyState
                         icon="history_edu"
-                        title="Chưa có lịch sử mượn trả"
-                        message="Các giao dịch đã hoàn tất sẽ xuất hiện tại đây."
+                        title={t('studentHistory.emptyTitle')}
+                        message={t('studentHistory.emptyDesc')}
                       />
                     </td>
                   </tr>
@@ -176,7 +178,7 @@ export default function History() {
                         <span
                           className={`inline-block rounded px-3 py-1 text-[10px] font-bold uppercase tracking-wider ${item.color}`}
                         >
-                          {item.status}
+                          {t(`studentHistory.${item.statusKey}`)}
                         </span>
                       </td>
                     </tr>

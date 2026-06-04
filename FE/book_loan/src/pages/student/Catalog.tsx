@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../auth/AuthContext';
 import { requestBorrow, getMyRequests, type MemberRequest } from '../../api/borrowApi';
 import { fetchBorrowableBooks } from '../../api/bookApi';
@@ -21,22 +22,23 @@ import { BOOK_CLASSIFICATIONS } from '../../lib/bookClassification';
 import { emitToast } from '../../notifications/events';
 import type { FormattedBook } from '../../types/book';
 import type { PaginationMeta } from '../../types/pagination';
+import { getIntlLocale } from '../../i18n';
 
 type AvailabilityFilter = 'all' | 'available' | 'unavailable';
 type SortKey = 'title' | 'newest' | 'available';
 
 const PAGE_SIZE = 12;
 
-const AVAILABILITY_OPTIONS: Array<{ label: string; value: AvailabilityFilter }> = [
-  { label: 'Tất cả trạng thái', value: 'all' },
-  { label: 'Còn sách', value: 'available' },
-  { label: 'Hết sách', value: 'unavailable' },
+const AVAILABILITY_OPTIONS: Array<{ labelKey: string; value: AvailabilityFilter }> = [
+  { labelKey: 'studentCatalog.allStatus', value: 'all' },
+  { labelKey: 'studentCatalog.inStock', value: 'available' },
+  { labelKey: 'studentCatalog.outOfStock', value: 'unavailable' },
 ];
 
-const SORT_OPTIONS: Array<{ label: string; value: SortKey }> = [
-  { label: 'Tên A-Z', value: 'title' },
-  { label: 'Năm xuất bản mới', value: 'newest' },
-  { label: 'Còn nhiều bản nhất', value: 'available' },
+const SORT_OPTIONS: Array<{ labelKey: string; value: SortKey }> = [
+  { labelKey: 'studentCatalog.sortAz', value: 'title' },
+  { labelKey: 'studentCatalog.sortNewest', value: 'newest' },
+  { labelKey: 'studentCatalog.sortQuantity', value: 'available' },
 ];
 
 function readAvailability(value: string | null): AvailabilityFilter {
@@ -58,7 +60,28 @@ function normalizeSearchQuery(value: string): string {
 }
 
 export default function Catalog() {
+  const { t, i18n } = useTranslation();
   const { user, role } = useAuth();
+
+  const getCategoryLabel = (genre: string) => {
+    switch (genre) {
+      case 'Khoa học Tự nhiên': return t('bookCategory.science', 'Khoa học Tự nhiên');
+      case 'Kinh tế - Lịch sử': return t('bookCategory.economics', 'Kinh tế - Lịch sử');
+      case 'Công nghệ - Kỹ thuật': return t('bookCategory.technology', 'Công nghệ - Kỹ thuật');
+      case 'Văn học - Xã hội': return t('bookCategory.literature', 'Văn học - Xã hội');
+      case 'Tham khảo & Từ điển': return t('bookCategory.reference', 'Tham khảo & Từ điển');
+      case 'Ngoại ngữ & Ngoại văn': return t('bookCategory.language', 'Ngoại ngữ & Ngoại văn');
+      case 'Giáo trình Đại học': return t('bookCategory.textbook', 'Giáo trình Đại học');
+      case 'Pháp luật & Chính trị': return t('bookCategory.law', 'Pháp luật & Chính trị');
+      case 'Nghệ thuật & Thể thao': return t('bookCategory.art', 'Nghệ thuật & Thể thao');
+      case 'Triết học & Tâm lý học': return t('bookCategory.philosophy', 'Triết học & Tâm lý học');
+      default: return genre;
+    }
+  };
+
+  const getClassificationLabel = (code: string, genre: string) => {
+    return `${code} - ${getCategoryLabel(genre)}`;
+  };
   const [searchParams, setSearchParams] = useSearchParams();
   const query = searchParams.get('q') || '';
   const category = searchParams.get('category') || 'all';
@@ -211,8 +234,8 @@ export default function Catalog() {
           return;
         }
 
-        const message = getErrorMessage(error, 'Không thể tải danh mục sách.');
-        emitToast({ tone: 'error', title: 'Không thể tải danh mục', message });
+        const message = getErrorMessage(error, t('studentCatalog.loadError'));
+        emitToast({ tone: 'error', title: t('studentCatalog.loadError'), message });
       });
     return () => {
       isActive = false;
@@ -248,9 +271,9 @@ export default function Catalog() {
           return;
         }
 
-        const message = getErrorMessage(error, 'Không thể tải danh mục sách.');
+        const message = getErrorMessage(error, t('studentCatalog.loadError'));
         setLoadError(message);
-        emitToast({ tone: 'error', title: 'Không thể tải danh mục', message });
+        emitToast({ tone: 'error', title: t('studentCatalog.loadError'), message });
       })
       .finally(() => {
         if (isActive) {
@@ -360,7 +383,7 @@ export default function Catalog() {
       const response = await requestBorrow(selectedBook.id);
       emitToast({
         tone: 'success',
-        title: 'Đã gửi yêu cầu mượn',
+        title: t('studentCatalog.borrowSuccess'),
         message: response.message,
       });
       closeBook();
@@ -369,10 +392,10 @@ export default function Catalog() {
         return;
       }
 
-      const message = getErrorMessage(error, 'Lỗi khi yêu cầu mượn sách');
+      const message = getErrorMessage(error, t('studentCatalog.borrowError'));
       emitToast({
         tone: 'error',
-        title: 'Không thể gửi yêu cầu mượn',
+        title: t('studentCatalog.borrowError'),
         message,
       });
     } finally {
@@ -388,13 +411,13 @@ export default function Catalog() {
       setReservations((prev) => [...prev, response.reservation]);
       emitToast({
         tone: 'success',
-        title: 'Đặt chỗ thành công',
+        title: t('studentCatalog.reserveSuccess'),
         message: response.message,
       });
     } catch (error: unknown) {
       if (isUnauthorizedError(error)) return;
-      const message = getErrorMessage(error, 'Lỗi khi đặt chỗ sách.');
-      emitToast({ tone: 'error', title: 'Không thể đặt chỗ', message });
+      const message = getErrorMessage(error, t('studentCatalog.reserveError'));
+      emitToast({ tone: 'error', title: t('studentCatalog.reserveError'), message });
     } finally {
       setIsReserving(false);
     }
@@ -407,13 +430,13 @@ export default function Catalog() {
       setReservations((prev) => prev.filter((r) => r.reservation_id !== reservationId));
       emitToast({
         tone: 'success',
-        title: 'Đã hủy đặt chỗ',
+        title: t('studentCatalog.cancelReserveSuccess'),
         message: response.message,
       });
     } catch (error: unknown) {
       if (isUnauthorizedError(error)) return;
-      const message = getErrorMessage(error, 'Lỗi khi hủy đặt chỗ.');
-      emitToast({ tone: 'error', title: 'Không thể hủy đặt chỗ', message });
+      const message = getErrorMessage(error, t('studentCatalog.cancelReserveError'));
+      emitToast({ tone: 'error', title: t('studentCatalog.cancelReserveError'), message });
     } finally {
       setIsReserving(false);
     }
@@ -451,15 +474,15 @@ export default function Catalog() {
 
       emitToast({
         tone: 'success',
-        title: 'Đánh giá thành công',
+        title: t('studentCatalog.reviewSuccess'),
         message: response.message,
       });
       setNewComment('');
       setNewRating(5);
     } catch (error: unknown) {
       if (isUnauthorizedError(error)) return;
-      const message = getErrorMessage(error, 'Không thể gửi đánh giá.');
-      emitToast({ tone: 'error', title: 'Gửi đánh giá thất bại', message });
+      const message = getErrorMessage(error, t('studentCatalog.reviewError'));
+      emitToast({ tone: 'error', title: t('studentCatalog.reviewError'), message });
     } finally {
       setIsSubmittingReview(false);
     }
@@ -485,7 +508,7 @@ export default function Catalog() {
       syncFavoriteBook(response.book);
       emitToast({
         tone: 'success',
-        title: response.book.is_favorite ? 'Đã thêm vào yêu thích' : 'Đã bỏ khỏi yêu thích',
+        title: response.book.is_favorite ? t('studentCatalog.favoriteAdd') : t('studentCatalog.favoriteRemove'),
         message: response.message,
       });
     } catch (error: unknown) {
@@ -493,8 +516,8 @@ export default function Catalog() {
         return;
       }
 
-      const message = getErrorMessage(error, 'Không thể cập nhật sách yêu thích.');
-      emitToast({ tone: 'error', title: 'Không thể cập nhật yêu thích', message });
+      const message = getErrorMessage(error, t('studentCatalog.favoriteError'));
+      emitToast({ tone: 'error', title: t('studentCatalog.favoriteError'), message });
     } finally {
       setFavoriteActionId(null);
     }
@@ -521,25 +544,25 @@ export default function Catalog() {
               type="button"
               onClick={() => setIsFilterOpen(false)}
               className="flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container lg:hidden cursor-pointer"
-              aria-label="Đóng bộ lọc"
+              aria-label={t('studentCatalog.ariaClose')}
             >
               <span className="material-symbols-outlined">close</span>
             </button>
-            <h2 className="text-lg font-bold text-on-surface">Bộ lọc</h2>
+            <h2 className="text-lg font-bold text-on-surface">{t('studentCatalog.filterTitle')}</h2>
           </div>
           <button
             type="button"
             onClick={resetFilters}
             className="text-xs font-medium text-primary hover:underline"
           >
-            Xóa tất cả
+            {t('studentCatalog.clearAll')}
           </button>
         </div>
 
         <div className="space-y-8">
           <div ref={autocompleteRef} className="relative block space-y-2">
             <span className="block text-xs font-bold uppercase tracking-widest text-outline">
-              Tìm trong danh mục
+              {t('studentCatalog.searchLabel')}
             </span>
             <div className="relative">
               <input
@@ -554,7 +577,7 @@ export default function Catalog() {
                 onFocus={() => {
                   if (suggestions.length > 0) setShowSuggestions(true);
                 }}
-                placeholder="Tên sách, tác giả, ISBN..."
+                placeholder={t('studentCatalog.searchPlaceholder')}
                 className="w-full rounded-lg border border-surface-container-high bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20"
               />
               {isSearchingSuggestions && (
@@ -592,7 +615,7 @@ export default function Catalog() {
 
           <div>
             <p className="mb-3 text-xs font-bold uppercase tracking-widest text-outline">
-              Trạng thái kho
+              {t('studentCatalog.stockStatus')}
             </p>
             <div className="space-y-2">
               {AVAILABILITY_OPTIONS.map((option) => (
@@ -607,7 +630,7 @@ export default function Catalog() {
                     onChange={() => updateFilter('availability', option.value)}
                     className="text-primary focus:ring-primary"
                   />
-                  {option.label}
+                  {t(option.labelKey)}
                 </label>
               ))}
             </div>
@@ -615,7 +638,7 @@ export default function Catalog() {
 
           <div>
             <p className="mb-3 text-xs font-bold uppercase tracking-widest text-outline">
-              Phân loại
+              {t('studentCatalog.categoryLabel')}
             </p>
             <div className="space-y-2">
               <button
@@ -627,7 +650,7 @@ export default function Catalog() {
                     : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container'
                 }`}
               >
-                Tất cả phân loại
+                {t('studentCatalog.allCategories')}
               </button>
               {BOOK_CLASSIFICATIONS.map((item) => (
                 <button
@@ -640,7 +663,7 @@ export default function Catalog() {
                       : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container'
                   }`}
                 >
-                  {item.label}
+                  {getClassificationLabel(item.code, item.genre)}
                 </button>
               ))}
             </div>
@@ -648,7 +671,7 @@ export default function Catalog() {
 
           <label className="block space-y-2">
             <span className="text-xs font-bold uppercase tracking-widest text-outline">
-              Sắp xếp
+              {t('studentCatalog.sortLabel')}
             </span>
             <select
               value={sort}
@@ -657,7 +680,7 @@ export default function Catalog() {
             >
               {SORT_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
-                  {option.label}
+                  {t(option.labelKey)}
                 </option>
               ))}
             </select>
@@ -668,9 +691,9 @@ export default function Catalog() {
       <section className="custom-scrollbar flex-1 overflow-y-auto p-4 md:p-8">
         <div className="mb-6 md:mb-8 flex items-center justify-between">
           <div>
-            <h2 className="text-xl md:text-2xl font-bold text-on-surface">Danh mục sách</h2>
+            <h2 className="text-xl md:text-2xl font-bold text-on-surface">{t('studentCatalog.title')}</h2>
             <p className="mt-1 text-xs md:text-sm text-on-surface-variant">
-              Hiển thị {books.length} trong tổng số {totalRecords} kết quả
+              {t('studentCatalog.resultsRange', { count: books.length, total: totalRecords })}
             </p>
           </div>
           <button
@@ -679,7 +702,7 @@ export default function Catalog() {
             className="inline-flex items-center gap-1.5 rounded-xl bg-primary/10 border border-primary/20 px-4 py-2 text-xs font-bold text-primary lg:hidden transition-colors hover:bg-primary hover:text-white cursor-pointer"
           >
             <span className="material-symbols-outlined text-sm">filter_alt</span>
-            Bộ lọc
+            {t('studentCatalog.filterBtn')}
           </button>
         </div>
 
@@ -694,7 +717,7 @@ export default function Catalog() {
                 : 'bg-surface-container-low text-slate-600 hover:bg-slate-100 hover:text-slate-800 border border-slate-200/60 dark:border-stone-800 dark:text-stone-300'
             }`}
           >
-            Tất cả
+            {t('studentCatalog.allTab')}
           </button>
           {BOOK_CLASSIFICATIONS.map((item) => (
             <button
@@ -707,24 +730,24 @@ export default function Catalog() {
                   : 'bg-surface-container-low text-slate-600 hover:bg-slate-100 hover:text-slate-800 border border-slate-200/60 dark:border-stone-800 dark:text-stone-300'
               }`}
             >
-              {item.label}
+              {getCategoryLabel(item.genre)}
             </button>
           ))}
         </div>
 
         <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {isLoading ? (
-            <div className="col-span-full py-10 text-center">Đang tải biểu mẫu sách...</div>
+            <div className="col-span-full py-10 text-center">{t('studentCatalog.loadingForm')}</div>
           ) : loadError ? (
             <div className="col-span-full">
-              <EmptyState icon="error" title="Không thể tải danh mục" message={loadError} />
+              <EmptyState icon="error" title={t('studentCatalog.loadError')} message={loadError} />
             </div>
           ) : books.length === 0 ? (
             <div className="col-span-full">
               <EmptyState
                 icon="search_off"
-                title="Không tìm thấy sách phù hợp"
-                message="Thử xóa bộ lọc hoặc nhập từ khóa khác."
+                title={t('studentCatalog.noBooksTitle')}
+                message={t('studentCatalog.noBooksDesc')}
               />
             </div>
           ) : (
@@ -756,8 +779,8 @@ export default function Catalog() {
                     type="button"
                     aria-label={
                       book.is_favorite
-                        ? `Bỏ yêu thích ${book.title}`
-                        : `Thêm yêu thích ${book.title}`
+                        ? t('studentCatalog.favoriteRemoveAria', { title: book.title, defaultValue: `Bỏ yêu thích ${book.title}` })
+                        : t('studentCatalog.favoriteAddAria', { title: book.title, defaultValue: `Thêm yêu thích ${book.title}` })
                     }
                     disabled={favoriteActionId === book.id}
                     onClick={(e) => {
@@ -786,13 +809,13 @@ export default function Catalog() {
                   </div>
                 ) : null}
                 <p className="mt-1.5 text-[10px] font-medium uppercase text-primary">
-                  {Number(book.favorite_count ?? 0)} lượt yêu thích
+                  {t('studentCatalog.likes', { count: Number(book.favorite_count ?? 0) })}
                 </p>
                 {book.is_available ? (
-                  <p className="mt-1 text-[10px] uppercase text-outline">Kệ: {book.location ? book.location.replace(/^kệ\s+/i, '') : ''}</p>
+                  <p className="mt-1 text-[10px] uppercase text-outline">{t('studentCatalog.shelf')}: {book.location ? book.location.replace(/^kệ\s+/i, '') : ''}</p>
                 ) : (
                   <p className="mt-1 text-[10px] font-medium text-error">
-                    Đã hết bản sẵn sàng cho mượn
+                    {t('studentCatalog.outOfCopies')}
                   </p>
                 )}
               </article>
@@ -830,7 +853,7 @@ export default function Catalog() {
               <div className="mb-6 flex items-start justify-between">
                 <div>
                   <span className="rounded-full bg-primary-container px-3 py-1 text-xs font-bold uppercase tracking-widest text-primary">
-                    {selectedBook.category}
+                    {getCategoryLabel(selectedBook.category)}
                   </span>
                   <h2 className="mt-4 text-2xl md:text-3xl font-bold text-on-surface">{selectedBook.title}</h2>
                   <p className="mt-2 text-base md:text-lg text-on-surface-variant">{selectedBook.author}</p>
@@ -851,19 +874,19 @@ export default function Catalog() {
                   </div>
                   <div>
                     <p className="text-[11px] font-bold uppercase tracking-widest text-outline">
-                      Năm xuất bản
+                      {t('studentCatalog.publishedYear')}
                     </p>
                     <p className="mt-1 font-semibold text-on-surface">
-                      {selectedBook.published_year ?? 'Chưa rõ'}
+                      {selectedBook.published_year ?? t('common.notAvailable', 'Chưa rõ')}
                     </p>
                   </div>
                   <div>
                     <p className="text-[11px] font-bold uppercase tracking-widest text-outline">
-                      Vị trí kệ
+                      {t('studentCatalog.shelfLocation')}
                     </p>
                     <div className="mt-1 flex items-center gap-2">
                       <span className="font-semibold text-on-surface">
-                        {selectedBook.location || 'Chưa rõ'}
+                        {selectedBook.location || t('common.notAvailable', 'Chưa rõ')}
                       </span>
                       {selectedBook.location && (
                         <button
@@ -876,14 +899,14 @@ export default function Catalog() {
                           className="inline-flex items-center gap-1 rounded-lg bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary transition-colors hover:bg-primary hover:text-white cursor-pointer"
                         >
                           <span className="material-symbols-outlined text-[12px]">map</span>
-                          Xem vị trí
+                          {t('studentCatalog.viewLocation', 'Xem vị trí')}
                         </button>
                       )}
                     </div>
                   </div>
                   <div>
                     <p className="text-[11px] font-bold uppercase tracking-widest text-outline">
-                      Tổng số / Còn lại
+                      {t('studentCatalog.quantityRatio', 'Tổng số / Còn lại')}
                     </p>
                     <p className="mt-1 font-semibold text-on-surface">
                       {selectedBook.quantity} / {selectedBook.available_quantity}
@@ -891,7 +914,7 @@ export default function Catalog() {
                   </div>
                   <div>
                     <p className="text-[11px] font-bold uppercase tracking-widest text-outline">
-                      Trạng thái
+                      {t('studentCatalog.statusLabel')}
                     </p>
                     <div className="mt-1 flex items-center gap-2 font-semibold text-on-surface">
                       <span className={`h-2.5 w-2.5 rounded-full ${selectedBook.statusColor}`} />
@@ -900,12 +923,12 @@ export default function Catalog() {
                   </div>
                   <div>
                     <p className="text-[11px] font-bold uppercase tracking-widest text-outline">
-                      Đánh giá trung bình
+                      {t('studentCatalog.avgRating', 'Đánh giá trung bình')}
                     </p>
                     <div className="mt-1 flex items-center gap-1.5 font-semibold text-on-surface">
                       <StarRating rating={selectedBook.avg_rating ?? 0} size="sm" />
                       <span className="text-xs font-bold">
-                        {selectedBook.avg_rating ?? 0}/5 ({selectedBook.reviews_count ?? 0} lượt)
+                        {selectedBook.avg_rating ?? 0}/5 ({t('studentCatalog.reviewsCountValue', { count: selectedBook.reviews_count ?? 0, defaultValue: `${selectedBook.reviews_count ?? 0} lượt` })})
                       </span>
                     </div>
                   </div>
@@ -916,7 +939,7 @@ export default function Catalog() {
                 <div className="mt-4 rounded-2xl border border-primary/10 bg-primary/5 p-4">
                   <div className="flex items-center gap-2 text-primary">
                     <span className="material-symbols-outlined text-lg">auto_awesome</span>
-                    <h3 className="text-sm font-bold">Tóm tắt AI</h3>
+                    <h3 className="text-sm font-bold">{t('studentCatalog.aiSummaryTitle', 'Tóm tắt AI')}</h3>
                   </div>
                   {selectedBook.ai_summary ? (
                     <p className="mt-2 text-sm leading-relaxed text-on-surface-variant">
@@ -951,9 +974,9 @@ export default function Catalog() {
                       <div className="rounded-xl bg-amber-500/10 border border-amber-500/25 p-4 text-xs text-amber-700 flex items-start gap-3 w-full text-left">
                         <span className="material-symbols-outlined text-amber-600 shrink-0 select-none text-lg">info</span>
                         <div className="flex-1">
-                          <p className="font-bold text-sm text-amber-800">Quyền mượn bị giới hạn</p>
+                          <p className="font-bold text-sm text-amber-800">{t('studentCatalog.guestLimitTitle', 'Quyền mượn bị giới hạn')}</p>
                           <p className="mt-1 text-xs leading-relaxed text-amber-700/90">
-                            Quyền mượn sách vật lý và đặt chỗ chỉ áp dụng cho sinh viên sử dụng email trường (@student.hcmue.edu.vn hoặc @hcmue.edu.vn). Giao dịch của bạn được ghi nhận dưới danh nghĩa khách vãng lai (chỉ được xem tài liệu).
+                            {t('studentCatalog.guestLimitDesc', 'Quyền mượn sách vật lý và đặt chỗ chỉ áp dụng cho sinh viên sử dụng email trường (@student.hcmue.edu.vn hoặc @hcmue.edu.vn). Giao dịch của bạn được ghi nhận dưới danh nghĩa khách vãng lai (chỉ được xem tài liệu).')}
                           </p>
                         </div>
                       </div>
@@ -969,7 +992,7 @@ export default function Catalog() {
                   <div className="mt-8 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 border-t border-surface-container-high pt-6">
                     <div className="flex flex-col">
                       <span className="text-[10px] font-bold uppercase text-outline">
-                        Trạng thái tại kho
+                        {t('studentCatalog.stockStatus')}
                       </span>
                       <span
                         className={`mt-1 flex items-center gap-1 font-bold ${
@@ -982,8 +1005,8 @@ export default function Catalog() {
                           }`}
                         />
                         {selectedIsAvailable
-                          ? `${selectedBook.available_quantity} bản sẵn sàng cho mượn`
-                          : 'Hiện chưa có bản sẵn sàng cho mượn'}
+                          ? t('studentCatalog.availableCount', { count: selectedBook.available_quantity })
+                          : t('studentCatalog.outOfCopies')}
                       </span>
                     </div>
 
@@ -994,12 +1017,12 @@ export default function Catalog() {
                         disabled={isBorrowing}
                         className="rounded-xl bg-tertiary px-8 py-3 font-bold text-white shadow-lg shadow-tertiary/20 transition-all active:scale-95 disabled:cursor-wait disabled:opacity-60 cursor-pointer text-center"
                       >
-                        {isBorrowing ? 'Đang gửi...' : 'Mượn ngay'}
+                        {isBorrowing ? t('studentCatalog.btnSubmitting', 'Đang gửi...') : t('studentCatalog.btnBorrowNow', 'Mượn ngay')}
                       </button>
                     ) : activeRes ? (
                       <div className="flex flex-col items-stretch sm:items-end gap-1">
                         <span className="text-[10px] font-bold text-primary uppercase text-center sm:text-right">
-                          Bạn đang xếp vị trí thứ #{activeRes.position} hàng chờ
+                          {t('studentCatalog.waitingPosition', { position: activeRes.position, defaultValue: `Bạn đang xếp vị trí thứ #${activeRes.position} hàng chờ` })}
                         </span>
                         <button
                           type="button"
@@ -1007,7 +1030,7 @@ export default function Catalog() {
                           disabled={isReserving}
                           className="rounded-lg bg-error px-5 py-2 text-xs font-bold text-white shadow-md shadow-error/15 transition-all active:scale-95 disabled:cursor-wait cursor-pointer text-center"
                         >
-                          {isReserving ? 'Đang hủy...' : 'Hủy đặt chỗ'}
+                          {isReserving ? t('studentCatalog.btnCancelling', 'Đang hủy...') : t('studentCatalog.btnCancelReservation', 'Hủy đặt chỗ')}
                         </button>
                       </div>
                     ) : (
@@ -1017,7 +1040,7 @@ export default function Catalog() {
                         disabled={isReserving}
                         className="rounded-xl bg-primary px-8 py-3 font-bold text-white shadow-lg shadow-primary/20 transition-all active:scale-95 disabled:cursor-wait disabled:opacity-60 cursor-pointer text-center"
                       >
-                        {isReserving ? 'Đang gửi...' : 'Đặt chỗ trước'}
+                        {isReserving ? t('studentCatalog.btnSubmitting', 'Đang gửi...') : t('studentCatalog.btnReserve')}
                       </button>
                     )}
                   </div>
@@ -1039,21 +1062,21 @@ export default function Catalog() {
                     }`}>
                       <div className="flex items-center gap-1.5 text-primary">
                         <span className="material-symbols-outlined text-xl">rate_review</span>
-                        <h4 className="font-bold text-sm">Đánh giá cuốn sách này</h4>
+                        <h4 className="font-bold text-sm">{t('studentCatalog.addReviewTitle')}</h4>
                       </div>
                       <p className="text-xs text-on-surface-variant leading-relaxed">
-                        Bạn đã trả sách thành công! Hãy gửi đánh giá để giúp những bạn đọc khác chọn được sách phù hợp.
+                        {t('studentCatalog.reviewPrompt', 'Bạn đã trả sách thành công! Hãy gửi đánh giá để giúp những bạn đọc khác chọn được sách phù hợp.')}
                       </p>
                       
                       <div className="space-y-3">
                         <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold text-outline">Số sao của bạn:</span>
+                          <span className="text-xs font-bold text-outline">{t('studentCatalog.yourRating', 'Số sao của bạn:')}</span>
                           <StarRating rating={newRating} onChange={setNewRating} interactive={true} size="lg" />
                         </div>
                         <textarea
                           value={newComment}
                           onChange={(e) => setNewComment(e.target.value)}
-                          placeholder="Nhập cảm nhận của bạn về cuốn sách (tối đa 1000 ký tự)..."
+                          placeholder={t('studentCatalog.reviewPlaceholder')}
                           rows={3}
                           className="w-full rounded-xl border border-surface-container-high bg-surface-bright text-on-surface p-3 text-xs outline-none focus:ring-2 focus:ring-primary/25 placeholder:text-outline/70 transition-all duration-200"
                           maxLength={1000}
@@ -1068,12 +1091,12 @@ export default function Catalog() {
                             {isSubmittingReview ? (
                               <>
                                 <span className="material-symbols-outlined animate-spin text-xs">progress_activity</span>
-                                <span>Đang gửi...</span>
+                                <span>{t('studentCatalog.btnSubmittingReview')}</span>
                               </>
                             ) : (
                               <>
                                 <span className="material-symbols-outlined text-xs">send</span>
-                                <span>Gửi đánh giá</span>
+                                <span>{t('studentCatalog.btnSubmitReview')}</span>
                               </>
                             )}
                           </button>
@@ -1086,12 +1109,12 @@ export default function Catalog() {
                 {/* Reviews List */}
                 <div className="space-y-4">
                   <h4 className="font-bold text-on-surface text-sm">
-                    Đánh giá từ bạn đọc ({reviews.length})
+                    {t('studentCatalog.reviewsTitle', 'Đánh giá từ bạn đọc')} ({reviews.length})
                   </h4>
 
                   {reviews.length === 0 ? (
                     <p className="text-xs text-on-surface-variant italic">
-                      Chưa có đánh giá nào cho cuốn sách này. Hãy là người đầu tiên gửi cảm nhận!
+                      {t('studentCatalog.noReviews', 'Chưa có đánh giá nào cho cuốn sách này. Hãy là người đầu tiên gửi cảm nhận!')}
                     </p>
                   ) : (
                     <div className="space-y-3 max-h-60 overflow-y-auto custom-scrollbar pr-2">
@@ -1101,10 +1124,10 @@ export default function Catalog() {
                             <div>
                               <p className="text-xs font-bold text-on-surface flex items-center gap-1.5">
                                 <span className="material-symbols-outlined text-sm text-primary">account_circle</span>
-                                {rev.member?.name ?? 'Bạn đọc'}
+                                {rev.member?.name ?? t('studentCatalog.defaultReviewer', 'Bạn đọc')}
                               </p>
                               <span className="text-[10px] text-on-surface-variant/80 font-medium pl-5 block mt-0.5">
-                                {rev.created_at ? new Date(rev.created_at).toLocaleDateString('vi-VN') : 'Gần đây'}
+                                {rev.created_at ? new Date(rev.created_at).toLocaleDateString(getIntlLocale()) : t('studentCatalog.recentTime', 'Gần đây')}
                               </span>
                             </div>
                             <div className="shrink-0 bg-surface-bright px-2 py-1 rounded-lg border border-outline-variant/30 flex items-center">

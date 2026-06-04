@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
+import { getIntlLocale } from '../../i18n';
 import { getAuditLogs, AuditLogEntry } from '../../api/auditApi';
 import { motion } from 'framer-motion';
 import { echoClient } from '../../lib/echo';
@@ -75,11 +77,34 @@ const getActionBadgeStyles = (rawAction: string) => {
   }
 };
 
-const parseUserAgent = (ua: string | null) => {
-  if (!ua) return { os: 'Hệ thống', browser: 'Hệ thống', osIcon: 'settings', browserIcon: 'settings' };
+const getActionLabel = (rawAction: string, fallback: string, t: any) => {
+  const map: Record<string, string> = {
+    login: t('adminAuditLogs.actionLogin'),
+    logout: t('adminAuditLogs.actionLogout'),
+    register: t('adminAuditLogs.actionRegister'),
+    profile_update: t('adminAuditLogs.actionProfileUpdate'),
+    book_create: t('adminAuditLogs.actionBookCreate'),
+    book_update: t('adminAuditLogs.actionBookUpdate'),
+    book_delete: t('adminAuditLogs.actionBookDelete'),
+    digital_file_upload: t('adminAuditLogs.actionFileUpload'),
+    digital_file_download: t('adminAuditLogs.actionFileDownload'),
+    borrow_request: t('adminAuditLogs.actionBorrowRequest'),
+    borrow_approve: t('adminAuditLogs.actionBorrowApprove'),
+    borrow_pickup: t('adminAuditLogs.actionBorrowPickup'),
+    borrow_reject: t('adminAuditLogs.actionBorrowReject'),
+    borrow_return: t('adminAuditLogs.actionBorrowReturn'),
+    collect_fine: t('adminAuditLogs.actionCollectFine'),
+    settings_update: t('adminAuditLogs.actionSettingsUpdate'),
+    revoke_device: t('adminAuditLogs.actionRevokeDevice'),
+  };
+  return map[rawAction] || fallback;
+};
+
+const parseUserAgent = (ua: string | null, t: any) => {
+  if (!ua) return { os: t('adminAuditLogs.systemActor'), browser: t('adminAuditLogs.systemActor'), osIcon: 'settings', browserIcon: 'settings' };
   
-  let os = 'Thiết bị khác';
-  let browser = 'Trình duyệt';
+  let os = t('adminAuditLogs.deviceOther');
+  let browser = t('adminAuditLogs.browserLabel');
   let osIcon = 'devices';
   let browserIcon = 'language';
   
@@ -125,6 +150,7 @@ const parseUserAgent = (ua: string | null) => {
 };
 
 export default function AdminAuditLogs() {
+  const { t } = useTranslation();
   const [logs, setLogs] = useState<AuditLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -199,7 +225,7 @@ export default function AdminAuditLogs() {
       setTotalPages(res.last_page);
       setTotalLogs(res.total);
     } catch (err: any) {
-      setError(err?.message || 'Có lỗi xảy ra khi tải nhật ký hệ thống.');
+      setError(err?.message || t('adminAuditLogs.loadError'));
     } finally {
       setLoading(false);
     }
@@ -231,10 +257,10 @@ export default function AdminAuditLogs() {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">
-            Nhật Ký Vận Hành
+            {t('adminAuditLogs.title')}
           </h1>
           <p className="text-muted-foreground mt-1">
-            Ghi vết toàn bộ hành động nghiệp vụ, an ninh và quản trị trong hệ thống.
+            {t('adminAuditLogs.subtitle')}
           </p>
         </div>
       </div>
@@ -243,9 +269,9 @@ export default function AdminAuditLogs() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-surface-bright border border-border/80 rounded-2xl p-4 shadow-sm flex items-center justify-between hover:shadow-md transition-all duration-200">
           <div>
-            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Tổng Sự Kiện</p>
+            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{t('adminAuditLogs.statTotal')}</p>
             <h3 className="text-2xl font-bold text-foreground mt-1 font-mono">{totalLogs}</h3>
-            <p className="text-[10px] text-muted-foreground/80 mt-1">Khớp toàn bộ bộ lọc</p>
+            <p className="text-[10px] text-muted-foreground/80 mt-1">{t('adminAuditLogs.statTotalDesc')}</p>
           </div>
           <div className="w-11 h-11 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
             <span className="material-symbols-outlined text-2xl">history</span>
@@ -254,9 +280,9 @@ export default function AdminAuditLogs() {
 
         <div className="bg-surface-bright border border-border/80 rounded-2xl p-4 shadow-sm flex items-center justify-between hover:shadow-md transition-all duration-200">
           <div>
-            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">IP Duy Nhất (Trang)</p>
+            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{t('adminAuditLogs.statIp')}</p>
             <h3 className="text-2xl font-bold text-foreground mt-1 font-mono">{uniqueIpsCount}</h3>
-            <p className="text-[10px] text-muted-foreground/80 mt-1">Địa chỉ IP trên trang này</p>
+            <p className="text-[10px] text-muted-foreground/80 mt-1">{t('adminAuditLogs.statIpDesc')}</p>
           </div>
           <div className="w-11 h-11 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
             <span className="material-symbols-outlined text-2xl">lan</span>
@@ -265,9 +291,9 @@ export default function AdminAuditLogs() {
 
         <div className="bg-surface-bright border border-border/80 rounded-2xl p-4 shadow-sm flex items-center justify-between hover:shadow-md transition-all duration-200">
           <div>
-            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Thủ Thư (Trang)</p>
+            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{t('adminAuditLogs.statLibrarians')}</p>
             <h3 className="text-2xl font-bold text-foreground mt-1 font-mono">{adminActionsCount}</h3>
-            <p className="text-[10px] text-muted-foreground/80 mt-1">Thao tác admin trên trang</p>
+            <p className="text-[10px] text-muted-foreground/80 mt-1">{t('adminAuditLogs.statLibrariansDesc')}</p>
           </div>
           <div className="w-11 h-11 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
             <span className="material-symbols-outlined text-2xl">shield_person</span>
@@ -276,9 +302,9 @@ export default function AdminAuditLogs() {
 
         <div className="bg-surface-bright border border-border/80 rounded-2xl p-4 shadow-sm flex items-center justify-between hover:shadow-md transition-all duration-200">
           <div>
-            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Sinh Viên (Trang)</p>
+            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{t('adminAuditLogs.statStudents')}</p>
             <h3 className="text-2xl font-bold text-foreground mt-1 font-mono">{studentActionsCount}</h3>
-            <p className="text-[10px] text-muted-foreground/80 mt-1">Thao tác sinh viên trên trang</p>
+            <p className="text-[10px] text-muted-foreground/80 mt-1">{t('adminAuditLogs.statStudentsDesc')}</p>
           </div>
           <div className="w-11 h-11 rounded-xl bg-green-500/10 text-green-600 dark:text-green-400 flex items-center justify-center shrink-0">
             <span className="material-symbols-outlined text-2xl">person</span>
@@ -292,13 +318,13 @@ export default function AdminAuditLogs() {
           {/* Search Query */}
           <div>
             <label className="block text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-2">
-              Tìm kiếm chi tiết
+              {t('adminAuditLogs.searchLabel')}
             </label>
             <div className="relative">
               <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-lg">search</span>
               <input
                 type="text"
-                placeholder="Tìm mô tả, hành động..."
+                placeholder={t('adminAuditLogs.searchPlaceholder')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-9 pr-12 py-2 bg-surface border border-border/85 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all placeholder:text-muted-foreground/60"
@@ -321,13 +347,13 @@ export default function AdminAuditLogs() {
           {/* Operator Query */}
           <div>
             <label className="block text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-2">
-              Người thực hiện
+              {t('adminAuditLogs.userLabel')}
             </label>
             <div className="relative">
               <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-lg">person</span>
               <input
                 type="text"
-                placeholder="Tên, email user..."
+                placeholder={t('adminAuditLogs.userPlaceholder')}
                 value={userQuery}
                 onChange={(e) => setUserQuery(e.target.value)}
                 className="w-full pl-9 pr-12 py-2 bg-surface border border-border/85 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all placeholder:text-muted-foreground/60"
@@ -350,7 +376,7 @@ export default function AdminAuditLogs() {
           {/* User Type */}
           <div>
             <label className="block text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-2">
-              Đối tượng thực hiện
+              {t('adminAuditLogs.targetLabel')}
             </label>
             <div className="relative">
               <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-lg">group</span>
@@ -359,10 +385,10 @@ export default function AdminAuditLogs() {
                 onChange={(e) => setUserType(e.target.value)}
                 className="w-full pl-9 pr-8 py-2 bg-surface border border-border/85 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all appearance-none cursor-pointer"
               >
-                <option value="">Tất cả đối tượng</option>
-                <option value="student">Sinh viên</option>
-                <option value="admin">Thủ thư / Admin</option>
-                <option value="unknown">Hệ thống</option>
+                <option value="">{t('adminAuditLogs.allTargets')}</option>
+                <option value="student">{t('adminAuditLogs.targetStudent')}</option>
+                <option value="admin">{t('adminAuditLogs.targetAdmin')}</option>
+                <option value="unknown">{t('adminAuditLogs.targetSystem')}</option>
               </select>
               <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none text-lg">arrow_drop_down</span>
             </div>
@@ -371,7 +397,7 @@ export default function AdminAuditLogs() {
           {/* Action type */}
           <div>
             <label className="block text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-2">
-              Loại hành động
+              {t('adminAuditLogs.actionLabel')}
             </label>
             <div className="relative">
               <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-lg">tune</span>
@@ -380,24 +406,24 @@ export default function AdminAuditLogs() {
                 onChange={(e) => setAction(e.target.value)}
                 className="w-full pl-9 pr-8 py-2 bg-surface border border-border/85 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all appearance-none cursor-pointer"
               >
-                <option value="">Tất cả hành động</option>
-                <option value="login">Đăng nhập</option>
-                <option value="logout">Đăng xuất</option>
-                <option value="register">Đăng ký</option>
-                <option value="profile_update">Sửa hồ sơ</option>
-                <option value="book_create">Thêm sách</option>
-                <option value="book_update">Sửa sách</option>
-                <option value="book_delete">Xóa sách</option>
-                <option value="digital_file_upload">Tải lên tài liệu số</option>
-                <option value="digital_file_download">Tải/Xem tài liệu số</option>
-                <option value="borrow_request">Yêu cầu mượn</option>
-                <option value="borrow_approve">Duyệt mượn</option>
-                <option value="borrow_pickup">Bàn giao sách</option>
-                <option value="borrow_reject">Từ chối mượn</option>
-                <option value="borrow_return">Nhận trả sách</option>
-                <option value="collect_fine">Thu phí phạt</option>
-                <option value="settings_update">Cấu hình hệ thống</option>
-                <option value="revoke_device">Hủy phiên thiết bị</option>
+                <option value="">{t('adminAuditLogs.allActions')}</option>
+                <option value="login">{t('adminAuditLogs.actionLogin')}</option>
+                <option value="logout">{t('adminAuditLogs.actionLogout')}</option>
+                <option value="register">{t('adminAuditLogs.actionRegister')}</option>
+                <option value="profile_update">{t('adminAuditLogs.actionProfileUpdate')}</option>
+                <option value="book_create">{t('adminAuditLogs.actionBookCreate')}</option>
+                <option value="book_update">{t('adminAuditLogs.actionBookUpdate')}</option>
+                <option value="book_delete">{t('adminAuditLogs.actionBookDelete')}</option>
+                <option value="digital_file_upload">{t('adminAuditLogs.actionFileUpload')}</option>
+                <option value="digital_file_download">{t('adminAuditLogs.actionFileDownload')}</option>
+                <option value="borrow_request">{t('adminAuditLogs.actionBorrowRequest')}</option>
+                <option value="borrow_approve">{t('adminAuditLogs.actionBorrowApprove')}</option>
+                <option value="borrow_pickup">{t('adminAuditLogs.actionBorrowPickup')}</option>
+                <option value="borrow_reject">{t('adminAuditLogs.actionBorrowReject')}</option>
+                <option value="borrow_return">{t('adminAuditLogs.actionBorrowReturn')}</option>
+                <option value="collect_fine">{t('adminAuditLogs.actionCollectFine')}</option>
+                <option value="settings_update">{t('adminAuditLogs.actionSettingsUpdate')}</option>
+                <option value="revoke_device">{t('adminAuditLogs.actionRevokeDevice')}</option>
               </select>
               <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none text-lg">arrow_drop_down</span>
             </div>
@@ -406,7 +432,7 @@ export default function AdminAuditLogs() {
           {/* Date Filter */}
           <div>
             <label className="block text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-2">
-              Lọc theo ngày
+              {t('adminAuditLogs.dateLabel')}
             </label>
             <div className="relative">
               <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-lg">calendar_today</span>
@@ -426,7 +452,7 @@ export default function AdminAuditLogs() {
               className="flex-1 py-2 bg-primary hover:bg-primary-hover text-white rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-sm shadow-primary/20 h-[38px]"
             >
               <span className="material-symbols-outlined text-lg">filter_alt</span>
-              <span>Lọc</span>
+              <span>{t('adminAuditLogs.btnFilter')}</span>
             </button>
             {(userType || action || searchQuery || userQuery || dateFilter) && (
               <button
@@ -447,13 +473,13 @@ export default function AdminAuditLogs() {
                       setTotalLogs(res.total);
                       setLoading(false);
                     }).catch(err => {
-                      setError(err?.message || 'Có lỗi xảy ra.');
+                      setError(err?.message || t('adminAuditLogs.loadError'));
                       setLoading(false);
                     });
                   }, 0);
                 }}
                 className="px-3.5 bg-surface hover:bg-surface-container border border-border/85 text-muted-foreground hover:text-foreground rounded-xl transition-colors flex items-center justify-center cursor-pointer h-[38px]"
-                title="Đặt lại bộ lọc"
+                title={t('adminAuditLogs.btnReset')}
               >
                 <span className="material-symbols-outlined text-lg">restart_alt</span>
               </button>
@@ -496,7 +522,7 @@ export default function AdminAuditLogs() {
               onClick={() => fetchLogsData(currentPage)}
               className="px-4 py-2 bg-surface hover:bg-surface-container border border-border/85 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
             >
-              Thử lại
+              {t('adminAuditLogs.btnRetry')}
             </button>
           </div>
         ) : logs.length === 0 ? (
@@ -504,9 +530,9 @@ export default function AdminAuditLogs() {
             <div className="w-16 h-16 bg-muted rounded-2xl flex items-center justify-center mx-auto mb-4 text-muted-foreground">
               <span className="material-symbols-outlined text-3xl">receipt_long</span>
             </div>
-            <h3 className="text-base font-bold text-foreground">Không tìm thấy nhật ký vận hành</h3>
+            <h3 className="text-base font-bold text-foreground">{t('adminAuditLogs.emptyTitle')}</h3>
             <p className="text-xs text-muted-foreground mt-1 max-w-xs mx-auto">
-              Không tìm thấy bản ghi nào trùng khớp với tiêu chí tìm kiếm hoặc bộ lọc hiện tại của bạn.
+              {t('adminAuditLogs.emptyDesc')}
             </p>
             {(userType || action || searchQuery || userQuery || dateFilter) && (
               <button
@@ -522,7 +548,7 @@ export default function AdminAuditLogs() {
                 className="mt-4 px-4 py-2 bg-primary hover:bg-primary-hover text-white text-xs font-semibold rounded-xl transition-all shadow-sm shadow-primary/10 cursor-pointer inline-flex items-center gap-1.5"
               >
                 <span className="material-symbols-outlined text-sm">restart_alt</span>
-                <span>Đặt lại bộ lọc</span>
+                <span>{t('adminAuditLogs.btnReset')}</span>
               </button>
             )}
           </div>
@@ -531,23 +557,23 @@ export default function AdminAuditLogs() {
             <table className="w-full text-left text-sm border-collapse">
               <thead>
                 <tr className="bg-muted/30 border-b border-border/60 text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                  <th className="py-3.5 px-4 font-bold">Thời gian</th>
-                  <th className="py-3.5 px-4 font-bold">Người thực hiện</th>
-                  <th className="py-3.5 px-4 font-bold">Hành động</th>
-                  <th className="py-3.5 px-4 font-bold">Mô tả chi tiết</th>
-                  <th className="py-3.5 px-4 font-bold">IP & Thiết bị</th>
+                  <th className="py-3.5 px-4 font-bold">{t('adminAuditLogs.tableHeaderTime')}</th>
+                  <th className="py-3.5 px-4 font-bold">{t('adminAuditLogs.tableHeaderActor')}</th>
+                  <th className="py-3.5 px-4 font-bold">{t('adminAuditLogs.tableHeaderAction')}</th>
+                  <th className="py-3.5 px-4 font-bold">{t('adminAuditLogs.tableHeaderDesc')}</th>
+                  <th className="py-3.5 px-4 font-bold">{t('adminAuditLogs.tableHeaderIp')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/50">
                 {logs.map((log, index) => {
                   const logDate = new Date(log.created_at);
-                  const timeStr = logDate.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-                  const dateStr = logDate.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                  const timeStr = logDate.toLocaleTimeString(getIntlLocale(), { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                  const dateStr = logDate.toLocaleDateString(getIntlLocale(), { day: '2-digit', month: '2-digit', year: 'numeric' });
                   
                   const initials = getUserInitials(log.user_name);
                   const avatarColorClass = getUserAvatarColorClass(log.user_name);
                   const badgeStyle = getActionBadgeStyles(log.raw_action);
-                  const client = parseUserAgent(log.user_agent);
+                  const client = parseUserAgent(log.user_agent, t);
 
                   return (
                     <motion.tr
@@ -588,7 +614,7 @@ export default function AdminAuditLogs() {
                                     : 'bg-slate-500/10 text-slate-500 border border-slate-500/20'
                               }`}
                             >
-                              {log.user_type}
+                              {log.raw_user_type === 'admin' ? t('common.librarian') : log.raw_user_type === 'student' ? t('common.student') : t('adminAuditLogs.targetSystem')}
                             </span>
                           </div>
                         </div>
@@ -598,7 +624,7 @@ export default function AdminAuditLogs() {
                       <td className="py-3.5 px-4 whitespace-nowrap">
                         <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold ${badgeStyle.bg}`}>
                           <span className="material-symbols-outlined text-[15px]">{badgeStyle.icon}</span>
-                          <span>{log.action}</span>
+                          <span>{getActionLabel(log.raw_action, log.action, t)}</span>
                         </span>
                       </td>
 
@@ -616,14 +642,14 @@ export default function AdminAuditLogs() {
                         <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
                           <span 
                             className="inline-flex items-center gap-0.5 bg-muted/40 text-muted-foreground px-1.5 py-0.5 rounded-md text-[9px] font-semibold border border-border/50 cursor-help" 
-                            title={log.user_agent || 'Không rõ'}
+                            title={log.user_agent || t('common.notAvailable')}
                           >
                             <span className="material-symbols-outlined text-[11px]">{client.osIcon}</span>
                             <span>{client.os}</span>
                           </span>
                           <span 
                             className="inline-flex items-center gap-0.5 bg-muted/40 text-muted-foreground px-1.5 py-0.5 rounded-md text-[9px] font-semibold border border-border/50 cursor-help" 
-                            title={log.user_agent || 'Không rõ'}
+                            title={log.user_agent || t('common.notAvailable')}
                           >
                             <span className="material-symbols-outlined text-[11px]">{client.browserIcon}</span>
                             <span>{client.browser}</span>
@@ -642,7 +668,7 @@ export default function AdminAuditLogs() {
         {!loading && !error && logs.length > 0 && (
           <div className="flex items-center justify-between border-t border-border/60 px-6 py-4 bg-muted/10 text-sm">
             <div className="text-muted-foreground font-medium text-xs">
-              Hiển thị trang <span className="font-bold text-foreground">{currentPage}</span> /{' '}
+              {t('pagination.page')} <span className="font-bold text-foreground">{currentPage}</span> /{' '}
               <span className="font-bold text-foreground">{totalPages}</span>
             </div>
             <div className="flex items-center gap-2">
@@ -652,14 +678,14 @@ export default function AdminAuditLogs() {
                 className="flex items-center gap-1 px-3.5 py-1.5 bg-surface-bright border border-border/80 hover:bg-muted/10 hover:border-border text-foreground rounded-xl text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer shadow-sm"
               >
                 <span className="material-symbols-outlined text-sm">chevron_left</span>
-                <span>Trước</span>
+                <span>{t('pagination.previous')}</span>
               </button>
               <button
                 disabled={currentPage === totalPages}
                 onClick={() => handlePageChange(currentPage + 1)}
                 className="flex items-center gap-1 px-3.5 py-1.5 bg-surface-bright border border-border/80 hover:bg-muted/10 hover:border-border text-foreground rounded-xl text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer shadow-sm"
               >
-                <span>Sau</span>
+                <span>{t('pagination.next')}</span>
                 <span className="material-symbols-outlined text-sm">chevron_right</span>
               </button>
             </div>

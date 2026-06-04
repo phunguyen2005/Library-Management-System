@@ -122,8 +122,8 @@ export default function UserLayout() {
     } catch (err) {
       emitToast({
         tone: 'error',
-        title: 'Điểm danh thất bại',
-        message: getErrorMessage(err, 'Không thể thực hiện điểm danh.'),
+        title: t('userLayout.checkinFailed'),
+        message: getErrorMessage(err, t('userLayout.checkinFailedDesc')),
       });
       // Also close modal to not annoy the user
       handleClose();
@@ -255,27 +255,27 @@ export default function UserLayout() {
               {!isCheckedIn ? (
                 <>
                   <h3 className="text-xl font-extrabold text-on-surface leading-tight">
-                    Chào mừng bạn quay lại! 👋
+                    {t('userLayout.welcomeBack')}
                   </h3>
                   <p className="text-sm text-on-surface-variant mt-2 px-1">
-                    Hôm nay bạn chưa điểm danh. Hãy điểm danh ngay để nhận điểm thưởng học thuật và tích chuỗi nhé!
+                    {t('userLayout.notCheckedInDesc')}
                   </p>
                   
                   {/* Streak widget */}
                   {user?.daily_streak !== undefined && (
                     <div className="mt-4 bg-surface-container-low px-4 py-2 rounded-xl border border-surface-container-high text-sm font-semibold text-on-surface flex items-center gap-1.5 justify-center">
-                      <span>Chuỗi hiện tại:</span>
-                      <span className="text-primary font-black">{user.daily_streak} ngày 🔥</span>
+                      <span>{t('userLayout.currentStreak')}</span>
+                      <span className="text-primary font-black">{user.daily_streak} {t('common.days', { defaultValue: 'ngày' })} 🔥</span>
                     </div>
                   )}
 
                   {/* 7-day Progress Journey Map */}
                   <div className="mt-4 w-full bg-surface-container-low border border-surface-container-high rounded-xl p-3">
-                    <p className="text-[10px] font-black text-on-surface-variant uppercase tracking-wider mb-2 text-left">Hành trình 7 ngày</p>
+                    <p className="text-[10px] font-black text-on-surface-variant uppercase tracking-wider mb-2 text-left">{t('userLayout.journeyTitle')}</p>
                     <div className="flex justify-between items-center gap-1">
                       {daysOfJourney.map((day) => (
                         <div key={day.dayNum} className="flex flex-col items-center shrink-0 min-w-[36px]">
-                          <span className="text-[9px] font-bold text-on-surface-variant mb-1">N{day.dayNum}</span>
+                          <span className="text-[9px] font-bold text-on-surface-variant mb-1">{t('userLayout.journeyDay', { day: day.dayNum })}</span>
                           <div
                             className={`h-8 w-8 rounded-full flex items-center justify-center text-[10px] font-black transition-all relative ${
                               day.isToday
@@ -306,41 +306,41 @@ export default function UserLayout() {
                       onClick={handleCheckIn}
                       className="w-full py-3 rounded-xl bg-primary text-white font-bold hover:bg-primary-hover shadow-md hover:shadow-lg transition-all cursor-pointer transform hover:-translate-y-0.5"
                     >
-                      {isSubmitting ? 'Đang điểm danh...' : 'Điểm danh (+20 XP)'}
+                      {isSubmitting ? t('userLayout.btnCheckInSubmitting') : t('userLayout.btnCheckIn')}
                     </button>
                     <button
                       type="button"
                       onClick={handleClose}
                       className="text-xs font-semibold text-on-surface-variant hover:text-primary transition-colors py-1 hover:underline cursor-pointer"
                     >
-                      Để sau
+                      {t('userLayout.btnLater')}
                     </button>
                   </div>
                 </>
               ) : (
                 <>
                   <h3 className="text-xl font-extrabold text-green-600 leading-tight">
-                    Điểm danh thành công! 🎉
+                    {t('userLayout.checkinSuccessTitle')}
                   </h3>
                   <p className="text-sm text-on-surface-variant mt-2 px-1">
-                    Cảm ơn bạn! Hệ thống đã ghi nhận điểm danh học thuật hôm nay của bạn.
+                    {t('userLayout.checkinSuccessDesc')}
                   </p>
 
                   {/* Reward details */}
                   <div className="mt-4 flex flex-col gap-1 items-center justify-center">
-                    <p className="text-sm font-bold text-green-600">+20 XP Kinh nghiệm</p>
-                    <p className="text-sm font-bold text-primary">+{pointsGained} Điểm thưởng 🪙</p>
+                    <p className="text-sm font-bold text-green-600">{t('userLayout.xpEarned')}</p>
+                    <p className="text-sm font-bold text-primary">{t('userLayout.pointsEarned', { points: pointsGained })}</p>
                   </div>
 
                   {/* 7-day Progress Journey Map */}
                   <div className="mt-4 w-full bg-surface-container-low border border-surface-container-high rounded-xl p-3">
-                    <p className="text-[10px] font-black text-on-surface-variant uppercase tracking-wider mb-2 text-left">Hành trình 7 ngày</p>
+                    <p className="text-[10px] font-black text-on-surface-variant uppercase tracking-wider mb-2 text-left">{t('userLayout.journeyTitle')}</p>
                     <div className="flex justify-between items-center gap-1">
                       {daysOfJourney.map((day) => {
                         const isDayDone = day.isCompleted || day.isToday;
                         return (
                           <div key={day.dayNum} className="flex flex-col items-center shrink-0 min-w-[36px]">
-                            <span className="text-[9px] font-bold text-on-surface-variant mb-1">N{day.dayNum}</span>
+                            <span className="text-[9px] font-bold text-on-surface-variant mb-1">{t('userLayout.journeyDay', { day: day.dayNum })}</span>
                             <div
                               className={`h-8 w-8 rounded-full flex items-center justify-center text-[10px] font-black transition-all relative ${
                                 isDayDone
@@ -364,7 +364,7 @@ export default function UserLayout() {
 
                   {user?.daily_streak !== undefined && (
                     <p className="mt-4 text-xs font-semibold text-on-surface-variant bg-surface-container-low px-3 py-1 rounded-full border border-surface-container-high">
-                      Chuỗi hiện tại: <strong className="text-primary">{user.daily_streak} ngày 🔥</strong>
+                      {t('userLayout.currentStreak')} <strong className="text-primary">{user.daily_streak} {t('common.days', { defaultValue: 'ngày' })} 🔥</strong>
                     </p>
                   )}
 
@@ -375,7 +375,7 @@ export default function UserLayout() {
                       onClick={handleClose}
                       className="w-full py-3 rounded-xl bg-green-600 text-white font-bold hover:bg-green-700 shadow-md hover:shadow-lg transition-all cursor-pointer transform hover:-translate-y-0.5"
                     >
-                      Tuyệt vời!
+                      {t('userLayout.btnAwesome')}
                     </button>
                   </div>
                 </>

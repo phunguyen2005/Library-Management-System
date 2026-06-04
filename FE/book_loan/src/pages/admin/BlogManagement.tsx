@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   deleteBlogPost,
@@ -16,19 +17,24 @@ import { formatDisplayDate } from '../../lib/display';
 import { getErrorMessage, isUnauthorizedError } from '../../lib/errors';
 import { useDebounce } from '../../hooks/useDebounce';
 import { emitToast } from '../../notifications/events';
+import { getIntlLocale } from '../../i18n';
 
 type EditorState = {
   isOpen: boolean;
   post: BlogPostRecord | null;
 };
 
-const STATUS_LABELS: Record<BlogPostRecord['status'], string> = {
-  draft: 'Nháp',
-  published: 'Đã xuất bản',
-  archived: 'Lưu trữ',
+const getStatusLabel = (status: BlogPostRecord['status'], t: any) => {
+  const map: Record<BlogPostRecord['status'], string> = {
+    draft: t('blogAdmin.statusDraft', 'Nháp'),
+    published: t('blogAdmin.statusPublished', 'Đã xuất bản'),
+    archived: t('blogAdmin.statusArchived', 'Lưu trữ'),
+  };
+  return map[status] || status;
 };
 
 export default function BlogManagement() {
+  const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const [posts, setPosts] = useState<BlogPostRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -61,8 +67,8 @@ export default function BlogManagement() {
       if (!isUnauthorizedError(error)) {
         emitToast({
           tone: 'error',
-          title: 'Không thể tải blog',
-          message: getErrorMessage(error, 'Vui lòng thử lại.'),
+          title: t('blogAdmin.loadErrorTitle', 'Không thể tải blog'),
+          message: getErrorMessage(error, t('common.tryAgain', 'Vui lòng thử lại.')),
         });
       }
     } finally {
@@ -99,7 +105,7 @@ export default function BlogManagement() {
       await publishBlogPost(post.id, post.status !== 'published');
       await loadPosts(false);
     } catch (error: unknown) {
-      emitToast({ tone: 'error', title: 'Không thể đổi trạng thái', message: getErrorMessage(error, 'Vui lòng thử lại.') });
+      emitToast({ tone: 'error', title: t('blogAdmin.statusErrorTitle', 'Không thể đổi trạng thái'), message: getErrorMessage(error, t('common.tryAgain', 'Vui lòng thử lại.')) });
     }
   };
 
@@ -108,7 +114,7 @@ export default function BlogManagement() {
       await pinBlogPost(post.id, !post.is_pinned);
       await loadPosts(false);
     } catch (error: unknown) {
-      emitToast({ tone: 'error', title: 'Không thể ghim bài', message: getErrorMessage(error, 'Vui lòng thử lại.') });
+      emitToast({ tone: 'error', title: t('blogAdmin.pinErrorTitle', 'Không thể ghim bài'), message: getErrorMessage(error, t('common.tryAgain', 'Vui lòng thử lại.')) });
     }
   };
 
@@ -123,9 +129,9 @@ export default function BlogManagement() {
     try {
       await deleteBlogPost(target.id);
       await loadPosts(false);
-      emitToast({ tone: 'success', title: 'Đã xóa bài viết', message: target.title });
+      emitToast({ tone: 'success', title: t('blogAdmin.deleteSuccessTitle', 'Đã xóa bài viết'), message: target.title });
     } catch (error: unknown) {
-      emitToast({ tone: 'error', title: 'Không thể xóa bài viết', message: getErrorMessage(error, 'Vui lòng thử lại.') });
+      emitToast({ tone: 'error', title: t('blogAdmin.deleteErrorTitle', 'Không thể xóa bài viết'), message: getErrorMessage(error, t('common.tryAgain', 'Vui lòng thử lại.')) });
     }
   };
 
@@ -133,9 +139,9 @@ export default function BlogManagement() {
     <div className="mx-auto w-full max-w-7xl space-y-8 p-8">
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
         <div>
-          <h2 className="text-3xl font-bold text-on-surface">Quản lý Blog</h2>
+          <h2 className="text-3xl font-bold text-on-surface">{t('blogAdmin.title', 'Quản lý Blog')}</h2>
           <p className="mt-1 text-sm text-on-surface-variant">
-            Viết thông báo, tin tức, review sách, sự kiện và hướng dẫn cho sinh viên.
+            {t('blogAdmin.subtitle', 'Viết thông báo, tin tức, review sách, sự kiện và hướng dẫn cho sinh viên.')}
           </p>
         </div>
         <button
@@ -144,7 +150,7 @@ export default function BlogManagement() {
           className="flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 font-bold text-white shadow-lg shadow-primary/20 transition-all hover:-translate-y-0.5"
         >
           <span className="material-symbols-outlined text-[18px]">edit_square</span>
-          Viết bài mới
+          {t('blogAdmin.btnAdd', 'Viết bài mới')}
         </button>
       </div>
 
@@ -158,7 +164,7 @@ export default function BlogManagement() {
               type="search"
               value={query}
               onChange={(event) => updateFilter('query', event.target.value)}
-              placeholder="Tìm theo tiêu đề, tóm tắt, nội dung..."
+              placeholder={t('blogAdmin.searchPlaceholder', 'Tìm theo tiêu đề, tóm tắt, nội dung...')}
               className="w-full rounded-lg border border-surface-container-high bg-surface-bright py-2 pl-9 pr-3 text-sm text-on-surface outline-none placeholder:text-on-surface-variant focus:ring-2 focus:ring-primary/20"
             />
           </label>
@@ -168,17 +174,17 @@ export default function BlogManagement() {
               onChange={(event) => updateFilter('status', event.target.value)}
               className="rounded-lg border border-surface-container-high bg-surface-bright px-3 py-2 text-sm text-on-surface outline-none focus:ring-2 focus:ring-primary/20"
             >
-              <option value="">Tất cả trạng thái</option>
-              <option value="draft">Nháp</option>
-              <option value="published">Đã xuất bản</option>
-              <option value="archived">Lưu trữ</option>
+              <option value="">{t('blogAdmin.filterStatusAll', 'Tất cả trạng thái')}</option>
+              <option value="draft">{t('blogAdmin.statusDraft', 'Nháp')}</option>
+              <option value="published">{t('blogAdmin.statusPublished', 'Đã xuất bản')}</option>
+              <option value="archived">{t('blogAdmin.statusArchived', 'Lưu trữ')}</option>
             </select>
             <select
               value={category}
               onChange={(event) => updateFilter('category', event.target.value)}
               className="rounded-lg border border-surface-container-high bg-surface-bright px-3 py-2 text-sm text-on-surface outline-none focus:ring-2 focus:ring-primary/20"
             >
-              <option value="">Tất cả phân loại</option>
+              <option value="">{t('blogAdmin.filterCategoryAll', 'Tất cả phân loại')}</option>
               {BLOG_CATEGORY_OPTIONS.map((option) => {
                 const meta = getBlogCategoryMeta(option.value);
                 return (
@@ -195,26 +201,26 @@ export default function BlogManagement() {
           <table className="w-full min-w-[1060px] text-left">
             <thead>
               <tr className="border-b border-surface-container-high bg-surface-container-low text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
-                <th className="px-6 py-4">Bài viết</th>
-                <th className="px-6 py-4">Phân loại</th>
-                <th className="px-6 py-4">Trạng thái</th>
-                <th className="px-6 py-4">Tác giả</th>
-                <th className="px-6 py-4">Ngày xuất bản</th>
-                <th className="px-6 py-4">Lượt xem</th>
-                <th className="px-6 py-4 text-right">Hành động</th>
+                <th className="px-6 py-4">{t('blogAdmin.tableHeaderTitle', 'Bài viết')}</th>
+                <th className="px-6 py-4">{t('blogAdmin.tableHeaderCategory', 'Phân loại')}</th>
+                <th className="px-6 py-4">{t('blogAdmin.tableHeaderStatus', 'Trạng thái')}</th>
+                <th className="px-6 py-4">{t('blogAdmin.tableHeaderAuthor', 'Tác giả')}</th>
+                <th className="px-6 py-4">{t('blogAdmin.tableHeaderDate', 'Ngày xuất bản')}</th>
+                <th className="px-6 py-4">{t('blogAdmin.tableHeaderViews', 'Lượt xem')}</th>
+                <th className="px-6 py-4 text-right">{t('blogAdmin.tableHeaderActions', 'Hành động')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-surface-container">
               {isLoading ? (
                 <tr>
                   <td colSpan={7} className="px-6 py-10 text-center text-on-surface-variant">
-                    Đang tải danh sách bài viết...
+                    {t('blogAdmin.loadingPosts', 'Đang tải danh sách bài viết...')}
                   </td>
                 </tr>
               ) : posts.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-6 py-10">
-                    <EmptyState icon="article" title="Chưa có bài blog nào" message="Tạo bài viết đầu tiên để hiển thị trên Landing và trang Blog." />
+                    <EmptyState icon="article" title={t('blogAdmin.emptyTitle', 'Chưa có bài blog nào')} message={t('blogAdmin.emptyDesc', 'Tạo bài viết đầu tiên để hiển thị trên Landing và trang Blog.')} />
                   </td>
                 </tr>
               ) : (
@@ -251,17 +257,17 @@ export default function BlogManagement() {
                               ? 'bg-surface-container text-on-surface-variant'
                               : 'bg-amber-500/10 text-amber-700 dark:text-amber-300'
                         }`}>
-                          {STATUS_LABELS[post.status]}
+                          {getStatusLabel(post.status, t)}
                         </span>
                         {post.is_pinned ? (
                           <span className="ml-2 rounded-md bg-primary/10 px-2 py-1 text-xs font-semibold text-primary">
-                            Ghim
+                            {t('blogAdmin.badgePinned', 'Ghim')}
                           </span>
                         ) : null}
                       </td>
                       <td className="px-6 py-4 text-sm text-on-surface-variant">{post.author?.name || 'HCMUE Library'}</td>
-                      <td className="px-6 py-4 text-sm text-on-surface-variant">{formatDisplayDate(post.published_at, 'Chưa xuất bản')}</td>
-                      <td className="px-6 py-4 text-sm font-bold text-on-surface">{post.views.toLocaleString()}</td>
+                      <td className="px-6 py-4 text-sm text-on-surface-variant">{formatDisplayDate(post.published_at, t('blogAdmin.notPublishedYet', 'Chưa xuất bản'))}</td>
+                      <td className="px-6 py-4 text-sm font-bold text-on-surface">{post.views.toLocaleString(getIntlLocale())}</td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-1">
                           {post.status === 'published' ? (
@@ -269,7 +275,7 @@ export default function BlogManagement() {
                               to={`/blog/${post.slug}`}
                               target="_blank"
                               className="rounded-lg p-2 text-on-surface-variant transition hover:bg-surface-container-high hover:text-primary"
-                              title="Xem bài viết"
+                              title={t('blogAdmin.btnView', 'Xem bài viết')}
                             >
                               <span className="material-symbols-outlined text-[18px]">open_in_new</span>
                             </Link>
@@ -278,7 +284,7 @@ export default function BlogManagement() {
                             type="button"
                             onClick={() => setEditorState({ isOpen: true, post })}
                             className="rounded-lg p-2 text-primary transition hover:bg-primary-container"
-                            title="Chỉnh sửa"
+                            title={t('blogAdmin.btnEdit', 'Chỉnh sửa')}
                           >
                             <span className="material-symbols-outlined text-[18px]">edit</span>
                           </button>
@@ -286,7 +292,7 @@ export default function BlogManagement() {
                             type="button"
                             onClick={() => handlePublishToggle(post)}
                             className="rounded-lg p-2 text-green-600 transition hover:bg-green-500/10 dark:text-green-300"
-                            title={post.status === 'published' ? 'Gỡ xuất bản' : 'Xuất bản'}
+                            title={post.status === 'published' ? t('blogAdmin.btnUnpublish', 'Gỡ xuất bản') : t('blogAdmin.btnPublish', 'Xuất bản')}
                           >
                             <span className="material-symbols-outlined text-[18px]">
                               {post.status === 'published' ? 'visibility_off' : 'publish'}
@@ -296,7 +302,7 @@ export default function BlogManagement() {
                             type="button"
                             onClick={() => handlePinToggle(post)}
                             className="rounded-lg p-2 text-amber-600 transition hover:bg-amber-500/10 dark:text-amber-300"
-                            title={post.is_pinned ? 'Bỏ ghim' : 'Ghim'}
+                            title={post.is_pinned ? t('blogAdmin.btnUnpin', 'Bỏ ghim') : t('blogAdmin.btnPin', 'Ghim')}
                           >
                             <span className={`material-symbols-outlined text-[18px] ${post.is_pinned ? 'filled' : ''}`}>push_pin</span>
                           </button>
@@ -304,7 +310,7 @@ export default function BlogManagement() {
                             type="button"
                             onClick={() => setPostToDelete(post)}
                             className="rounded-lg p-2 text-red-500 transition hover:bg-error-container"
-                            title="Xóa"
+                            title={t('blogAdmin.btnDelete', 'Xóa')}
                           >
                             <span className="material-symbols-outlined text-[18px]">delete</span>
                           </button>
@@ -333,9 +339,9 @@ export default function BlogManagement() {
 
       <ConfirmDialog
         isOpen={Boolean(postToDelete)}
-        title="Xác nhận xóa bài viết"
-        message={`Bạn có chắc chắn muốn xóa "${postToDelete?.title}"?`}
-        confirmLabel="Xóa bài viết"
+        title={t('blogAdmin.confirmDeleteTitle', 'Xác nhận xóa bài viết')}
+        message={t('blogAdmin.confirmDelete', { title: postToDelete?.title, defaultValue: `Bạn có chắc chắn muốn xóa "${postToDelete?.title}"?` })}
+        confirmLabel={t('blogAdmin.btnDeleteConfirm', 'Xóa bài viết')}
         isDestructive
         onConfirm={handleDelete}
         onCancel={() => setPostToDelete(null)}

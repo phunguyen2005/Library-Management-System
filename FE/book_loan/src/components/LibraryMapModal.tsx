@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { SHELF_LABELS } from '../lib/bookClassification';
 
 export { SHELF_LABELS };
@@ -71,73 +72,74 @@ function clampZoom(value: number) {
   return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, value));
 }
 
-const ZONES: Record<string, MapZoneInfo> = {
-  computer_room: {
-    id: 'computer_room',
-    name: 'Phòng Máy Tính',
-    description: 'Bố trí 4 máy tính tra cứu tốc độ cao dành cho sinh viên.',
-    icon: 'computer',
-    details: 'Được trang bị internet cáp quang, cài đặt sẵn cơ sở dữ liệu thư viện phục vụ tra cứu tài liệu học tập, nghiên cứu và truy cập học liệu điện tử.',
-  },
-  newspaper_room: {
-    id: 'newspaper_room',
-    name: 'Phòng Đọc Báo / Tạp Chí',
-    description: 'Nơi đọc báo giấy, báo tuần và các ấn phẩm định kỳ mới nhất.',
-    icon: 'menu_book',
-    details: 'Không gian yên tĩnh, có ghế sofa nghỉ ngơi và kệ trưng bày các loại báo chí, tạp chí khoa học chuyên ngành trong nước và quốc tế.',
-  },
-  internal_staff: {
-    id: 'internal_staff',
-    name: 'Kho Sách / Nhân Viên',
-    description: 'Khu vực nghiệp vụ, lưu trữ sách gốc và văn phòng làm việc của thủ thư.',
-    icon: 'badge',
-    details: 'Khu vực nội bộ dành riêng cho thủ thư xử lý phân loại sách mới, quản lý kho lưu trữ sâu và lưu động tài liệu.',
-  },
-  conference_room: {
-    id: 'conference_room',
-    name: 'Phòng Họp Hội Thảo',
-    description: 'Không gian tổ chức hội nghị, seminars hoặc các buổi sinh hoạt chuyên đề.',
-    icon: 'groups',
-    details: 'Được trang bị máy chiếu, bảng tương tác thông minh và hệ thống âm thanh, bàn họp sức chứa 15-20 người.',
-  },
-  reception_student: {
-    id: 'reception_student',
-    name: 'Phòng Tiếp Sinh Viên & Quầy GV',
-    description: 'Giải đáp thắc mắc, hỗ trợ thủ tục làm thẻ thư viện và đăng ký tài liệu.',
-    icon: 'support_agent',
-    details: 'Nơi sinh viên đăng ký các dịch vụ đặc biệt hoặc giáo viên gửi học liệu, giáo trình bản cứng bổ sung cho môn học.',
-  },
-  lockers: {
-    id: 'lockers',
-    name: 'Tủ Khóa Gửi Đồ',
-    description: 'Dãy tủ khóa thông minh gửi tư trang cá nhân trước khi vào thư viện.',
-    icon: 'lock',
-    details: 'Có chìa khóa riêng hoặc thẻ quét cảm ứng. Sinh viên bắt buộc gửi balo, túi xách lớn tại đây trước khi vào phòng đọc chính.',
-  },
-  reception_desk: {
-    id: 'reception_desk',
-    name: 'Quầy Lễ Tân / Mượn - Trả Sách',
-    description: 'Quầy phục vụ chính thực hiện thủ tục mượn sách, trả sách và nộp phạt.',
-    icon: 'desk',
-    details: 'Thủ thư túc trực thường xuyên để hỗ trợ quét mã vạch mượn/trả sách, kiểm tra tình trạng kho và tư vấn tìm tài liệu.',
-  },
-  study_area: {
-    id: 'study_area',
-    name: 'Khu Tự Học',
-    description: 'Không gian tự học cá nhân hoặc học tập nhóm đa dạng.',
-    icon: 'local_library',
-    details: 'Gồm 20 bàn đơn tự học yên tĩnh, 3 bàn thảo luận nhóm lớn và 2 phòng thảo luận nhóm biệt lập cách âm.',
-  },
-  bookcase_area: {
-    id: 'bookcase_area',
-    name: 'Khu Kệ Sách',
-    description: 'Khu vực lưu trữ các kệ sách vật lý chính của thư viện phân theo phân mục.',
-    icon: 'shelves',
-    details: 'Phân loại từ A đến J theo sơ đồ thư viện: khoa học tự nhiên ở dãy A, kinh tế - lịch sử ở dãy B, công nghệ - kỹ thuật ở dãy C, văn học - xã hội ở dãy D, tham khảo ở dãy E và các nhóm chuyên đề bổ sung ở tầng 2.',
-  },
-};
-
 export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bookTitle }: LibraryMapModalProps) {
+  const { t } = useTranslation();
+
+  const ZONES = useMemo<Record<string, MapZoneInfo>>(() => ({
+    computer_room: {
+      id: 'computer_room',
+      name: t('map.zones.computer_room.name', 'Phòng Máy Tính'),
+      description: t('map.zones.computer_room.description', 'Bố trí 4 máy tính tra cứu tốc độ cao dành cho sinh viên.'),
+      icon: 'computer',
+      details: t('map.zones.computer_room.details', 'Được trang bị internet cáp quang, cài đặt sẵn cơ sở dữ liệu thư viện phục vụ tra cứu tài liệu học tập, nghiên cứu và truy cập học liệu điện tử.'),
+    },
+    newspaper_room: {
+      id: 'newspaper_room',
+      name: t('map.zones.newspaper_room.name', 'Phòng Đọc Báo / Tạp Chí'),
+      description: t('map.zones.newspaper_room.description', 'Nơi đọc báo giấy, báo tuần và các ấn phẩm định kỳ mới nhất.'),
+      icon: 'menu_book',
+      details: t('map.zones.newspaper_room.details', 'Không gian yên tĩnh, có ghế sofa nghỉ ngơi và kệ trưng bày các loại báo chí, tạp chí khoa học chuyên ngành trong nước và quốc tế.'),
+    },
+    internal_staff: {
+      id: 'internal_staff',
+      name: t('map.zones.internal_staff.name', 'Kho Sách / Nhân Viên'),
+      description: t('map.zones.internal_staff.description', 'Khu vực nghiệp vụ, lưu trữ sách gốc và văn phòng làm việc của thủ thư.'),
+      icon: 'badge',
+      details: t('map.zones.internal_staff.details', 'Khu vực nội bộ dành riêng cho thủ thư xử lý phân loại sách mới, quản lý kho lưu trữ sâu và lưu động tài liệu.'),
+    },
+    conference_room: {
+      id: 'conference_room',
+      name: t('map.zones.conference_room.name', 'Phòng Họp Hội Thảo'),
+      description: t('map.zones.conference_room.description', 'Không gian tổ chức hội nghị, seminars hoặc các buổi sinh hoạt chuyên đề.'),
+      icon: 'groups',
+      details: t('map.zones.conference_room.details', 'Được trang bị máy chiếu, bảng tương tác thông minh và hệ thống âm thanh, bàn họp sức chứa 15-20 người.'),
+    },
+    reception_student: {
+      id: 'reception_student',
+      name: t('map.zones.reception_student.name', 'Phòng Tiếp Sinh Viên & Quầy GV'),
+      description: t('map.zones.reception_student.description', 'Giải đáp thắc mắc, hỗ trợ thủ tục làm thẻ thư viện và đăng ký tài liệu.'),
+      icon: 'support_agent',
+      details: t('map.zones.reception_student.details', 'Nơi sinh viên đăng ký các dịch vụ đặc biệt hoặc giáo viên gửi học liệu, giáo trình bản cứng bổ sung cho môn học.'),
+    },
+    lockers: {
+      id: 'lockers',
+      name: t('map.zones.lockers.name', 'Tủ Khóa Gửi Đồ'),
+      description: t('map.zones.lockers.description', 'Dãy tủ khóa thông minh gửi tư trang cá nhân trước khi vào thư viện.'),
+      icon: 'lock',
+      details: t('map.zones.lockers.details', 'Có chìa khóa riêng hoặc thẻ quét cảm ứng. Sinh viên bắt buộc gửi balo, túi xách lớn tại đây trước khi vào phòng đọc chính.'),
+    },
+    reception_desk: {
+      id: 'reception_desk',
+      name: t('map.zones.reception_desk.name', 'Quầy Lễ Tân / Mượn - Trả Sách'),
+      description: t('map.zones.reception_desk.description', 'Quầy phục vụ chính thực hiện thủ tục mượn sách, trả sách và nộp phạt.'),
+      icon: 'desk',
+      details: t('map.zones.reception_desk.details', 'Thủ thư túc trực thường xuyên để hỗ trợ quét mã vạch mượn/trả sách, kiểm tra tình trạng kho và tư vấn tìm tài liệu.'),
+    },
+    study_area: {
+      id: 'study_area',
+      name: t('map.zones.study_area.name', 'Khu Tự Học'),
+      description: t('map.zones.study_area.description', 'Không gian tự học cá nhân hoặc học tập nhóm đa dạng.'),
+      icon: 'local_library',
+      details: t('map.zones.study_area.details', 'Gồm 20 bàn đơn tự học yên tĩnh, 3 bàn thảo luận nhóm lớn và 2 phòng thảo luận nhóm biệt lập cách âm.'),
+    },
+    bookcase_area: {
+      id: 'bookcase_area',
+      name: t('map.zones.bookcase_area.name', 'Khu Kệ Sách'),
+      description: t('map.zones.bookcase_area.description', 'Khu vực lưu trữ các kệ sách vật lý chính của thư viện phân theo phân mục.'),
+      icon: 'shelves',
+      details: t('map.zones.bookcase_area.details', 'Phân loại từ A đến J theo sơ đồ thư viện: khoa học tự nhiên ở dãy A, kinh tế - lịch sử ở dãy B, công nghệ - kỹ thuật ở dãy C, văn học - xã hội ở dãy D, tham khảo ở dãy E và các nhóm chuyên đề bổ sung ở tầng 2.'),
+    },
+  }), [t]);
   const [activeZone, setActiveZone] = useState<MapZoneInfo | null>(null);
   const [selectedZone, setSelectedZone] = useState<MapZoneInfo | null>(null);
   const [activeTab, setActiveTab] = useState<LibraryMapTab>('map');
@@ -221,12 +223,29 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
   const isShelfHighlighted = (shelfCode: string) => parsed.shelf === shelfCode;
   const isZoneHighlighted = (zoneId: string) => parsed.zone === zoneId;
 
-  const getShelfInfo = (shelfCode: string, label = SHELF_LABELS[shelfCode] || 'Kệ sách'): MapZoneInfo => ({
+  const getShelfLabel = (shelfCode: string) => {
+    const code = shelfCode.charAt(0).toUpperCase();
+    switch (code) {
+      case 'A': return t('map.shelfA', 'Khoa học Tự nhiên');
+      case 'B': return t('map.shelfB', 'Kinh tế - Lịch sử');
+      case 'C': return t('map.shelfC', 'Công nghệ - Kỹ thuật');
+      case 'D': return t('map.shelfD', 'Văn học - Xã hội');
+      case 'E': return t('map.shelfE', 'Tham khảo & Từ điển');
+      case 'F': return t('map.shelfF', 'Ngoại ngữ & Ngoại văn');
+      case 'G': return t('map.shelfG', 'Giáo trình Đại học');
+      case 'H': return t('map.shelfH', 'Pháp luật & Chính trị');
+      case 'I': return t('map.shelfI', 'Nghệ thuật & Thể thao');
+      case 'J': return t('map.shelfJ', 'Triết học & Tâm lý học');
+      default: return SHELF_LABELS[shelfCode] || t('map.defaultShelfLabel', 'Kệ sách');
+    }
+  };
+
+  const getShelfInfo = (shelfCode: string, label = getShelfLabel(shelfCode)): MapZoneInfo => ({
     id: shelfCode,
-    name: `Kệ Sách ${shelfCode}`,
-    description: `Khu vực: ${label}`,
+    name: t('map.bookshelfCode', 'Kệ Sách {{code}}', { code: shelfCode }),
+    description: t('map.shelfArea', 'Khu vực: {{label}}', { label }),
     icon: 'shelves',
-    details: `Kệ chuyên đề chứa các tài liệu thuộc phân mục: ${label}. Mã phân loại Dewey tương ứng.`,
+    details: t('map.shelfDetails', 'Kệ chuyên đề chứa các tài liệu thuộc phân mục: {{label}}. Mã phân loại Dewey tương ứng.', { label }),
   });
 
   const selectZone = (zone: MapZoneInfo) => {
@@ -306,21 +325,31 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
           <p className="text-[10px] tracking-widest opacity-85">{shelfCode}</p>
           <p className="text-[8px] font-sans font-normal opacity-75 truncate max-w-[60px] mx-auto">
             {shelfCode.startsWith('A')
-              ? 'KHTN'
+              ? t('map.shelfShortA', 'KHTN')
               : shelfCode.startsWith('B')
-              ? 'KT-LS'
+              ? t('map.shelfShortB', 'KT-LS')
               : shelfCode.startsWith('C')
-              ? 'CN-KT'
+              ? t('map.shelfShortC', 'CN-KT')
               : shelfCode.startsWith('D')
-              ? 'VH-XH'
+              ? t('map.shelfShortD', 'VH-XH')
               : shelfCode.startsWith('E')
-              ? 'T.Khảo'
-              : 'Sách'}
+              ? t('map.shelfShortE', 'T.Khảo')
+              : shelfCode.startsWith('F')
+              ? t('map.shelfShortF', 'N.Ngữ')
+              : shelfCode.startsWith('G')
+              ? t('map.shelfShortG', 'G.Trình')
+              : shelfCode.startsWith('H')
+              ? t('map.shelfShortH', 'P.Luật')
+              : shelfCode.startsWith('I')
+              ? t('map.shelfShortI', 'M.Thuật')
+              : shelfCode.startsWith('J')
+              ? t('map.shelfShortJ', 'T.Học')
+              : t('map.shelfShortDefault', 'Sách')}
           </p>
         </div>
         {isHighlighted && (
           <div className="absolute -top-6 left-1/2 z-20 -translate-x-1/2 whitespace-nowrap rounded-md bg-amber-500 px-2 py-0.5 text-[9px] font-bold text-white shadow-md animate-bounce">
-            🎯 {bookTitle ? 'Sách ở đây!' : shelfCode}
+            🎯 {bookTitle ? t('map.bookHere', 'Sách ở đây!') : shelfCode}
           </div>
         )}
       </div>
@@ -366,23 +395,23 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
               <span className="material-symbols-outlined">map</span>
             </div>
             <div>
-              <h2 id="library-map-title" className="text-base font-bold text-on-surface">Sơ đồ bố trí Thư viện</h2>
+              <h2 id="library-map-title" className="text-base font-bold text-on-surface">{t('map.title', 'Sơ đồ bố trí Thư viện')}</h2>
               <p className="text-xs text-on-surface-variant">
-                Bố cục không gian học tập và định vị tài liệu tại chỗ
+                {t('map.subtitle', 'Bố cục không gian học tập và định vị tài liệu tại chỗ')}
               </p>
             </div>
           </div>
           <button
             type="button"
             onClick={handleClose}
-            aria-label="Đóng cửa sổ sơ đồ"
+            aria-label={t('map.closeLabel', 'Đóng cửa sổ sơ đồ')}
             className="flex h-9 w-9 items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer"
           >
             <span className="material-symbols-outlined">close</span>
           </button>
         </header>
 
-        <div className="grid grid-cols-2 border-b border-surface-container-high bg-surface-container-low p-1 md:hidden" role="tablist" aria-label="Chế độ xem sơ đồ thư viện">
+        <div className="grid grid-cols-2 border-b border-surface-container-high bg-surface-container-low p-1 md:hidden" role="tablist" aria-label={t('map.tabsLabel', 'Chế độ xem sơ đồ thư viện')}>
           <button
             type="button"
             role="tab"
@@ -394,7 +423,7 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
                 : 'text-on-surface-variant hover:bg-surface-container-high'
             }`}
           >
-            Bản đồ
+            {t('map.tabs.map', 'Bản đồ')}
           </button>
           <button
             type="button"
@@ -407,7 +436,7 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
                 : 'text-on-surface-variant hover:bg-surface-container-high'
             }`}
           >
-            Chú thích & Chi tiết
+            {t('map.tabs.details', 'Chú thích & Chi tiết')}
           </button>
         </div>
 
@@ -423,7 +452,7 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
             <div className="absolute right-3 top-3 z-30 flex items-center gap-1 rounded-full border border-surface-container-high bg-surface-bright/95 p-1 shadow-lg backdrop-blur">
               <button
                 type="button"
-                aria-label="Thu nhỏ"
+                aria-label={t('map.zoomOut', 'Thu nhỏ')}
                 onClick={() => setManualZoom(zoom - ZOOM_STEP)}
                 className="flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high"
               >
@@ -432,7 +461,7 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
               <span className="min-w-12 text-center text-[11px] font-bold text-on-surface">{zoomPercent}%</span>
               <button
                 type="button"
-                aria-label="Phóng to"
+                aria-label={t('map.zoomIn', 'Phóng to')}
                 onClick={() => setManualZoom(zoom + ZOOM_STEP)}
                 className="flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high"
               >
@@ -441,7 +470,7 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
               <span className="mx-0.5 h-5 w-px bg-surface-container-high" />
               <button
                 type="button"
-                aria-label="Vừa màn hình"
+                aria-label={t('map.fitToScreen', 'Vừa màn hình')}
                 onClick={fitToScreen}
                 className={`flex h-8 w-8 items-center justify-center rounded-full ${
                   isAutoFit ? 'bg-primary/10 text-primary' : 'text-on-surface-variant hover:bg-surface-container-high'
@@ -451,7 +480,7 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
               </button>
               <button
                 type="button"
-                aria-label="Kích thước gốc 100%"
+                aria-label={t('map.actualSize', 'Kích thước gốc 100%')}
                 onClick={resetToActualSize}
                 className="flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high"
               >
@@ -465,13 +494,13 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
                 <div className="flex items-center gap-2">
                   <span className="material-symbols-outlined text-amber-500">my_location</span>
                   <span>
-                    Đang định vị tài liệu: <strong>{bookTitle || 'Sách được chọn'}</strong> tại{' '}
+                    {t('map.locating', 'Đang định vị tài liệu:')} <strong>{bookTitle || t('map.selectedBook', 'Sách được chọn')}</strong> {t('map.atLocation', 'tại')}{' '}
                     <strong className="underline text-amber-500">{highlightLocation}</strong>
                   </span>
                 </div>
                 {isAuxiliaryShelf && (
                   <span className="rounded bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-700 dark:text-amber-300">
-                    Kệ phụ bổ sung
+                    {t('map.auxiliaryShelf', 'Kệ phụ bổ sung')}
                   </span>
                 )}
               </div>
@@ -496,7 +525,7 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
               
               {/* Outer boundary wall label */}
               <div className="absolute top-2 left-1/2 -translate-x-1/2 px-4 py-0.5 rounded-full bg-slate-700 text-white text-[10px] uppercase font-bold tracking-wider">
-                Thư viện Trường Đại học Sư phạm TP.HCM
+                {t('map.uniName', 'Thư viện Trường Đại học Sư phạm TP.HCM')}
               </div>
 
               {/* Grid Layout representing the ASCII map */}
@@ -516,10 +545,10 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
                   >
                     <div className="flex items-center gap-1.5 text-indigo-500">
                       <span className="material-symbols-outlined text-sm">groups</span>
-                      <h4 className="text-xs font-bold leading-tight">PHÒNG HỌP HỘI THẢO</h4>
+                      <h4 className="text-xs font-bold leading-tight">{t('map.conferenceRoomHeading', 'PHÒNG HỌP HỘI THẢO')}</h4>
                     </div>
                     <div className="my-1 rounded-lg border border-dashed border-indigo-300 bg-indigo-50/10 p-1 text-center text-[9px] text-indigo-700 dark:text-indigo-300">
-                      ── Bàn họp lớn ──
+                      {t('map.largeMeetingTable', '── Bàn họp lớn ──')}
                     </div>
                     <div className="grid grid-cols-4 gap-1 text-center">
                       <span className="text-[10px]">🪑</span>
@@ -540,7 +569,7 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
                   >
                     <div className="flex items-center gap-1.5 text-primary">
                       <span className="material-symbols-outlined text-sm">computer</span>
-                      <h4 className="text-xs font-bold">PHÒNG MÁY TÍNH</h4>
+                      <h4 className="text-xs font-bold">{t('map.computerRoomHeading', 'PHÒNG MÁY TÍNH')}</h4>
                     </div>
                     <div className="mt-2 grid grid-cols-2 gap-1.5 text-center">
                       <span className="rounded bg-surface-container py-1 text-[10px]">💻 PC1</span>
@@ -562,13 +591,13 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
                         <span className="material-symbols-outlined text-sm">menu_book</span>
-                        <h4 className="text-xs font-bold">ĐỌC BÁO / TẠP CHÍ</h4>
+                        <h4 className="text-xs font-bold">{t('map.newspaperRoomHeading', 'ĐỌC BÁO / TẠP CHÍ')}</h4>
                       </div>
-                      <span className="text-[10px] text-emerald-500">Mới 📰</span>
+                      <span className="text-[10px] text-emerald-500">{t('map.newStatus', 'Mới 📰')}</span>
                     </div>
                     <div className="mt-2 flex justify-center gap-2">
-                      <span className="rounded-lg bg-surface-container px-2 py-1 text-[9px] flex items-center gap-1 whitespace-nowrap">🪑 Ghế 1</span>
-                      <span className="rounded-lg bg-surface-container px-2 py-1 text-[9px] flex items-center gap-1 whitespace-nowrap">🪑 Ghế 2</span>
+                      <span className="rounded-lg bg-surface-container px-2 py-1 text-[9px] flex items-center gap-1 whitespace-nowrap">🪑 {t('map.chair1', 'Ghế 1')}</span>
+                      <span className="rounded-lg bg-surface-container px-2 py-1 text-[9px] flex items-center gap-1 whitespace-nowrap">🪑 {t('map.chair2', 'Ghế 2')}</span>
                     </div>
                   </div>
 
@@ -583,10 +612,10 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
                   >
                     <div className="flex items-center gap-1.5 text-teal-600 dark:text-teal-400">
                       <span className="material-symbols-outlined text-sm">support_agent</span>
-                      <h4 className="text-xs font-bold">PHÒNG TIẾP SV</h4>
+                      <h4 className="text-xs font-bold">{t('map.receptionStudentHeading', 'PHÒNG TIẾP SV')}</h4>
                     </div>
                     <div className="rounded border border-teal-500/35 bg-teal-500/15 p-2 text-center text-[10px] font-bold text-teal-700 dark:text-teal-300">
-                      QUẦY GV 📋
+                      {t('map.teacherDesk', 'QUẦY GV 📋')}
                     </div>
                   </div>
 
@@ -607,7 +636,7 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
                       <div className="mb-3 flex items-center justify-between border-b border-surface-container pb-2">
                         <div className="flex items-center gap-1.5 text-primary">
                           <span className="material-symbols-outlined text-sm">shelves</span>
-                          <h4 className="text-xs font-bold uppercase">Khu vực kệ sách chính</h4>
+                          <h4 className="text-xs font-bold uppercase">{t('map.mainShelvesHeading', 'Khu vực kệ sách chính')}</h4>
                         </div>
                         <span className="text-[10px] text-outline tracking-wider font-semibold">Dewey Classification</span>
                       </div>
@@ -624,7 +653,7 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
                           }`}
                         >
                           <span className="material-symbols-outlined text-sm">stairs</span>
-                          TẦNG 1 (DÃY A - E)
+                          {t('map.floor1Heading', 'TẦNG 1 (DÃY A - E)')}
                         </button>
                         <button
                           type="button"
@@ -636,7 +665,7 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
                           }`}
                         >
                           <span className="material-symbols-outlined text-sm">stairs</span>
-                          TẦNG 2 (DÃY F - J)
+                          {t('map.floor2Heading', 'TẦNG 2 (DÃY F - J)')}
                         </button>
                       </div>
                     </div>
@@ -651,11 +680,11 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
                             <div className="space-y-1 border-b border-dashed border-slate-150/40 dark:border-slate-800/40 pb-2.5">
                               <div className="flex flex-col text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase mb-1">
                                 <div className="flex justify-between items-center">
-                                  <span>Dãy A</span>
+                                  <span>{t('map.shelfRowA', 'Dãy A')}</span>
                                   <span className="font-mono text-[9px] opacity-75">A1 - A4</span>
                                 </div>
                                 <div className="text-[8px] font-normal text-slate-400 dark:text-slate-500 normal-case truncate">
-                                  Khoa học Tự nhiên
+                                  {t('map.rowA_desc', 'Khoa học Tự nhiên')}
                                 </div>
                               </div>
                               <div className="grid grid-cols-4 gap-2">
@@ -670,11 +699,11 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
                             <div className="space-y-1">
                               <div className="flex flex-col text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase mb-1">
                                 <div className="flex justify-between items-center">
-                                  <span>Dãy B</span>
+                                  <span>{t('map.shelfRowB', 'Dãy B')}</span>
                                   <span className="font-mono text-[9px] opacity-75">B1 - B8</span>
                                 </div>
                                 <div className="text-[8px] font-normal text-slate-400 dark:text-slate-500 normal-case truncate">
-                                  Kinh tế - Lịch sử
+                                  {t('map.rowB_desc', 'Kinh tế - Lịch sử')}
                                 </div>
                               </div>
                               <div className="grid grid-cols-4 gap-2">
@@ -696,11 +725,11 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
                             <div className="space-y-1 border-b border-dashed border-slate-150/40 dark:border-slate-800/40 pb-2.5">
                               <div className="flex flex-col text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase mb-1">
                                 <div className="flex justify-between items-center">
-                                  <span>Dãy C</span>
+                                  <span>{t('map.shelfRowC', 'Dãy C')}</span>
                                   <span className="font-mono text-[9px] opacity-75">C1 - C3</span>
                                 </div>
                                 <div className="text-[8px] font-normal text-slate-400 dark:text-slate-500 normal-case truncate">
-                                  Công nghệ - Kỹ thuật
+                                  {t('map.rowC_desc', 'Công nghệ - Kỹ thuật')}
                                 </div>
                               </div>
                               <div className="grid grid-cols-3 gap-2">
@@ -714,11 +743,11 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
                             <div className="space-y-1 border-b border-dashed border-slate-150/40 dark:border-slate-800/40 pb-2.5">
                               <div className="flex flex-col text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase mb-1">
                                 <div className="flex justify-between items-center">
-                                  <span>Dãy D</span>
+                                  <span>{t('map.shelfRowD', 'Dãy D')}</span>
                                   <span className="font-mono text-[9px] opacity-75">D1 - D4</span>
                                 </div>
                                 <div className="text-[8px] font-normal text-slate-400 dark:text-slate-500 normal-case truncate">
-                                  Văn học - Xã hội
+                                  {t('map.rowD_desc', 'Văn học - Xã hội')}
                                 </div>
                               </div>
                               <div className="grid grid-cols-4 gap-2">
@@ -733,11 +762,11 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
                             <div className="space-y-1">
                               <div className="flex flex-col text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase mb-1">
                                 <div className="flex justify-between items-center">
-                                  <span>Dãy E</span>
+                                  <span>{t('map.shelfRowE', 'Dãy E')}</span>
                                   <span className="font-mono text-[9px] opacity-75">E1 - E3</span>
                                 </div>
                                 <div className="text-[8px] font-normal text-slate-400 dark:text-slate-500 normal-case truncate">
-                                  Tham khảo & Từ điển
+                                  {t('map.rowE_desc', 'Tham khảo & Từ điển')}
                                 </div>
                               </div>
                               <div className="grid grid-cols-3 gap-2">
@@ -752,7 +781,7 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
                         {/* Floor 1 Info Banner */}
                         <div className="mt-3 rounded-lg border border-sky-400/20 bg-sky-500/5 p-2 text-[10px] text-sky-700 dark:text-sky-300 flex items-center gap-1.5">
                           <span className="material-symbols-outlined text-xs">info</span>
-                          <span>Tầng 1 chứa tài liệu KHTN, Kinh tế, Tin học, Kỹ thuật và Văn học đại chúng.</span>
+                          <span>{t('map.floor1Info', 'Tầng 1 chứa tài liệu KHTN, Kinh tế, Tin học, Kỹ thuật và Văn học đại chúng.')}</span>
                         </div>
                       </div>
                     )}
@@ -767,11 +796,11 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
                             <div className="space-y-1 border-b border-dashed border-slate-150/40 dark:border-slate-800/40 pb-2.5">
                               <div className="flex flex-col text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase mb-1">
                                 <div className="flex justify-between items-center">
-                                  <span>Dãy F</span>
+                                  <span>{t('map.shelfRowF', 'Dãy F')}</span>
                                   <span className="font-mono text-[9px] opacity-75">F1 - F6</span>
                                 </div>
                                 <div className="text-[8px] font-normal text-slate-400 dark:text-slate-500 normal-case truncate">
-                                  Ngoại ngữ & Ngoại văn
+                                  {t('map.rowF_desc', 'Ngoại ngữ & Ngoại văn')}
                                 </div>
                               </div>
                               <div className="grid grid-cols-3 gap-2">
@@ -788,11 +817,11 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
                             <div className="space-y-1">
                               <div className="flex flex-col text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase mb-1">
                                 <div className="flex justify-between items-center">
-                                  <span>Dãy G</span>
+                                  <span>{t('map.shelfRowG', 'Dãy G')}</span>
                                   <span className="font-mono text-[9px] opacity-75">G1 - G4</span>
                                 </div>
                                 <div className="text-[8px] font-normal text-slate-400 dark:text-slate-500 normal-case truncate">
-                                  Giáo trình Đại học
+                                  {t('map.rowG_desc', 'Giáo trình Đại học')}
                                 </div>
                               </div>
                               <div className="grid grid-cols-4 gap-2">
@@ -810,11 +839,11 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
                             <div className="space-y-1 border-b border-dashed border-slate-150/40 dark:border-slate-800/40 pb-2.5">
                               <div className="flex flex-col text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase mb-1">
                                 <div className="flex justify-between items-center">
-                                  <span>Dãy H</span>
+                                  <span>{t('map.shelfRowH', 'Dãy H')}</span>
                                   <span className="font-mono text-[9px] opacity-75">H1 - H3</span>
                                 </div>
                                 <div className="text-[8px] font-normal text-slate-400 dark:text-slate-500 normal-case truncate">
-                                  Pháp luật & Chính trị
+                                  {t('map.rowH_desc', 'Pháp luật & Chính trị')}
                                 </div>
                               </div>
                               <div className="grid grid-cols-3 gap-2">
@@ -828,11 +857,11 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
                             <div className="space-y-1 border-b border-dashed border-slate-150/40 dark:border-slate-800/40 pb-2.5">
                               <div className="flex flex-col text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase mb-1">
                                 <div className="flex justify-between items-center">
-                                  <span>Dãy I</span>
+                                  <span>{t('map.shelfRowI', 'Dãy I')}</span>
                                   <span className="font-mono text-[9px] opacity-75">I1 - I2</span>
                                 </div>
                                 <div className="text-[8px] font-normal text-slate-400 dark:text-slate-500 normal-case truncate">
-                                  Nghệ thuật & Thể thao
+                                  {t('map.rowI_desc', 'Nghệ thuật & Thể thao')}
                                 </div>
                               </div>
                               <div className="grid grid-cols-2 gap-2">
@@ -845,11 +874,11 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
                             <div className="space-y-1">
                               <div className="flex flex-col text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase mb-1">
                                 <div className="flex justify-between items-center">
-                                  <span>Dãy J</span>
+                                  <span>{t('map.shelfRowJ', 'Dãy J')}</span>
                                   <span className="font-mono text-[9px] opacity-75">J1 - J3</span>
                                 </div>
                                 <div className="text-[8px] font-normal text-slate-400 dark:text-slate-500 normal-case truncate">
-                                  Triết học & Tâm lý học
+                                  {t('map.rowJ_desc', 'Triết học & Tâm lý học')}
                                 </div>
                               </div>
                               <div className="grid grid-cols-3 gap-2">
@@ -864,7 +893,7 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
                         {/* Floor 2 Info Banner */}
                         <div className="mt-3 rounded-lg border border-purple-400/20 bg-purple-500/5 p-2 text-[10px] text-purple-700 dark:text-purple-300 flex items-center gap-1.5">
                           <span className="material-symbols-outlined text-xs">info</span>
-                          <span>Tầng 2 tập trung sách chuyên ngành Ngoại ngữ, Giáo trình, Luật, Mỹ thuật và Triết học.</span>
+                          <span>{t('map.floor2Info', 'Tầng 2 tập trung sách chuyên ngành Ngoại ngữ, Giáo trình, Luật, Mỹ thuật và Triết học.')}</span>
                         </div>
                       </div>
                     )}
@@ -883,7 +912,7 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
                     >
                       <div className="flex items-center gap-1 text-slate-600 dark:text-slate-400">
                         <span className="material-symbols-outlined text-xs">lock</span>
-                        <span className="text-[10px] font-bold">TỦ KHÓA GỬI ĐỒ</span>
+                        <span className="text-[10px] font-bold">{t('map.lockersHeading', 'TỦ KHÓA GỬI ĐỒ')}</span>
                       </div>
                       <div className="flex justify-around text-xs mb-1">
                         <span>🔒</span>
@@ -896,7 +925,7 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
 
                     {/* Security Gates */}
                     <div className="rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-100/30 p-2 flex flex-col items-center justify-center">
-                      <p className="text-[8px] font-bold uppercase text-outline tracking-widest">Cổng từ an ninh</p>
+                      <p className="text-[8px] font-bold uppercase text-outline tracking-widest">{t('map.securityGate', 'Cổng từ an ninh')}</p>
                       <div className="flex items-center gap-3 text-xs mt-1 text-primary animate-pulse">
                         <span>◀</span>
                         <span className="material-symbols-outlined text-sm">sensors</span>
@@ -921,13 +950,13 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
                     <div className="border-b border-surface-container pb-1">
                       <div className="flex items-center gap-1.5 text-sky-600 dark:text-sky-400">
                         <span className="material-symbols-outlined text-sm">local_library</span>
-                        <h4 className="text-xs font-bold">KHU TỰ HỌC</h4>
+                        <h4 className="text-xs font-bold">{t('map.studyAreaHeading', 'KHU TỰ HỌC')}</h4>
                       </div>
                     </div>
 
                     {/* Group Rooms R-01, R-02 */}
                     <div className="space-y-1 mt-1.5">
-                      <p className="text-[9px] text-outline font-bold uppercase">Phòng nhóm</p>
+                      <p className="text-[9px] text-outline font-bold uppercase">{t('map.groupRoomsLabel', 'Phòng nhóm')}</p>
                       <div className="grid grid-cols-2 gap-1.5">
                         <div
                           className={`rounded-lg border p-1 text-center cursor-pointer transition-all duration-200 ${
@@ -937,8 +966,8 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
                           }`}
                           {...getInteractiveZoneProps({
                             id: 'R1',
-                            name: 'Phòng Nhóm R-01',
-                            description: 'Phòng thảo luận nhóm cách âm, sức chứa 6-8 người.',
+                            name: t('map.groupRoomName', 'Phòng Nhóm R-01'),
+                            description: t('map.groupRoomDesc', 'Phòng thảo luận nhóm cách âm, sức chứa 6-8 người.'),
                             icon: 'meeting_room',
                           })}
                         >
@@ -953,8 +982,8 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
                           }`}
                           {...getInteractiveZoneProps({
                             id: 'R2',
-                            name: 'Phòng Nhóm R-02',
-                            description: 'Phòng thảo luận nhóm cách âm, sức chứa 6-8 người.',
+                            name: t('map.groupRoomName2', 'Phòng Nhóm R-02'),
+                            description: t('map.groupRoomDesc2', 'Phòng thảo luận nhóm cách âm, sức chứa 6-8 người.'),
                             icon: 'meeting_room',
                           })}
                         >
@@ -966,7 +995,7 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
 
                     {/* Desks Grid (S-01 to S-12) */}
                     <div className="mt-1.5">
-                      <p className="text-[9px] text-outline font-bold uppercase mb-1">Góc tự học cá nhân</p>
+                      <p className="text-[9px] text-outline font-bold uppercase mb-1">{t('map.singleStudyAreaLabel', 'Góc tự học cá nhân')}</p>
                       <div className="grid grid-cols-4 gap-1">
                         {Array.from({ length: 12 }, (_, i) => {
                           const code = `S${i + 1}`;
@@ -981,8 +1010,8 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
                               }`}
                               {...getInteractiveZoneProps({
                                 id: code,
-                                name: `Bàn học S-${String(i + 1).padStart(2, '0')}`,
-                                description: 'Bàn tự học đơn cá nhân.',
+                                name: t('map.deskName', 'Bàn học S-{{num}}', { num: String(i + 1).padStart(2, '0') }),
+                                description: t('map.deskDesc', 'Bàn tự học đơn cá nhân.'),
                                 icon: 'desk',
                               })}
                             >
@@ -995,7 +1024,7 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
 
                     {/* Group Tables (G-01 to G-03) */}
                     <div className="mt-1.5">
-                      <p className="text-[9px] text-outline font-bold uppercase mb-1">Bàn nhóm lớn</p>
+                      <p className="text-[9px] text-outline font-bold uppercase mb-1">{t('map.largeGroupTablesLabel', 'Bàn nhóm lớn')}</p>
                       <div className="grid grid-cols-3 gap-1.5">
                         {['G1', 'G2', 'G3'].map((code, idx) => {
                           const isHigh = parsed.shelf === code;
@@ -1009,14 +1038,14 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
                               }`}
                               {...getInteractiveZoneProps({
                                 id: code,
-                                name: `Bàn Nhóm G-0${idx + 1}`,
-                                description: 'Bàn họp nhóm lớn, có cổng cắm điện và cáp mạng.',
+                                name: t('map.largeGroupName', 'Bàn Nhóm G-0{{num}}', { num: idx + 1 }),
+                                description: t('map.largeGroupDesc', 'Bàn họp nhóm lớn, có cổng cắm điện và cáp mạng.'),
                                 icon: 'table_restaurant',
-                                details: 'Sức chứa tối đa 6 người, thích hợp thảo luận nhóm vừa và làm việc nhóm.',
+                                details: t('map.largeGroupDetails', 'Sức chứa tối đa 6 người, thích hợp thảo luận nhóm vừa và làm việc nhóm.'),
                               })}
                             >
                               <span className="block text-[10px] font-bold">G-0{idx + 1}</span>
-                              <span className="text-[8px] opacity-80">6 chỗ 🪑</span>
+                              <span className="text-[8px] opacity-80">{t('map.sixSeats', '6 chỗ 🪑')}</span>
                             </div>
                           );
                         })}
@@ -1039,8 +1068,8 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
                               }`}
                               {...getInteractiveZoneProps({
                                 id: code,
-                                name: `Bàn học S-${i + 13}`,
-                                description: 'Bàn tự học đơn cá nhân.',
+                                name: t('map.deskName', 'Bàn học S-{{num}}', { num: String(i + 13) }),
+                                description: t('map.deskDesc', 'Bàn tự học đơn cá nhân.'),
                                 icon: 'desk',
                               })}
                             >
@@ -1063,10 +1092,10 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
                   >
                     <div className="flex items-center gap-1.5 text-rose-500">
                       <span className="material-symbols-outlined text-sm">badge</span>
-                      <h4 className="text-xs font-bold leading-tight">KHO SÁCH / NHÂN VIÊN</h4>
+                      <h4 className="text-xs font-bold leading-tight">{t('map.internalStaffHeading', 'KHO SÁCH / NHÂN VIÊN')}</h4>
                     </div>
                     <p className="text-[9px] text-rose-700 dark:text-rose-300 font-semibold italic text-center uppercase tracking-wider">
-                      ⚠️ Nội bộ / Staff only
+                      {t('map.staffOnly', '⚠️ Nội bộ / Staff only')}
                     </p>
                   </div>
 
@@ -1081,11 +1110,11 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
                   >
                     <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
                       <span className="material-symbols-outlined text-sm">desk</span>
-                      <h4 className="text-[11px] font-bold leading-tight">QUẦY LỄ TÂN & MƯỢN-TRẢ</h4>
+                      <h4 className="text-[11px] font-bold leading-tight">{t('map.receptionDeskHeading', 'QUẦY LỄ TÂN & MƯỢN-TRẢ')}</h4>
                     </div>
                     <div className="flex items-center justify-between text-[9px] text-slate-500">
-                      <span>📋 Nhân viên</span>
-                      <span>Thủ thư 👨‍💼</span>
+                      <span>{t('map.staffLabel', '📋 Nhân viên')}</span>
+                      <span>{t('map.librarianLabel', 'Thủ thư 👨‍💼')}</span>
                     </div>
                   </div>
 
@@ -1097,10 +1126,10 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
               <div className="mt-4 border-t-4 border-slate-700 pt-3 flex justify-center">
                 <div className="rounded-xl border-2 border-slate-400 bg-slate-200/50 dark:bg-slate-800/80 px-10 py-2.5 text-center shadow-md relative">
                   <p className="text-xs font-bold uppercase tracking-widest text-slate-700 dark:text-slate-200">
-                    ═══ CỬA VÀO CHÍNH ═══
+                    {t('map.mainEntrance', '═══ CỬA VÀO CHÍNH ═══')}
                   </p>
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded bg-slate-700 px-2 py-0.5 text-[8px] font-bold text-white uppercase">
-                    Entrance
+                    {t('map.entranceLabel', 'Entrance')}
                   </div>
                 </div>
               </div>
@@ -1112,7 +1141,7 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
               <div
                 data-testid="mobile-zone-sheet"
                 className="absolute inset-x-3 bottom-3 z-40 rounded-2xl border border-surface-container-high bg-surface-bright p-4 shadow-2xl md:hidden"
-                aria-label="Chi tiết khu vực đã chọn"
+                aria-label={t('map.mobileZoneSheetLabel', 'Chi tiết khu vực đã chọn')}
               >
                 <div className="flex items-start gap-3">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
@@ -1124,7 +1153,7 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
                   </div>
                   <button
                     type="button"
-                    aria-label="Đóng chi tiết khu vực"
+                    aria-label={t('map.closeZoneDetails', 'Đóng chi tiết khu vực')}
                     onClick={() => setSelectedZone(null)}
                     className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container-high"
                   >
@@ -1136,7 +1165,7 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
                   onClick={() => setActiveTab('details')}
                   className="mt-3 w-full rounded-xl bg-primary px-4 py-2.5 text-xs font-bold text-white shadow-sm"
                 >
-                  Xem chi tiết & Chú giải
+                  {t('map.viewDetailsButton', 'Xem chi tiết & Chú giải')}
                 </button>
               </div>
             )}
@@ -1145,12 +1174,12 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
           {/* Interactive Info Sidebar panel */}
           <aside
             className={`${activeTab === 'details' ? 'flex' : 'hidden'} md:flex w-full md:w-80 border-t md:border-t-0 md:border-l border-surface-container-high bg-surface-container-low p-6 flex-col justify-between overflow-y-auto`}
-            aria-label="Chi tiết khu vực"
+            aria-label={t('map.sidebar.header', 'Chi tiết khu vực')}
           >
             <div>
               <h3 className="text-sm font-bold uppercase text-outline tracking-wider mb-4 flex items-center gap-1.5">
                 <span className="material-symbols-outlined text-base">info</span>
-                Chi tiết khu vực
+                {t('map.sidebar.header', 'Chi tiết khu vực')}
               </h3>
 
               {currentInfo ? (
@@ -1170,7 +1199,7 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
                         </div>
 
                         <div className="rounded-xl border border-surface-container-high bg-surface-bright p-4 text-xs text-on-surface-variant leading-relaxed shadow-sm">
-                          {currentInfo.details || 'Không gian tự học yên tĩnh phục vụ sinh viên. Vui lòng giữ trật tự và vệ sinh chung khi sử dụng.'}
+                          {currentInfo.details || t('map.sidebar.defaultDetails', 'Không gian tự học yên tĩnh phục vụ sinh viên. Vui lòng giữ trật tự và vệ sinh chung khi sử dụng.')}
                         </div>
                       </>
                     );
@@ -1181,14 +1210,13 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
                     <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 space-y-2">
                       <p className="text-xs font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1">
                         <span className="material-symbols-outlined text-sm">my_location</span>
-                        Vị trí tài liệu định vị
+                        {t('map.sidebar.locatorHeader', 'Vị trí tài liệu định vị')}
                       </p>
                       <p className="text-xs leading-relaxed text-on-surface-variant">
-                        Cuốn sách <strong>{bookTitle || 'bạn chọn'}</strong> hiện nằm tại{' '}
-                        <span className="rounded bg-amber-500/20 px-1.5 py-0.5 font-mono font-bold text-amber-800 dark:text-amber-300">
-                          {highlightLocation}
-                        </span>
-                        . Vui lòng đến khu vực được nhấp nháy màu vàng trên sơ đồ để nhận sách.
+                        {t('map.sidebar.locatorDesc', 'Cuốn sách {{title}} hiện nằm tại {{location}}. Vui lòng đến khu vực được nhấp nháy màu vàng trên sơ đồ để nhận sách.', {
+                          title: bookTitle || t('map.selectedBook', 'bạn chọn'),
+                          location: highlightLocation
+                        })}
                       </p>
                     </div>
                   )}
@@ -1199,7 +1227,7 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
                     ads_click
                   </span>
                   <p className="text-xs leading-relaxed max-w-[200px] mx-auto">
-                    Di chuột qua hoặc click vào các phòng, kệ sách hoặc khu vực tự học trên sơ đồ để xem thông tin chi tiết.
+                    {t('map.sidebar.helpText', 'Di chuột qua hoặc click vào các phòng, kệ sách hoặc khu vực tự học trên sơ đồ để xem thông tin chi tiết.')}
                   </p>
                 </div>
               )}
@@ -1207,58 +1235,58 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
 
             {/* Legend / Chú giải */}
             <div className="border-t border-surface-container-high pt-5 mt-5">
-              <h4 className="text-xs font-bold text-on-surface uppercase tracking-wider mb-3">Chú giải bản đồ</h4>
+              <h4 className="text-xs font-bold text-on-surface uppercase tracking-wider mb-3">{t('map.legend.header', 'Chú giải bản đồ')}</h4>
               
               {/* Dynamic Shelves based on Floor */}
-              <div className="mb-4">
+              <div className="blueprint-legend mb-4">
                 <p className="text-[10px] font-bold text-outline uppercase tracking-wider mb-2">
-                  Kệ Sách {selectedFloor === 1 ? 'Tầng 1' : 'Tầng 2'}
+                  {t('map.legend.shelvesFloor', 'Kệ Sách Tầng {{floor}}', { floor: selectedFloor })}
                 </p>
                 <div className="grid grid-cols-2 gap-2 text-[11px] text-on-surface-variant">
                   {selectedFloor === 1 ? (
                     <>
                       <div className="flex items-center gap-2">
                         <span className="inline-block h-3.5 w-3.5 rounded border border-sky-400/40 bg-sky-50/40" />
-                        <span>Kệ A (KHTN)</span>
+                        <span>{t('map.legend.shelfA', 'Kệ A (KHTN)')}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="inline-block h-3.5 w-3.5 rounded border border-amber-400/40 bg-amber-50/40" />
-                        <span>Kệ B (KT-LS)</span>
+                        <span>{t('map.legend.shelfB', 'Kệ B (KT-LS)')}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="inline-block h-3.5 w-3.5 rounded border border-emerald-400/40 bg-emerald-50/40" />
-                        <span>Kệ C (CN-KT)</span>
+                        <span>{t('map.legend.shelfC', 'Kệ C (CN-KT)')}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="inline-block h-3.5 w-3.5 rounded border border-pink-400/40 bg-pink-50/40" />
-                        <span>Kệ D (VH-XH)</span>
+                        <span>{t('map.legend.shelfD', 'Kệ D (VH-XH)')}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="inline-block h-3.5 w-3.5 rounded border border-violet-400/40 bg-violet-50/40" />
-                        <span>Kệ E (T.Khảo)</span>
+                        <span>{t('map.legend.shelfE', 'Kệ E (T.Khảo)')}</span>
                       </div>
                     </>
                   ) : (
                     <>
                       <div className="flex items-center gap-2">
                         <span className="inline-block h-3.5 w-3.5 rounded border border-orange-400/40 bg-orange-50/40" />
-                        <span>Kệ F (Ngoại ngữ)</span>
+                        <span>{t('map.legend.shelfF', 'Kệ F (Ngoại ngữ)')}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="inline-block h-3.5 w-3.5 rounded border border-sky-400/40 bg-sky-50/40" />
-                        <span>Kệ G (Giáo trình)</span>
+                        <span>{t('map.legend.shelfG', 'Kệ G (Giáo trình)')}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="inline-block h-3.5 w-3.5 rounded border border-amber-400/40 bg-amber-50/40" />
-                        <span>Kệ H (Pháp luật)</span>
+                        <span>{t('map.legend.shelfH', 'Kệ H (Pháp luật)')}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="inline-block h-3.5 w-3.5 rounded border border-pink-400/40 bg-pink-50/40" />
-                        <span>Kệ I (Mỹ thuật)</span>
+                        <span>{t('map.legend.shelfI', 'Kệ I (Mỹ thuật)')}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="inline-block h-3.5 w-3.5 rounded border border-violet-400/40 bg-violet-50/40" />
-                        <span>Kệ J (Triết học)</span>
+                        <span>{t('map.legend.shelfJ', 'Kệ J (Triết học)')}</span>
                       </div>
                     </>
                   )}
@@ -1268,16 +1296,16 @@ export default function LibraryMapModal({ isOpen, onClose, highlightLocation, bo
               {/* Spaces and Positioning */}
               <div>
                 <p className="text-[10px] font-bold text-outline uppercase tracking-wider mb-2">
-                  Không gian & Định vị
+                  {t('map.legend.spaceHeader', 'Không gian & Định vị')}
                 </p>
                 <div className="grid grid-cols-2 gap-2 text-[11px] text-on-surface-variant">
                   <div className="flex items-center gap-2">
                     <span className="inline-block h-3.5 w-3.5 rounded border-2 border-dashed border-amber-500 bg-amber-500/25 animate-pulse" />
-                    <span className="font-bold text-amber-600">Sách cần tìm</span>
+                    <span className="font-bold text-amber-600">{t('map.legend.bookTarget', 'Sách cần tìm')}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="inline-block h-3.5 w-3.5 rounded border border-sky-300/40 bg-sky-500/5" />
-                    <span>Phòng/Bàn nhóm</span>
+                    <span>{t('map.legend.groupRooms', 'Phòng/Bàn nhóm')}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="inline-block h-3.5 w-3.5 rounded border border-slate-200 bg-slate-50/10 dark:border-slate-800" />

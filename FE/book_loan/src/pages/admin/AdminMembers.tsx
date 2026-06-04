@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   createMember,
   deleteMember,
@@ -84,7 +85,7 @@ function mapMember(member: MemberApiRecord): MemberListItem {
     dept: SCHOOL_LABEL,
     type: 'Sinh viên',
     email: member.email || `${member.member_id}@student.hcmue.edu.vn`,
-    phoneNumber: member.phone_number || 'Chưa cập nhật',
+    phoneNumber: member.phone_number || '',
     joinDate: member.join_date || '',
     status: disabled ? 'Vô hiệu hóa' : 'Hoạt động',
     statusColor: disabled
@@ -128,27 +129,27 @@ function buildPayload(formData: MemberFormData, includePassword: boolean): Membe
   return payload;
 }
 
-function getValidationMessage(formData: MemberFormData, mode: ModalMode) {
+function getValidationMessage(formData: MemberFormData, mode: ModalMode, t: (key: string) => string) {
   const password = formData.password;
   const confirmation = formData.password_confirmation;
   const hasPasswordInput = Boolean(password || confirmation);
   const phoneNumber = formData.phone_number.trim();
 
   if (phoneNumber.length > 15) {
-    return 'So dien thoai khong duoc vuot qua 15 ky tu.';
+    return t('adminLibrarians.validation.phoneLength');
   }
 
   if (mode === 'add' || hasPasswordInput) {
     if (!password) {
-      return 'Vui lòng nhập mật khẩu cho thành viên.';
+      return t('adminMembers.validation.passwordRequired');
     }
 
     if (password !== confirmation) {
-      return 'Mật khẩu xác nhận không khớp.';
+      return t('adminMembers.validation.passwordConfirmMismatch');
     }
 
     if (password.length < 8 || !/[A-Za-z]/.test(password) || !/\d/.test(password)) {
-      return 'Mật khẩu cần có tối thiểu 8 ký tự, gồm chữ cái và số.';
+      return t('adminMembers.validation.passwordFormat');
     }
   }
 
@@ -156,6 +157,7 @@ function getValidationMessage(formData: MemberFormData, mode: ModalMode) {
 }
 
 export default function AdminMembers() {
+  const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const [members, setMembers] = useState<MemberListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -179,11 +181,11 @@ export default function AdminMembers() {
   const handleExportMembers = (columns: string[]) => {
     const token = getStoredToken();
     if (!token) {
-      emitToast({ tone: 'error', title: 'Lỗi', message: 'Không thể xác thực để xuất dữ liệu.' });
+      emitToast({ tone: 'error', title: t('common.error'), message: t('adminMembers.error.loadFailed') });
       return;
     }
     try {
-      emitToast({ tone: 'info', title: 'Xuất dữ liệu', message: 'Đang khởi tạo tải dữ liệu...' });
+      emitToast({ tone: 'info', title: t('adminMembers.exportCsv'), message: t('adminMembers.success.exportInit') });
 
       let exportUrl = `${API_BASE_URL}/reports/export-members`;
       const params: Record<string, string> = {
@@ -195,7 +197,7 @@ export default function AdminMembers() {
       exportUrl += '?' + new URLSearchParams(params).toString();
 
       fetch(exportUrl, { headers: { Authorization: `Bearer ${token}` } })
-        .then((res) => { if (!res.ok) throw new Error('Yêu cầu xuất tệp dữ liệu thất bại.'); return res.blob(); })
+        .then((res) => { if (!res.ok) throw new Error(t('adminMembers.error.loadFailed')); return res.blob(); })
         .then((blob) => {
           const url = window.URL.createObjectURL(blob);
           const a = Object.assign(document.createElement('a'), {
@@ -206,11 +208,11 @@ export default function AdminMembers() {
           a.click();
           document.body.removeChild(a);
           window.URL.revokeObjectURL(url);
-          emitToast({ tone: 'success', title: 'Thành công', message: 'Tải xuống tệp CSV thành công.' });
+          emitToast({ tone: 'success', title: t('common.success'), message: t('adminMembers.success.exportSuccess') });
         })
-        .catch((err: Error) => emitToast({ tone: 'error', title: 'Thất bại', message: err.message }));
+        .catch((err: Error) => emitToast({ tone: 'error', title: t('common.error'), message: err.message }));
     } catch {
-      emitToast({ tone: 'error', title: 'Lỗi', message: 'Không thể xác thực để xuất dữ liệu.' });
+      emitToast({ tone: 'error', title: t('common.error'), message: t('adminMembers.error.loadFailed') });
     }
   };
 
@@ -235,8 +237,8 @@ export default function AdminMembers() {
         return;
       }
 
-      const message = getErrorMessage(error, 'Không thể tải danh sách thành viên.');
-      emitToast({ tone: 'error', title: 'Lỗi tải dữ liệu', message });
+      const message = getErrorMessage(error, t('adminMembers.error.loadFailed'));
+      emitToast({ tone: 'error', title: t('adminMembers.error.loadTitle'), message });
     } finally {
       if (showLoader) {
         setIsLoading(false);
@@ -281,7 +283,7 @@ export default function AdminMembers() {
       id: member.id,
       name: member.name,
       email: member.email,
-      phone_number: member.phoneNumber === 'Chưa cập nhật' ? '' : member.phoneNumber,
+      phone_number: member.phoneNumber,
       join_date: member.joinDate,
       password: '',
       password_confirmation: '',
@@ -323,16 +325,16 @@ export default function AdminMembers() {
       await loadMembers(false);
       emitToast({
         tone: 'success',
-        title: 'Đã xóa thành viên',
-        message: `${member.name} đã được xóa khỏi hệ thống.`,
+        title: t('adminMembers.success.deleteTitle'),
+        message: t('adminMembers.success.deleteMsg', { name: member.name }),
       });
     } catch (error: unknown) {
       if (isUnauthorizedError(error)) {
         return;
       }
 
-      const message = getErrorMessage(error, 'Không thể xóa thành viên.');
-      emitToast({ tone: 'error', title: 'Không thể xóa thành viên', message });
+      const message = getErrorMessage(error, t('adminMembers.error.deleteFailed'));
+      emitToast({ tone: 'error', title: t('adminMembers.error.deleteFailed'), message });
     }
   };
 
@@ -343,13 +345,13 @@ export default function AdminMembers() {
       await loadMembers(false);
       emitToast({
         tone: member.isDisabled ? 'success' : 'info',
-        title: member.isDisabled ? 'Đã kích hoạt tài khoản' : 'Đã vô hiệu hóa tài khoản',
+        title: member.isDisabled ? t('adminMembers.success.activate') : t('adminMembers.success.deactivate'),
         message: res.message,
       });
     } catch (error: unknown) {
       if (isUnauthorizedError(error)) return;
-      const message = getErrorMessage(error, 'Không thể thay đổi trạng thái tài khoản.');
-      emitToast({ tone: 'error', title: 'Thao tác thất bại', message });
+      const message = getErrorMessage(error, t('adminMembers.error.changeStatusFailed'));
+      emitToast({ tone: 'error', title: t('adminLibrarians.error.actionFailed'), message });
     } finally {
       setIsTogglingId(null);
     }
@@ -358,10 +360,10 @@ export default function AdminMembers() {
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
 
-    const validationMessage = getValidationMessage(formData, modalMode);
+    const validationMessage = getValidationMessage(formData, modalMode, t);
 
     if (validationMessage) {
-      emitToast({ tone: 'error', title: 'Không thể lưu thành viên', message: validationMessage });
+      emitToast({ tone: 'error', title: t('adminMembers.error.saveFailed'), message: validationMessage });
       return;
     }
 
@@ -372,15 +374,15 @@ export default function AdminMembers() {
         await createMember(buildPayload(formData, true));
         emitToast({
           tone: 'success',
-          title: 'Đã thêm thành viên',
-          message: `${formData.name.trim()} đã có tài khoản thư viện.`,
+          title: t('adminMembers.success.addTitle'),
+          message: t('adminMembers.success.addMsg', { name: formData.name.trim() }),
         });
       } else {
         await updateMember(formData.id, buildPayload(formData, false));
         emitToast({
           tone: 'success',
-          title: 'Đã cập nhật thành viên',
-          message: `${formData.name.trim()} đã được lưu thay đổi.`,
+          title: t('adminMembers.success.updateTitle'),
+          message: t('adminMembers.success.updateMsg', { name: formData.name.trim() }),
         });
       }
 
@@ -391,30 +393,40 @@ export default function AdminMembers() {
         return;
       }
 
-      const message = getErrorMessage(error, 'Không thể lưu thành viên.');
-      emitToast({ tone: 'error', title: 'Không thể lưu thành viên', message });
+      const message = getErrorMessage(error, t('adminMembers.error.saveFailed'));
+      emitToast({ tone: 'error', title: t('adminMembers.error.saveFailed'), message });
     } finally {
       setIsSaving(false);
     }
   };
 
+  const expectedFieldsTranslated = EXPECTED_FIELDS.map(field => ({
+    ...field,
+    label: t(`adminMembers.fields.${field.key}`, field.label)
+  }));
+
+  const availableExportColumnsTranslated = AVAILABLE_EXPORT_COLUMNS.map(col => ({
+    ...col,
+    label: t(`adminMembers.fields.${col.key}`, col.label)
+  }));
+
   return (
     <div className="mx-auto w-full max-w-7xl space-y-8 p-8">
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
         <div>
-          <h2 className="text-3xl font-bold text-on-surface">Quản lý thành viên</h2>
+          <h2 className="text-3xl font-bold text-on-surface">{t('adminMembers.title')}</h2>
           <p className="mt-1 text-sm text-on-surface-variant">
-            Tạo tài khoản, cập nhật hồ sơ và quản lý thông tin liên hệ của độc giả.
+            {t('adminMembers.subtitle')}
           </p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-3 flex-wrap">
           <button
             type="button"
             onClick={() => setIsRewardsModalOpen(true)}
             className="flex items-center gap-2 rounded-xl bg-indigo-50 border border-indigo-100 hover:bg-indigo-100/60 px-5 py-2.5 font-medium text-indigo-700 transition-all hover:-translate-y-0.5"
           >
             <span aria-hidden="true" className="material-symbols-outlined text-sm">storefront</span>
-            Quản lý kho quà
+            {t('adminMembers.manageRewards')}
           </button>
           <button
             type="button"
@@ -422,7 +434,7 @@ export default function AdminMembers() {
             className="flex items-center gap-2 rounded-xl bg-surface-container-high px-5 py-2.5 font-medium text-slate-700 transition-all hover:bg-slate-200 hover:-translate-y-0.5"
           >
             <span aria-hidden="true" className="material-symbols-outlined text-sm">upload_file</span>
-            Nhập từ CSV
+            {t('adminMembers.importCsv')}
           </button>
           <button
             type="button"
@@ -430,7 +442,7 @@ export default function AdminMembers() {
             className="flex items-center gap-2 rounded-xl bg-surface-container-high px-5 py-2.5 font-medium text-slate-700 transition-all hover:bg-slate-200 hover:-translate-y-0.5"
           >
             <span aria-hidden="true" className="material-symbols-outlined text-sm">download</span>
-            Xuất CSV
+            {t('adminMembers.exportCsv')}
           </button>
           <button
             type="button"
@@ -438,7 +450,7 @@ export default function AdminMembers() {
             className="flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 font-medium text-white shadow-lg shadow-primary/20 transition-all hover:-translate-y-0.5"
           >
             <span aria-hidden="true" className="material-symbols-outlined text-sm">person_add</span>
-            Thêm thành viên
+            {t('adminMembers.addBtn')}
           </button>
         </div>
       </div>
@@ -456,7 +468,7 @@ export default function AdminMembers() {
               type="search"
               value={searchTerm}
               onChange={(event) => updateSearch(event.target.value)}
-              placeholder="Tìm theo tên, email, số điện thoại..."
+              placeholder={t('adminMembers.searchPlaceholder') || ''}
               className="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-primary/20"
             />
           </div>
@@ -466,20 +478,20 @@ export default function AdminMembers() {
           <table className="w-full min-w-[980px] text-left">
             <thead>
               <tr className="border-b border-surface-container bg-white text-[10px] font-bold uppercase tracking-widest text-slate-500">
-                <th className="px-6 py-4">Mã độc giả</th>
-                <th className="px-6 py-4">Họ và tên</th>
-                <th className="px-6 py-4">Liên hệ</th>
-                <th className="px-6 py-4">Ngày tham gia</th>
-                <th className="px-6 py-4">Loại thẻ</th>
-                <th className="px-6 py-4">Trạng thái</th>
-                <th className="px-6 py-4 text-right">Quản lý</th>
+                <th className="px-6 py-4">{t('adminMembers.table.id')}</th>
+                <th className="px-6 py-4">{t('adminMembers.table.name')}</th>
+                <th className="px-6 py-4">{t('adminMembers.table.contact')}</th>
+                <th className="px-6 py-4">{t('adminMembers.table.joinDate')}</th>
+                <th className="px-6 py-4">{t('adminMembers.table.cardType')}</th>
+                <th className="px-6 py-4">{t('adminMembers.table.status')}</th>
+                <th className="px-6 py-4 text-right">{t('adminMembers.table.actions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-surface-container">
               {isLoading ? (
                 <tr>
                   <td colSpan={7} className="px-6 py-8 text-center text-slate-500">
-                    Đang tải danh sách...
+                    {t('adminMembers.loading')}
                   </td>
                 </tr>
               ) : members.length === 0 ? (
@@ -487,8 +499,8 @@ export default function AdminMembers() {
                   <td colSpan={7} className="px-6 py-8">
                     <EmptyState
                       icon="person_search"
-                      title="Không tìm thấy thành viên phù hợp"
-                      message="Thử thay đổi từ khóa tìm kiếm hoặc thêm thành viên mới."
+                      title={t('adminMembers.empty.title') || ''}
+                      message={t('adminMembers.empty.message') || ''}
                     />
                   </td>
                 </tr>
@@ -507,27 +519,27 @@ export default function AdminMembers() {
                         </div>
                         <div>
                           <p className="text-sm font-bold text-slate-800">{member.name}</p>
-                          <p className="text-[10px] text-slate-500">{member.dept}</p>
+                          <p className="text-[10px] text-slate-500">{t('landing.footerCatalog') === 'Danh mục sách' ? 'Trường Đại học Sư phạm TP.HCM' : 'Ho Chi Minh City University of Education'}</p>
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4">
                       <p className="text-sm font-medium text-slate-700">{member.email}</p>
-                      <p className="mt-0.5 text-xs text-slate-500">{member.phoneNumber}</p>
+                      <p className="mt-0.5 text-xs text-slate-500">{member.phoneNumber || t('adminMembers.notUpdated')}</p>
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-700">
-                      {formatDisplayDate(member.joinDate, 'Chưa cập nhật')}
+                      {formatDisplayDate(member.joinDate, t('adminMembers.notUpdated'))}
                     </td>
                     <td className="px-6 py-4">
                       <span className="rounded-md border border-slate-200 bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">
-                        {member.type}
+                        {t('adminMembers.typeStudent')}
                       </span>
                     </td>
                     <td className="px-6 py-4">
                       <span
                         className={`rounded-md border px-2.5 py-1 text-xs font-semibold ${member.statusColor}`}
                       >
-                        {member.status}
+                        {member.isDisabled ? t('adminMembers.statusDisabled') : t('adminMembers.statusActive')}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right">
@@ -539,8 +551,8 @@ export default function AdminMembers() {
                             setIsGamifyModalOpen(true);
                           }}
                           className="rounded-lg p-2 text-indigo-600 transition-all hover:bg-indigo-50"
-                          title="Quản lý Gamify & Phần thưởng"
-                          aria-label={`Quản lý Gamify ${member.name}`}
+                          title={t('adminMembers.gamify.title') || 'Gamify'}
+                          aria-label={`${t('adminMembers.gamify.title') || 'Gamify'} ${member.name}`}
                         >
                           <span aria-hidden="true" className="material-symbols-outlined text-[18px]">workspace_premium</span>
                         </button>
@@ -548,8 +560,8 @@ export default function AdminMembers() {
                           type="button"
                           onClick={() => openEditModal(member)}
                           className="rounded-lg p-2 text-primary transition-all hover:bg-primary-container"
-                          title="Chỉnh sửa"
-                          aria-label={`Chỉnh sửa ${member.name}`}
+                          title={t('common.edit') || 'Edit'}
+                          aria-label={`${t('common.edit') || 'Edit'} ${member.name}`}
                         >
                           <span aria-hidden="true" className="material-symbols-outlined text-[18px]">edit</span>
                         </button>
@@ -562,8 +574,8 @@ export default function AdminMembers() {
                               ? 'text-emerald-600 hover:bg-emerald-50'
                               : 'text-amber-600 hover:bg-amber-50'
                           }`}
-                          title={member.isDisabled ? 'Kích hoạt lại tài khoản' : 'Vô hiệu hóa tài khoản'}
-                          aria-label={member.isDisabled ? `Kích hoạt lại ${member.name}` : `Vô hiệu hóa ${member.name}`}
+                          title={member.isDisabled ? t('adminMembers.success.activate') : t('adminMembers.success.deactivate')}
+                          aria-label={member.isDisabled ? `${t('adminMembers.success.activate')} ${member.name}` : `${t('adminMembers.success.deactivate')} ${member.name}`}
                         >
                           <span aria-hidden="true" className="material-symbols-outlined text-[18px]">
                             {isTogglingId === member.id
@@ -577,8 +589,8 @@ export default function AdminMembers() {
                           type="button"
                           onClick={() => promptDelete(member)}
                           className="rounded-lg p-2 text-red-500 transition-all hover:bg-red-50"
-                          title="Xóa"
-                          aria-label={`Xóa ${member.name}`}
+                          title={t('common.delete') || 'Delete'}
+                          aria-label={`${t('common.delete') || 'Delete'} ${member.name}`}
                         >
                           <span aria-hidden="true" className="material-symbols-outlined text-[18px]">delete</span>
                         </button>
@@ -602,9 +614,9 @@ export default function AdminMembers() {
 
       <ConfirmDialog
         isOpen={isConfirmDeleteOpen}
-        title="Xác nhận xóa"
-        message={`Bạn có chắc chắn muốn xóa thành viên "${memberToDelete?.name}"? Hệ thống có thể không cho phép nếu sinh viên đang có sách mượn.`}
-        confirmLabel="Xóa thành viên"
+        title={t('adminMembers.confirmDelete.title')}
+        message={t('adminMembers.confirmDelete.message', { name: memberToDelete?.name })}
+        confirmLabel={t('adminMembers.confirmDelete.confirmLabel')}
         isDestructive={true}
         onConfirm={handleDelete}
         onCancel={cancelDelete}
@@ -615,13 +627,13 @@ export default function AdminMembers() {
           <div className="w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-surface-container bg-slate-50 p-6">
               <h3 className="text-xl font-bold text-slate-800">
-                {modalMode === 'add' ? 'Thêm thành viên mới' : 'Chỉnh sửa thành viên'}
+                {modalMode === 'add' ? t('adminMembers.modal.addTitle') : t('adminMembers.modal.editTitle')}
               </h3>
               <button
                 type="button"
                 onClick={closeModal}
                 className="text-slate-400 hover:text-slate-600"
-                aria-label="Đóng"
+                aria-label={t('common.close') || 'Close'}
               >
                 <span aria-hidden="true" className="material-symbols-outlined">close</span>
               </button>
@@ -633,13 +645,13 @@ export default function AdminMembers() {
                     <div>
                       <h4 className="font-bold text-sm text-indigo-900 flex items-center gap-1.5">
                         <span className="material-symbols-outlined text-[18px]">workspace_premium</span>
-                        Thành tích Học giả (Gamification)
+                        {t('adminMembers.gamify.title')}
                       </h4>
-                      <p className="text-[11px] text-indigo-700 mt-0.5">Điều chỉnh cấp độ, điểm tích lũy XP và xu thưởng của sinh viên.</p>
+                      <p className="text-[11px] text-indigo-700 mt-0.5">{t('adminMembers.gamify.subtitle')}</p>
                     </div>
                     <div className="flex flex-wrap gap-2.5 text-center w-full lg:w-auto">
                       <div className="flex-1 min-w-[85px] bg-white border border-indigo-200/60 rounded-xl px-2 py-1.5 shadow-sm transition-all focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-500/10">
-                        <label htmlFor="member-level" className="text-[9px] uppercase font-bold text-slate-400 block tracking-wider cursor-pointer select-none">Cấp độ</label>
+                        <label htmlFor="member-level" className="text-[9px] uppercase font-bold text-slate-400 block tracking-wider cursor-pointer select-none">{t('adminMembers.gamify.level')}</label>
                         <div className="flex items-center justify-center gap-0.5 mt-0.5">
                           <span className="font-bold text-indigo-500 text-xs select-none">Lvl</span>
                           <input
@@ -653,7 +665,7 @@ export default function AdminMembers() {
                         </div>
                       </div>
                       <div className="flex-1 min-w-[95px] bg-white border border-indigo-200/60 rounded-xl px-2 py-1.5 shadow-sm transition-all focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-500/10">
-                        <label htmlFor="member-xp" className="text-[9px] uppercase font-bold text-slate-400 block tracking-wider cursor-pointer select-none">Tích lũy</label>
+                        <label htmlFor="member-xp" className="text-[9px] uppercase font-bold text-slate-400 block tracking-wider cursor-pointer select-none">{t('adminMembers.gamify.xp')}</label>
                         <div className="flex items-center justify-center gap-0.5 mt-0.5">
                           <input
                             id="member-xp"
@@ -667,7 +679,7 @@ export default function AdminMembers() {
                         </div>
                       </div>
                       <div className="flex-1 min-w-[85px] bg-white border border-indigo-200/60 rounded-xl px-2 py-1.5 shadow-sm transition-all focus-within:border-amber-400 focus-within:ring-2 focus-within:ring-amber-500/10">
-                        <label htmlFor="member-points" className="text-[9px] uppercase font-bold text-slate-400 block tracking-wider cursor-pointer select-none">Điểm xu</label>
+                        <label htmlFor="member-points" className="text-[9px] uppercase font-bold text-slate-400 block tracking-wider cursor-pointer select-none">{t('adminMembers.gamify.points')}</label>
                         <div className="flex items-center justify-center gap-0.5 mt-0.5">
                           <input
                             id="member-points"
@@ -681,7 +693,7 @@ export default function AdminMembers() {
                         </div>
                       </div>
                       <div className="flex-1 min-w-[85px] bg-white/60 border border-indigo-100 rounded-xl px-2 py-1.5 shadow-sm select-none">
-                        <span className="text-[9px] uppercase font-bold text-slate-400 block tracking-wider">Huy hiệu</span>
+                        <span className="text-[9px] uppercase font-bold text-slate-400 block tracking-wider">{t('adminMembers.gamify.badges')}</span>
                         <div className="flex items-center justify-center gap-0.5 mt-0.5">
                           <span className="font-extrabold text-emerald-600 text-sm">{formData.badgesCount ?? 0}</span>
                           <span aria-hidden="true" className="text-xs">🏅</span>
@@ -692,7 +704,7 @@ export default function AdminMembers() {
                 )}
                 <div className="md:col-span-2">
                   <label htmlFor="member-name" className="mb-1 block text-xs font-bold text-slate-600">
-                    Họ và tên <span className="text-red-500">*</span>
+                    {t('adminMembers.form.fullName')} <span className="text-red-500">*</span>
                   </label>
                   <input
                     id="member-name"
@@ -705,7 +717,7 @@ export default function AdminMembers() {
                 </div>
                 <div>
                   <label htmlFor="member-email" className="mb-1 block text-xs font-bold text-slate-600">
-                    Email <span className="text-red-500">*</span>
+                    {t('adminMembers.form.email')} <span className="text-red-500">*</span>
                   </label>
                   <input
                     id="member-email"
@@ -718,7 +730,7 @@ export default function AdminMembers() {
                 </div>
                 <div>
                   <label htmlFor="member-phone" className="mb-1 block text-xs font-bold text-slate-600">
-                    Số điện thoại
+                    {t('adminMembers.form.phone')}
                   </label>
                   <input
                     id="member-phone"
@@ -732,7 +744,7 @@ export default function AdminMembers() {
                 </div>
                 <div>
                   <label htmlFor="member-join-date" className="mb-1 block text-xs font-bold text-slate-600">
-                    Ngày tham gia
+                    {t('adminMembers.form.joinDate')}
                   </label>
                   <input
                     id="member-join-date"
@@ -746,19 +758,19 @@ export default function AdminMembers() {
                 </div>
                 <div>
                   <label htmlFor="member-id" className="mb-1 block text-xs font-bold text-slate-600">
-                    Mã độc giả
+                    {t('adminMembers.form.id')}
                   </label>
                   <input
                     id="member-id"
                     type="text"
-                    value={modalMode === 'add' ? 'Tự động tạo' : formData.id}
+                    value={modalMode === 'add' ? t('adminMembers.form.idAuto') : formData.id}
                     disabled
                     className="w-full rounded-lg border border-slate-200 bg-slate-100 px-4 py-2 text-slate-500 outline-none"
                   />
                 </div>
                 <div>
                   <label htmlFor="member-password" className="mb-1 block text-xs font-bold text-slate-600">
-                    {modalMode === 'add' ? 'Mật khẩu' : 'Mật khẩu mới'}
+                    {modalMode === 'add' ? t('adminMembers.form.password') : t('adminMembers.form.newPassword')}
                     {modalMode === 'add' && <span className="text-red-500"> *</span>}
                   </label>
                   <input
@@ -770,13 +782,13 @@ export default function AdminMembers() {
                     onChange={(event) =>
                       setFormData({ ...formData, password: event.target.value })
                     }
-                    placeholder={modalMode === 'edit' ? 'Để trống nếu không đổi' : undefined}
+                    placeholder={modalMode === 'edit' ? t('adminMembers.form.passwordPlaceholder') || '' : undefined}
                     className="w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
                   />
                 </div>
                 <div>
                   <label htmlFor="member-password-confirmation" className="mb-1 block text-xs font-bold text-slate-600">
-                    Xác nhận mật khẩu
+                    {t('adminMembers.form.passwordConfirmation')}
                     {modalMode === 'add' && <span className="text-red-500"> *</span>}
                   </label>
                   <input
@@ -799,14 +811,14 @@ export default function AdminMembers() {
                   disabled={isSaving}
                   className="rounded-xl bg-slate-100 px-5 py-2.5 font-bold text-slate-600 transition-colors hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  Hủy
+                  {t('common.cancel')}
                 </button>
                 <button
                   type="submit"
                   disabled={isSaving}
                   className="rounded-xl bg-primary px-5 py-2.5 font-bold text-white shadow-md shadow-primary/20 transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {isSaving ? 'Đang lưu...' : 'Lưu thay đổi'}
+                  {isSaving ? t('common.processing') : t('common.confirm')}
                 </button>
               </div>
             </form>
@@ -824,7 +836,7 @@ export default function AdminMembers() {
             }}
             entityType="member"
             importApiCall={importMembers}
-            expectedFields={EXPECTED_FIELDS}
+            expectedFields={expectedFieldsTranslated}
             sampleCSV={SAMPLE_CSV}
             sampleFileName="mau_nhap_thanh_vien.csv"
           />
@@ -835,10 +847,10 @@ export default function AdminMembers() {
             isOpen={isExportModalOpen}
             onClose={() => setIsExportModalOpen(false)}
             onExport={handleExportMembers}
-            availableColumns={AVAILABLE_EXPORT_COLUMNS}
+            availableColumns={availableExportColumnsTranslated}
             defaultColumns={DEFAULT_EXPORT_COLUMNS}
-            title="Xuất danh sách Thành viên"
-            description="Lọc và xuất danh sách độc giả học giả ra tệp CSV để lưu trữ hoặc phân tích."
+            title={t('adminMembers.exportModal.title')}
+            description={t('adminMembers.exportModal.description')}
           />
         )}
 

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { EditorContent, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
@@ -60,6 +61,7 @@ function formFromPost(post?: BlogPostRecord | null): BlogEditorForm {
 }
 
 export default function BlogEditor({ post, onSaved, onCancel }: BlogEditorProps) {
+  const { t } = useTranslation();
   const [form, setForm] = useState<BlogEditorForm>(() => formFromPost(post));
   const [isSaving, setIsSaving] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -147,8 +149,8 @@ export default function BlogEditor({ post, onSaved, onCancel }: BlogEditorProps)
     if (!post) {
       emitToast({
         tone: 'error',
-        title: 'Chưa thể tạo tóm tắt',
-        message: 'Vui lòng lưu bài viết trước khi gọi AI tạo tóm tắt.',
+        title: t('blogAdmin.toastNoExcerptTitle', 'Chưa thể tạo tóm tắt'),
+        message: t('blogAdmin.toastNoExcerptMsg', 'Vui lòng lưu bài viết trước khi gọi AI tạo tóm tắt.'),
       });
       return;
     }
@@ -158,9 +160,9 @@ export default function BlogEditor({ post, onSaved, onCancel }: BlogEditorProps)
       const updated = await generateBlogExcerpt(post.id);
       updateForm('excerpt', updated.excerpt || '');
       onSaved(updated);
-      emitToast({ tone: 'success', title: 'Đã tạo tóm tắt AI', message: 'Tóm tắt blog đã được cập nhật.' });
+      emitToast({ tone: 'success', title: t('blogAdmin.toastAiExcerptSuccessTitle', 'Đã tạo tóm tắt AI'), message: t('blogAdmin.toastAiExcerptSuccessMsg', 'Tóm tắt blog đã được cập nhật.') });
     } catch (error: unknown) {
-      emitToast({ tone: 'error', title: 'Không thể tạo tóm tắt', message: getErrorMessage(error, 'AI chưa phản hồi.') });
+      emitToast({ tone: 'error', title: t('blogAdmin.toastAiExcerptErrorTitle', 'Không thể tạo tóm tắt'), message: getErrorMessage(error, t('blogAdmin.toastAiExcerptErrorMsg', 'AI chưa phản hồi.')) });
     } finally {
       setIsGenerating(false);
     }
@@ -175,8 +177,8 @@ export default function BlogEditor({ post, onSaved, onCancel }: BlogEditorProps)
     if (!form.title.trim() || !normalizedHtml.trim()) {
       emitToast({
         tone: 'error',
-        title: 'Thiếu nội dung bài viết',
-        message: 'Vui lòng nhập tiêu đề và nội dung rich text.',
+        title: t('blogAdmin.toastValidateTitle', 'Thiếu nội dung bài viết'),
+        message: t('blogAdmin.toastValidateMsg', 'Vui lòng nhập tiêu đề và nội dung rich text.'),
       });
       return;
     }
@@ -202,15 +204,15 @@ export default function BlogEditor({ post, onSaved, onCancel }: BlogEditorProps)
 
       emitToast({
         tone: 'success',
-        title: post ? 'Đã cập nhật bài viết' : 'Đã tạo bài viết',
+        title: post ? t('blogAdmin.toastUpdateSuccess', 'Đã cập nhật bài viết') : t('blogAdmin.toastCreateSuccess', 'Đã tạo bài viết'),
         message: saved.title,
       });
       onSaved(saved);
     } catch (error: unknown) {
       emitToast({
         tone: 'error',
-        title: 'Không thể lưu bài viết',
-        message: getErrorMessage(error, 'Vui lòng kiểm tra lại nội dung.'),
+        title: t('blogAdmin.saveError', 'Không thể lưu bài viết'),
+        message: getErrorMessage(error, t('blogAdmin.saveErrorMsg', 'Vui lòng kiểm tra lại nội dung.')),
       });
     } finally {
       setIsSaving(false);
@@ -225,9 +227,9 @@ export default function BlogEditor({ post, onSaved, onCancel }: BlogEditorProps)
         <div className="mb-5 flex items-center justify-between gap-4">
           <div>
             <h3 className="text-xl font-black text-on-surface">
-              {post ? 'Chỉnh sửa bài viết' : 'Viết bài blog mới'}
+              {post ? t('blogAdmin.modalTitleEdit', 'Chỉnh sửa bài viết') : t('blogAdmin.modalTitleAdd', 'Viết bài blog mới')}
             </h3>
-            <p className="mt-1 text-xs text-on-surface-variant">Nội dung được lưu dưới dạng HTML rich text.</p>
+            <p className="mt-1 text-xs text-on-surface-variant">{t('blogAdmin.editorHelpText', 'Nội dung được lưu dưới dạng HTML rich text.')}</p>
           </div>
           <button type="button" onClick={onCancel} className="rounded-lg p-2 text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface">
             <span className="material-symbols-outlined">close</span>
@@ -237,20 +239,20 @@ export default function BlogEditor({ post, onSaved, onCancel }: BlogEditorProps)
         <div className="space-y-4">
           <div>
             <label htmlFor="blog-title" className="mb-1 block text-xs font-bold uppercase tracking-wider text-on-surface-variant">
-              Tiêu đề
+              {t('blogAdmin.formTitle', 'Tiêu đề')}
             </label>
             <input
               id="blog-title"
               value={form.title}
               onChange={(event) => updateForm('title', event.target.value)}
               className="w-full rounded-xl border border-surface-container-high bg-surface-container-low px-4 py-3 text-base font-bold text-on-surface outline-none placeholder:text-on-surface-variant focus:border-primary/40 focus:ring-4 focus:ring-primary/10"
-              placeholder="Nhập tiêu đề bài viết"
+              placeholder={t('blogAdmin.placeholderTitle', 'Nhập tiêu đề bài viết')}
             />
           </div>
 
           <div>
             <label htmlFor="blog-excerpt" className="mb-1 block text-xs font-bold uppercase tracking-wider text-on-surface-variant">
-              Tóm tắt
+              {t('blogAdmin.formSummary', 'Tóm tắt')}
             </label>
             <div className="flex gap-2">
               <textarea
@@ -259,7 +261,7 @@ export default function BlogEditor({ post, onSaved, onCancel }: BlogEditorProps)
                 onChange={(event) => updateForm('excerpt', event.target.value)}
                 rows={3}
                 className="min-h-24 flex-1 rounded-xl border border-surface-container-high bg-surface-container-low px-4 py-3 text-sm text-on-surface outline-none placeholder:text-on-surface-variant focus:border-primary/40 focus:ring-4 focus:ring-primary/10"
-                placeholder="Để trống để hệ thống tự tạo từ nội dung"
+                placeholder={t('blogAdmin.placeholderSummary', 'Để trống để hệ thống tự tạo từ nội dung')}
               />
               <button
                 type="button"
@@ -268,14 +270,14 @@ export default function BlogEditor({ post, onSaved, onCancel }: BlogEditorProps)
                 className="flex w-24 shrink-0 flex-col items-center justify-center gap-1 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-xs font-bold text-primary transition hover:bg-primary hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <span className="material-symbols-outlined text-[20px]">auto_awesome</span>
-                {isGenerating ? 'Đang tạo' : 'AI'}
+                {isGenerating ? t('common.processing', 'Đang tạo') : t('blogAdmin.btnAi', 'AI')}
               </button>
             </div>
           </div>
 
           <div>
             <div className="mb-1 flex items-center justify-between">
-              <label className="block text-xs font-bold uppercase tracking-wider text-on-surface-variant">Nội dung</label>
+              <label className="block text-xs font-bold uppercase tracking-wider text-on-surface-variant">{t('blogAdmin.formContent', 'Nội dung')}</label>
               <span className={`inline-flex items-center gap-1 rounded border px-2 py-0.5 text-[10px] font-bold ${selectedCategory.color}`}>
                 <span className="material-symbols-outlined text-[13px]">{selectedCategory.icon}</span>
                 {selectedCategory.label}
@@ -318,7 +320,7 @@ export default function BlogEditor({ post, onSaved, onCancel }: BlogEditorProps)
       <aside className="custom-scrollbar max-h-[88vh] overflow-y-auto border-t border-surface-container-high bg-surface-container-low p-6 lg:border-l lg:border-t-0">
         <div className="space-y-5">
           <div>
-            <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-on-surface-variant">Ảnh bìa</label>
+            <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-on-surface-variant">{t('blogAdmin.formCoverImage', 'Ảnh bìa')}</label>
             <div className="overflow-hidden rounded-xl border border-surface-container-high bg-surface-bright">
               <img src={coverPreview} alt="Blog cover preview" className="aspect-[16/10] w-full object-cover" />
             </div>
@@ -332,7 +334,7 @@ export default function BlogEditor({ post, onSaved, onCancel }: BlogEditorProps)
               type="url"
               value={form.cover_image}
               onChange={(event) => updateForm('cover_image', event.target.value)}
-              placeholder="Hoặc dán URL ảnh bìa"
+              placeholder={t('blogAdmin.placeholderCoverUrl', 'Hoặc dán URL ảnh bìa')}
               className="mt-2 w-full rounded-lg border border-surface-container-high bg-surface-bright px-3 py-2 text-xs text-on-surface outline-none placeholder:text-on-surface-variant focus:ring-2 focus:ring-primary/20"
             />
           </div>
@@ -340,7 +342,7 @@ export default function BlogEditor({ post, onSaved, onCancel }: BlogEditorProps)
           <div className="grid grid-cols-1 gap-4">
             <div>
               <label htmlFor="blog-category" className="mb-1 block text-xs font-bold uppercase tracking-wider text-on-surface-variant">
-                Phân loại
+                {t('blogAdmin.formCategory', 'Phân loại')}
               </label>
               <select
                 id="blog-category"
@@ -361,7 +363,7 @@ export default function BlogEditor({ post, onSaved, onCancel }: BlogEditorProps)
 
             <div>
               <label htmlFor="blog-status" className="mb-1 block text-xs font-bold uppercase tracking-wider text-on-surface-variant">
-                Trạng thái
+                {t('blogAdmin.formStatus', 'Trạng thái')}
               </label>
               <select
                 id="blog-status"
@@ -369,9 +371,9 @@ export default function BlogEditor({ post, onSaved, onCancel }: BlogEditorProps)
                 onChange={(event) => updateForm('status', event.target.value as BlogEditorForm['status'])}
                 className="w-full rounded-lg border border-surface-container-high bg-surface-bright px-3 py-2 text-sm text-on-surface outline-none focus:ring-2 focus:ring-primary/20"
               >
-                <option value="draft">Nháp</option>
-                <option value="published">Xuất bản</option>
-                <option value="archived">Lưu trữ</option>
+                <option value="draft">{t('blogAdmin.statusDraft', 'Nháp')}</option>
+                <option value="published">{t('blogAdmin.statusPublished', 'Xuất bản')}</option>
+                <option value="archived">{t('blogAdmin.statusArchived', 'Lưu trữ')}</option>
               </select>
             </div>
 
@@ -382,7 +384,7 @@ export default function BlogEditor({ post, onSaved, onCancel }: BlogEditorProps)
                 onChange={(event) => updateForm('is_pinned', event.target.checked)}
                 className="h-4 w-4 accent-primary"
               />
-              Ghim bài viết
+              {t('blogAdmin.formPin', 'Ghim bài viết')}
             </label>
           </div>
 
@@ -393,14 +395,14 @@ export default function BlogEditor({ post, onSaved, onCancel }: BlogEditorProps)
               disabled={isSaving}
               className="flex-1 rounded-xl bg-surface-container px-4 py-3 text-sm font-bold text-on-surface transition hover:bg-surface-container-high disabled:opacity-60"
             >
-              Hủy
+              {t('common.cancel', 'Hủy')}
             </button>
             <button
               type="submit"
               disabled={isSaving}
               className="flex-1 rounded-xl bg-primary px-4 py-3 text-sm font-bold text-white shadow-md shadow-primary/20 transition hover:bg-blue-700 disabled:opacity-60"
             >
-              {isSaving ? 'Đang lưu...' : 'Lưu'}
+              {isSaving ? t('common.processing', 'Đang lưu...') : t('blogAdmin.btnSaveLabel', 'Lưu')}
             </button>
           </div>
         </div>

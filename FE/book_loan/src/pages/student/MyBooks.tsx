@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { getMyRequests } from '../../api/borrowApi';
 import EmptyState from '../../components/EmptyState';
 import { applyImageFallback, formatDisplayDate, getCoverUrl, getLoanDueLabel } from '../../lib/display';
@@ -29,7 +30,7 @@ type HistoryBookRow = {
   returnDate: string;
 };
 
-function getRequestDueLabel(req: MemberBorrowRequest) {
+function getRequestDueLabel(req: MemberBorrowRequest, t: any) {
   const fallback = getLoanDueLabel(req.due_date);
   const dueStatus = req.due_status || (fallback.isOverdue ? 'overdue' : 'active');
 
@@ -37,7 +38,7 @@ function getRequestDueLabel(req: MemberBorrowRequest) {
     const daysOverdue = Math.max(1, Number(req.days_overdue ?? 0));
 
     return {
-      label: `Qua han ${daysOverdue} ngay`,
+      label: t('due.overdue', { count: daysOverdue }),
       dueStatus: 'overdue' as DueStatus,
       isWarning: true,
       isOverdue: true,
@@ -46,7 +47,7 @@ function getRequestDueLabel(req: MemberBorrowRequest) {
 
   if (dueStatus === 'due_today') {
     return {
-      label: 'Den han hom nay',
+      label: t('due.today'),
       dueStatus,
       isWarning: true,
       isOverdue: false,
@@ -64,7 +65,7 @@ function getRequestDueLabel(req: MemberBorrowRequest) {
 
   if (dueStatus === 'none') {
     return {
-      label: 'Chua co han tra',
+      label: t('due.none'),
       dueStatus,
       isWarning: false,
       isOverdue: false,
@@ -73,7 +74,7 @@ function getRequestDueLabel(req: MemberBorrowRequest) {
 
   if (dueStatus === 'returned') {
     return {
-      label: 'Da tra',
+      label: t('studentHistory.statusReturned'),
       dueStatus,
       isWarning: false,
       isOverdue: false,
@@ -89,6 +90,7 @@ function getRequestDueLabel(req: MemberBorrowRequest) {
 }
 
 export default function MyBooks() {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<'borrowed' | 'history'>('borrowed');
   const [borrowedBooks, setBorrowedBooks] = useState<BorrowedBookCard[]>([]);
   const [historyBooks, setHistoryBooks] = useState<HistoryBookRow[]>([]);
@@ -103,13 +105,13 @@ export default function MyBooks() {
       .then((data: MemberBorrowRequest[]) => {
         const borrowed = data.filter((req) => req.status === 'borrowed');
         const mappedBorrowed = borrowed.map((req) => {
-          const dueStatus = getRequestDueLabel(req);
+          const dueStatus = getRequestDueLabel(req, t);
 
           return {
             id: req.id,
             title: req.bookTitle,
             author: req.author,
-            type: req.category || 'Tài liệu',
+            type: req.category || t('studentFines.bookTitle'),
             typeColor: dueStatus.isWarning ? 'text-tertiary' : 'text-primary',
             cover: getCoverUrl(req.cover),
             borrowDate: formatDisplayDate(req.borrow_date),
@@ -135,20 +137,20 @@ export default function MyBooks() {
         setHistoryBooks(history);
       })
       .catch((error: unknown) => {
-        const message = getErrorMessage(error, 'Không thể tải danh sách mượn sách.');
+        const message = getErrorMessage(error, t('studentMyBooks.loadError'));
         setError(message);
-        emitToast({ tone: 'error', title: 'Không thể tải sách của tôi', message });
+        emitToast({ tone: 'error', title: t('studentMyBooks.loadError'), message });
       })
       .finally(() => setIsLoading(false));
-  }, []);
+  }, [t]);
 
   return (
     <div className="p-4 md:p-8">
       <div className="mb-8 flex flex-col gap-6">
         <div>
-          <h2 className="text-3xl font-bold text-on-surface">Sách của tôi</h2>
+          <h2 className="text-3xl font-bold text-on-surface">{t('studentMyBooks.title')}</h2>
           <p className="mt-1 text-on-surface-variant">
-            Quản lý và theo dõi quá trình mượn trả tài liệu của bạn.
+            {t('studentMyBooks.subtitle')}
           </p>
         </div>
         <div className="flex w-fit gap-2 rounded-xl bg-surface-container-low p-1">
@@ -161,7 +163,7 @@ export default function MyBooks() {
             }`}
           >
             <span className="material-symbols-outlined text-sm">auto_stories</span>
-            Sách đang mượn
+            {t('studentMyBooks.tabActive')}
           </button>
           <button
             onClick={() => setActiveTab('history')}
@@ -172,23 +174,23 @@ export default function MyBooks() {
             }`}
           >
             <span className="material-symbols-outlined text-sm">history_edu</span>
-            Lịch sử mượn
+            {t('studentHistory.title')}
           </button>
         </div>
       </div>
 
       {error ? (
-        <EmptyState icon="error" title="Không thể tải dữ liệu" message={error} />
+        <EmptyState icon="error" title={t('common.error')} message={error} />
       ) : isLoading ? (
-        <EmptyState icon="hourglass_empty" title="Đang tải dữ liệu..." />
+        <EmptyState icon="hourglass_empty" title={t('common.loading')} />
       ) : activeTab === 'borrowed' ? (
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
           {borrowedBooks.length === 0 ? (
             <div className="col-span-full">
               <EmptyState
                 icon="auto_stories"
-                title="Chưa có sách đang mượn"
-                message="Các phiếu đã được thủ thư duyệt sẽ xuất hiện ở đây."
+                title={t('studentMyBooks.emptyTitle')}
+                message={t('studentMyBooks.emptyDesc')}
               />
             </div>
           ) : (
@@ -233,8 +235,8 @@ export default function MyBooks() {
               </div>
               <div className="flex items-center justify-between border-t border-outline-variant pt-4">
                 <div className="text-[10px] text-on-surface-variant">
-                  <p>Mượn: {book.borrowDate}</p>
-                  <p>Hạn: {book.dueDate}</p>
+                  <p>{t('studentHistory.tableHeaderBorrowDate')}: {book.borrowDate}</p>
+                  <p>{t('studentFines.dueDate')}: {book.dueDate}</p>
                 </div>
               </div>
             </div>
@@ -248,8 +250,8 @@ export default function MyBooks() {
             {historyBooks.length === 0 ? (
               <EmptyState
                 icon="history_edu"
-                title="Chưa có lịch sử mượn"
-                message="Các sách đã trả sẽ được lưu lại tại đây."
+                title={t('studentHistory.emptyTitle')}
+                message={t('studentHistory.emptyDesc')}
               />
             ) : (
               historyBooks.map((book) => (
@@ -260,16 +262,16 @@ export default function MyBooks() {
                       <p className="text-xs text-on-surface-variant mt-0.5">{book.author}</p>
                     </div>
                     <span className="shrink-0 rounded bg-surface-container px-2 py-0.5 text-[9px] font-bold uppercase text-on-surface-variant">
-                      Đã trả
+                      {t('studentHistory.statusReturned')}
                     </span>
                   </div>
                   <div className="mt-3 flex justify-between text-[11px] text-on-surface-variant border-t border-outline-variant pt-2">
                     <div>
-                      <span className="text-outline uppercase text-[9px] font-bold block">Ngày mượn</span>
+                      <span className="text-outline uppercase text-[9px] font-bold block">{t('studentHistory.tableHeaderBorrowDate')}</span>
                       <span className="font-semibold text-on-surface">{book.borrowDate}</span>
                     </div>
                     <div className="text-right">
-                      <span className="text-outline uppercase text-[9px] font-bold block">Ngày trả</span>
+                      <span className="text-outline uppercase text-[9px] font-bold block">{t('studentHistory.tableHeaderReturnDate')}</span>
                       <span className="font-semibold text-on-surface">{book.returnDate}</span>
                     </div>
                   </div>
@@ -283,10 +285,10 @@ export default function MyBooks() {
             <table className="w-full text-left">
               <thead className="bg-surface-container-low text-xs uppercase tracking-widest text-on-surface-variant">
                 <tr>
-                  <th className="px-6 py-4">Tên sách</th>
-                  <th className="px-6 py-4">Ngày mượn</th>
-                  <th className="px-6 py-4">Ngày trả</th>
-                  <th className="px-6 py-4">Trạng thái</th>
+                  <th className="px-6 py-4">{t('studentHistory.tableHeaderBook')}</th>
+                  <th className="px-6 py-4">{t('studentHistory.tableHeaderBorrowDate')}</th>
+                  <th className="px-6 py-4">{t('studentHistory.tableHeaderReturnDate')}</th>
+                  <th className="px-6 py-4">{t('studentHistory.tableHeaderStatus')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-surface-container-low">
@@ -295,8 +297,8 @@ export default function MyBooks() {
                     <td colSpan={4} className="px-6 py-8">
                       <EmptyState
                         icon="history_edu"
-                        title="Chưa có lịch sử mượn"
-                        message="Các sách đã trả sẽ được lưu lại tại đây."
+                        title={t('studentHistory.emptyTitle')}
+                        message={t('studentHistory.emptyDesc')}
                       />
                     </td>
                   </tr>
@@ -311,7 +313,7 @@ export default function MyBooks() {
                     <td className="px-6 py-4 text-sm font-medium text-slate-700">{book.returnDate}</td>
                     <td className="px-6 py-4">
                       <span className="rounded bg-surface-container px-2 py-1 text-[10px] font-bold uppercase">
-                        Đã trả
+                        {t('studentHistory.statusReturned')}
                       </span>
                     </td>
                   </tr>

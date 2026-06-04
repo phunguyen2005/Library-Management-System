@@ -10,9 +10,11 @@ import { getErrorMessage } from '../lib/errors';
 import { emitToast } from '../notifications/events';
 import { motion, AnimatePresence } from 'motion/react';
 import type { FormattedBook } from '../types/book';
+import { useTranslation } from 'react-i18next';
 
 // Custom inline card sub-component for rich previews and actions
 function InlineBookCard({ bookId }: { bookId: number }) {
+  const { t } = useTranslation();
   const { user, role } = useAuth();
   const [book, setBook] = useState<FormattedBook | null>(null);
   const [loading, setLoading] = useState(true);
@@ -47,8 +49,8 @@ function InlineBookCard({ bookId }: { bookId: number }) {
     if (role === 'student' && !isOutlookStudent) {
       emitToast({
         tone: 'warning',
-        title: 'Quyền mượn bị giới hạn',
-        message: 'Khách vãng lai không thể mượn sách vật lý. Vui lòng sử dụng tài khoản Outlook trường.',
+        title: t('aiChatbot.guestBorrowLimitTitle', 'Quyền mượn bị giới hạn'),
+        message: t('aiChatbot.guestBorrowLimitMsg', 'Khách vãng lai không thể mượn sách vật lý. Vui lòng sử dụng tài khoản Outlook trường.'),
       });
       return;
     }
@@ -57,14 +59,14 @@ function InlineBookCard({ bookId }: { bookId: number }) {
       const response = await requestBorrow(book.id);
       emitToast({
         tone: 'success',
-        title: 'Thành công',
-        message: response.message || `Đã gửi yêu cầu mượn cuốn: ${book.title}`,
+        title: t('aiChatbot.success', 'Thành công'),
+        message: response.message || t('aiChatbot.borrowRequestSubmitted', 'Đã gửi yêu cầu mượn cuốn: {{title}}', { title: book.title }),
       });
       const updated = await fetchBookDetail(book.id);
       setBook(updated);
     } catch (error: unknown) {
-      const message = getErrorMessage(error, 'Lỗi khi yêu cầu mượn sách');
-      emitToast({ tone: 'error', title: 'Lỗi mượn sách', message });
+      const message = getErrorMessage(error, t('aiChatbot.borrowError', 'Lỗi khi yêu cầu mượn sách'));
+      emitToast({ tone: 'error', title: t('aiChatbot.borrowFailedTitle', 'Lỗi mượn sách'), message });
     } finally {
       setActionLoading(false);
     }
@@ -76,8 +78,8 @@ function InlineBookCard({ bookId }: { bookId: number }) {
     if (role === 'student' && !isOutlookStudent) {
       emitToast({
         tone: 'warning',
-        title: 'Quyền đặt chỗ bị giới hạn',
-        message: 'Khách vãng lai không thể đặt chỗ trước. Vui lòng sử dụng tài khoản Outlook trường.',
+        title: t('aiChatbot.guestReserveLimitTitle', 'Quyền đặt chỗ bị giới hạn'),
+        message: t('aiChatbot.guestReserveLimitMsg', 'Khách vãng lai không thể đặt chỗ trước. Vui lòng sử dụng tài khoản Outlook trường.'),
       });
       return;
     }
@@ -86,14 +88,14 @@ function InlineBookCard({ bookId }: { bookId: number }) {
       const response = await reserveBook(book.id);
       emitToast({
         tone: 'success',
-        title: 'Thành công',
-        message: response.message || `Đặt chỗ thành công cuốn: ${book.title}`,
+        title: t('aiChatbot.success', 'Thành công'),
+        message: response.message || t('aiChatbot.reserveSuccessMsg', 'Đặt chỗ thành công cuốn: {{title}}', { title: book.title }),
       });
       const updated = await fetchBookDetail(book.id);
       setBook(updated);
     } catch (error: unknown) {
-      const message = getErrorMessage(error, 'Lỗi khi đặt chỗ sách');
-      emitToast({ tone: 'error', title: 'Lỗi đặt chỗ', message });
+      const message = getErrorMessage(error, t('aiChatbot.reserveError', 'Lỗi khi đặt chỗ sách'));
+      emitToast({ tone: 'error', title: t('aiChatbot.reserveFailedTitle', 'Lỗi đặt chỗ'), message });
     } finally {
       setActionLoading(false);
     }
@@ -115,7 +117,7 @@ function InlineBookCard({ bookId }: { bookId: number }) {
   if (!book) {
     return (
       <div className="text-xs text-outline italic my-2">
-        Không tìm thấy thông tin cuốn sách #{bookId}
+        {t('aiChatbot.bookNotFound', 'Không tìm thấy thông tin cuốn sách #{{id}}', { id: bookId })}
       </div>
     );
   }
@@ -141,10 +143,10 @@ function InlineBookCard({ bookId }: { bookId: number }) {
           <p className="text-[10px] text-on-surface-variant truncate mt-0.5">{book.author}</p>
           <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
             <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-primary/10 text-primary">
-              {book.is_digital ? 'Tài liệu số' : 'Sách vật lý'}
+              {book.is_digital ? t('aiChatbot.digitalBook', 'Tài liệu số') : t('aiChatbot.paperBook', 'Sách vật lý')}
             </span>
             <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded text-white ${book.is_available ? 'bg-green-600' : 'bg-red-500'}`}>
-              {book.is_available ? 'Còn sách' : 'Hết sách'}
+              {book.is_available ? t('aiChatbot.inStock', 'Còn sách') : t('aiChatbot.outOfStock', 'Hết sách')}
             </span>
           </div>
         </div>
@@ -159,7 +161,7 @@ function InlineBookCard({ bookId }: { bookId: number }) {
               }}
               className="text-[10px] bg-primary hover:bg-primary/95 text-white px-2.5 py-1 rounded-lg font-bold transition-colors cursor-pointer"
             >
-              Đọc online
+              {t('aiChatbot.readOnline', 'Đọc online')}
             </button>
           ) : book.is_available ? (
             <button
@@ -167,9 +169,9 @@ function InlineBookCard({ bookId }: { bookId: number }) {
               disabled={actionLoading || (role === 'student' && !isOutlookStudent)}
               onClick={handleBorrow}
               className="text-[10px] bg-primary hover:bg-primary/95 text-white px-2.5 py-1 rounded-lg font-bold transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-              title={role === 'student' && !isOutlookStudent ? 'Chỉ áp dụng cho email trường học' : undefined}
+              title={role === 'student' && !isOutlookStudent ? t('aiChatbot.outlookOnlyTooltip', 'Chỉ áp dụng cho email trường học') : undefined}
             >
-              {actionLoading ? 'Đang gửi...' : 'Mượn ngay'}
+              {actionLoading ? t('aiChatbot.submitting', 'Đang gửi...') : t('aiChatbot.borrowNow', 'Mượn ngay')}
             </button>
           ) : (
             <button
@@ -177,9 +179,9 @@ function InlineBookCard({ bookId }: { bookId: number }) {
               disabled={actionLoading || (role === 'student' && !isOutlookStudent)}
               onClick={handleReserve}
               className="text-[10px] bg-amber-600 hover:bg-amber-700 text-white px-2.5 py-1 rounded-lg font-bold transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-              title={role === 'student' && !isOutlookStudent ? 'Chỉ áp dụng cho email trường học' : undefined}
+              title={role === 'student' && !isOutlookStudent ? t('aiChatbot.outlookOnlyTooltip', 'Chỉ áp dụng cho email trường học') : undefined}
             >
-              {actionLoading ? 'Đang gửi...' : 'Đặt chỗ trước'}
+              {actionLoading ? t('aiChatbot.submitting', 'Đang gửi...') : t('aiChatbot.reserveNow', 'Đặt chỗ trước')}
             </button>
           )}
         </div>
@@ -189,6 +191,7 @@ function InlineBookCard({ bookId }: { bookId: number }) {
 }
 
 export default function AiChatbot() {
+  const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
@@ -267,15 +270,15 @@ export default function AiChatbot() {
         return next;
       });
 
-      const message = getErrorMessage(error, 'Đã xảy ra sự cố khi kết nối với AI.');
+      const message = getErrorMessage(error, t('aiChatbot.apiError', 'Đã xảy ra sự cố khi kết nối với AI.'));
       setMessages((prev) => [
         ...prev,
         {
           sender: 'ai',
-          text: '⚠️ *Xin lỗi bạn, kết nối của tôi tới hệ thống AI đang bị gián đoạn. Bạn vui lòng thử lại sau ít phút nhé!*',
+          text: t('aiChatbot.apiConnectionFailed', '⚠️ *Xin lỗi bạn, kết nối của tôi tới hệ thống AI đang bị gián đoạn. Bạn vui lòng thử lại sau ít phút nhé!*'),
         },
       ]);
-      emitToast({ tone: 'error', title: 'Lỗi chatbot AI', message });
+      emitToast({ tone: 'error', title: t('aiChatbot.chatErrorTitle', 'Lỗi chatbot AI'), message });
     } finally {
       setIsLoading(false);
     }
@@ -334,29 +337,35 @@ export default function AiChatbot() {
 
   const getDynamicSuggestedChips = (lastMessageText: string) => {
     const text = lastMessageText.toLowerCase();
-    if (text.includes('mượn') || text.includes('trả') || text.includes('quy trình')) {
+    if (text.includes('mượn') || text.includes('trả') || text.includes('quy trình') || 
+        text.includes('borrow') || text.includes('return') || text.includes('process') ||
+        text.includes('借') || text.includes('还') || text.includes('貸') || text.includes('返') || text.includes('대출') || text.includes('반납')) {
       return [
-        { label: '⏰ Thời hạn mượn tối đa?', query: 'Thời gian tối đa mượn một cuốn sách là bao lâu?' },
-        { label: '💰 Trả sách trễ hạn bị phạt thế nào?', query: 'Mức phạt tiền quá hạn cụ thể như thế nào?' },
-        { label: '🔄 Cách gia hạn mượn sách?', query: 'Quy trình gia hạn mượn sách ra sao?' }
+        { label: t('aiChatbot.chipMaxLoanDuration', '⏰ Thời hạn mượn tối đa?'), query: t('aiChatbot.chipMaxLoanDurationQuery', 'Thời gian tối đa mượn một cuốn sách là bao lâu?') },
+        { label: t('aiChatbot.chipLateFine', '💰 Trả sách trễ hạn bị phạt thế nào?'), query: t('aiChatbot.chipLateFineQuery', 'Mức phạt tiền quá hạn cụ thể như thế nào?') },
+        { label: t('aiChatbot.chipHowToRenew', '🔄 Cách gia hạn mượn sách?'), query: t('aiChatbot.chipHowToRenewQuery', 'Quy trình gia hạn mượn sách ra sao?') }
       ];
     }
-    if (text.includes('đặt chỗ') || text.includes('hàng đợi') || text.includes('hết sách')) {
+    if (text.includes('đặt chỗ') || text.includes('hàng đợi') || text.includes('hết sách') ||
+        text.includes('reserve') || text.includes('queue') || text.includes('out of stock') ||
+        text.includes('预约') || text.includes('排队') || text.includes('予約') || text.includes('대기') || text.includes('예약')) {
       return [
-        { label: '❌ Cách hủy đặt chỗ trước?', query: 'Tôi muốn hủy đăng ký đặt chỗ trước sách' },
-        { label: '📈 Xem danh sách đặt chỗ của tôi?', query: 'Tôi xem danh sách đặt chỗ ở đâu?' }
+        { label: t('aiChatbot.chipCancelReserve', '❌ Cách hủy đặt chỗ trước?'), query: t('aiChatbot.chipCancelReserveQuery', 'Tôi muốn hủy đăng ký đặt chỗ trước sách') },
+        { label: t('aiChatbot.chipViewReservations', '📈 Xem danh sách đặt chỗ của tôi?'), query: t('aiChatbot.chipViewReservationsQuery', 'Tôi xem danh sách đặt chỗ ở đâu?') }
       ];
     }
-    if (text.includes('phòng tự học') || text.includes('đặt phòng') || text.includes('học nhóm')) {
+    if (text.includes('phòng tự học') || text.includes('đặt phòng') || text.includes('học nhóm') ||
+        text.includes('study room') || text.includes('group study') ||
+        text.includes('自习室') || text.includes('自習室') || text.includes('스터디룸') || text.includes('자습실')) {
       return [
-        { label: '🔑 Check-in nhận phòng tự học?', query: 'Hướng dẫn check-in phòng tự học khi tới giờ' },
-        { label: '🚫 Cách hủy phòng tự học đã đặt?', query: 'Hủy lịch đặt phòng đã đặt nhóm thế nào?' }
+        { label: t('aiChatbot.chipCheckinRoom', '🔑 Check-in nhận phòng tự học?'), query: t('aiChatbot.chipCheckinRoomQuery', 'Hướng dẫn check-in phòng tự học khi tới giờ') },
+        { label: t('aiChatbot.chipCancelRoom', '🚫 Cách hủy phòng tự học đã đặt?'), query: t('aiChatbot.chipCancelRoomQuery', 'Hủy lịch đặt phòng đã đặt nhóm thế nào?') }
       ];
     }
     return [
-      { label: '🔍 Tìm sách lập trình Web', query: 'Tìm cho tôi sách về lập trình Web' },
-      { label: '📋 Quy trình mượn sách', query: 'Quy trình mượn trả sách như thế nào?' },
-      { label: 'Đặt chỗ trước khi hết sách', query: 'Tính năng đặt chỗ trước hoạt động ra sao?' }
+      { label: t('aiChatbot.chipFindWebDevBook', '🔍 Tìm sách lập trình Web'), query: t('aiChatbot.chipFindWebDevBookQuery', 'Tìm cho tôi sách về lập trình Web') },
+      { label: t('aiChatbot.chipBorrowProcedure', '📋 Quy trình mượn sách'), query: t('aiChatbot.chipBorrowProcedureQuery', 'Quy trình mượn trả sách như thế nào?') },
+      { label: t('aiChatbot.chipReserveFeature', 'Đặt chỗ trước khi hết sách'), query: t('aiChatbot.chipReserveFeatureQuery', 'Tính năng đặt chỗ trước hoạt động ra sao?') }
     ];
   };
 
@@ -377,10 +386,10 @@ export default function AiChatbot() {
         dragElastic={0.1}
         dragMomentum={false}
         onClick={() => setIsOpen(!isOpen)}
-        aria-label="Trợ lý AI"
+        aria-label={t('aiChatbot.robotAssistant', 'Trợ lý AI')}
         className={`fixed z-40 flex items-center justify-center rounded-full bg-primary text-white shadow-xl shadow-primary/30 active:scale-95 cursor-pointer glow-pulse touch-none transition-all duration-300
           bottom-28 right-4 h-12 w-12 md:bottom-6 md:right-6 md:h-14 md:w-14
-          ${isScrolling ? 'opacity-20 scale-75 pointer-events-none md:opacity-100 md:scale-100 md:pointer-events-auto' : 'opacity-100 scale-100'}`}
+          \${isScrolling ? 'opacity-20 scale-75 pointer-events-none md:opacity-100 md:scale-100 md:pointer-events-auto' : 'opacity-100 scale-100'}`}
       >
         <span className="material-symbols-outlined text-2xl md:text-3xl animate-pulse">smart_toy</span>
       </motion.button>
@@ -398,10 +407,10 @@ export default function AiChatbot() {
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary text-2xl">smart_toy</span>
                 <div>
-                  <h2 className="text-sm font-bold text-on-surface">Thủ thư AI HCMUE</h2>
+                  <h2 className="text-sm font-bold text-on-surface">{t('aiChatbot.headerTitle', 'Thủ thư AI HCMUE')}</h2>
                   <span className="flex items-center gap-1 text-[10px] font-semibold text-green-600">
                     <span className="h-1.5 w-1.5 rounded-full bg-green-600 animate-ping" />
-                    Trực tuyến 24/7
+                    {t('aiChatbot.headerSubtitle', 'Trực tuyến 24/7')}
                   </span>
                 </div>
               </div>
@@ -418,16 +427,16 @@ export default function AiChatbot() {
               {messages.map((msg, index) => (
                 <div
                   key={index}
-                  className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+                  className={`flex \${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
                   <div
-                    className={`max-w-[85%] rounded-2xl p-4 text-sm scholar-shadow relative group ${
+                    className={`max-w-[85%] rounded-2xl p-4 text-sm scholar-shadow relative group \${
                       msg.sender === 'user'
                         ? 'bg-primary text-white rounded-tr-none'
                         : 'bg-surface-container text-on-surface rounded-tl-none border border-surface-container-high'
                     }`}
                   >
-                    {renderMessageContent(msg.text)}
+                    {renderMessageContent(index === 0 && msg.sender === 'ai' ? t('aiChatbot.initialGreeting', msg.text) : msg.text)}
                   </div>
                 </div>
               ))}
@@ -439,7 +448,7 @@ export default function AiChatbot() {
                       <span className="h-1.5 w-1.5 bg-on-surface-variant rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
                       <span className="h-1.5 w-1.5 bg-on-surface-variant rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
                       <span className="h-1.5 w-1.5 bg-on-surface-variant rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                      <span className="text-xs font-semibold ml-1">AI đang soạn tin nhắn...</span>
+                      <span className="text-xs font-semibold ml-1">{t('aiChatbot.composing', 'AI đang soạn tin nhắn...')}</span>
                     </div>
                   </div>
                 </div>
@@ -450,7 +459,7 @@ export default function AiChatbot() {
             <div className="border-t border-surface-container-high bg-surface p-4">
               {suggestedChips.length > 0 && !isLoading && (
                 <div className="mb-3 flex flex-col gap-1.5 animate-fade-in">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-outline px-1">Gợi ý câu hỏi nhanh:</p>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-outline px-1">{t('aiChatbot.quickSuggestions', 'Gợi ý câu hỏi nhanh:')}</p>
                   <div className="flex gap-2 overflow-x-auto no-scrollbar py-1 px-1 -mx-1 snap-x snap-mandatory">
                     {suggestedChips.map((chip, idx) => (
                       <button
@@ -477,7 +486,7 @@ export default function AiChatbot() {
                   type="text"
                   value={inputText}
                   onChange={(event) => setInputText(event.target.value)}
-                  placeholder="Hỏi Thủ thư AI..."
+                  placeholder={t('aiChatbot.inputPlaceholder', 'Hỏi Thủ thư AI...')}
                   className="flex-1 bg-transparent text-sm text-on-surface outline-none"
                   disabled={isLoading}
                 />
@@ -496,3 +505,4 @@ export default function AiChatbot() {
     </>
   );
 }
+

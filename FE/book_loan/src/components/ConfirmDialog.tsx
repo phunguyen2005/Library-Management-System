@@ -1,5 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { useTranslation } from 'react-i18next';
 
 interface ConfirmDialogProps {
   isOpen: boolean;
@@ -16,12 +17,15 @@ export default function ConfirmDialog({
   isOpen,
   title,
   message,
-  confirmLabel = 'Xác nhận',
-  cancelLabel = 'Hủy',
+  confirmLabel,
+  cancelLabel,
   onConfirm,
   onCancel,
   isDestructive = false
 }: ConfirmDialogProps) {
+  const { t } = useTranslation();
+  const displayConfirmLabel = confirmLabel ?? t('common.confirm', 'Xác nhận');
+  const displayCancelLabel = cancelLabel ?? t('common.cancel', 'Hủy');
   return (
     <AnimatePresence>
       {isOpen && (
@@ -58,7 +62,7 @@ export default function ConfirmDialog({
                   onClick={onCancel}
                   className="px-4 py-2 rounded-xl text-sm font-medium text-[var(--color-on-surface-variant)] hover:bg-[var(--color-on-surface)]/5 transition-colors"
                 >
-                  {cancelLabel}
+                  {displayCancelLabel}
                 </button>
                 <button
                   onClick={onConfirm}
@@ -68,7 +72,7 @@ export default function ConfirmDialog({
                       : 'bg-[var(--color-primary)] hover:bg-[var(--color-primary)]/90'
                   }`}
                 >
-                  {confirmLabel}
+                  {displayConfirmLabel}
                 </button>
               </div>
             </div>

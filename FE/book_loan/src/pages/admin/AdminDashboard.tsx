@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { deleteBook, fetchBooks } from '../../api/bookApi';
 import { API_BASE_URL } from '../../api/client';
 import {
@@ -79,9 +80,9 @@ function mapInventoryBook(book: FormattedBook): DashboardInventoryBook {
     title: book.title,
     author: book.author,
     isbn: book.isbn || `ISBN-${book.id ?? book.book_id}000`,
-    category: book.category || book.genre || 'Khác',
+    category: book.category || book.genre || 'other',
     location: book.location || 'Khu A',
-    status: book.is_available ? 'Sẵn có' : 'Đang mượn',
+    status: book.is_available ? 'available' : 'borrowed',
     statusColor: book.is_available ? 'bg-green-500' : 'bg-tertiary',
     cover: book.cover,
     isDigital: book.is_digital,
@@ -91,6 +92,7 @@ function mapInventoryBook(book: FormattedBook): DashboardInventoryBook {
 }
 
 export default function AdminDashboard() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [pendingRequests, setPendingRequests] = useState<BorrowRequest[]>([]);
   const [recentReturns, setRecentReturns] = useState<BorrowRequest[]>([]);
@@ -147,9 +149,9 @@ export default function AdminDashboard() {
         return;
       }
 
-      const message = getErrorMessage(error, 'Không thể tải dữ liệu dashboard.');
+      const message = getErrorMessage(error, t('adminDashboard.loadError', 'Unable to load dashboard data.'));
       setLoadError(message);
-      emitToast({ tone: 'error', title: 'Không thể tải dashboard', message });
+      emitToast({ tone: 'error', title: t('adminDashboard.loadErrorTitle', 'Unable to load dashboard'), message });
     }
   };
 
@@ -208,15 +210,15 @@ export default function AdminDashboard() {
 
   const quickActionHint = useMemo(() => {
     if (!quickForm.memberId && !quickForm.bookId) {
-      return 'Nhập Member ID và Book ID để xử lý nhanh.';
+      return t('adminDashboard.quickAction.hintEmpty');
     }
 
     if (!quickForm.memberId || !quickForm.bookId) {
-      return 'Cần nhập đầy đủ cả Member ID và Book ID.';
+      return t('adminDashboard.quickAction.hintMissing');
     }
 
-    return `Đang sẵn sàng xử lý cho Member ${quickForm.memberId} và Book ${quickForm.bookId}.`;
-  }, [quickForm.bookId, quickForm.memberId]);
+    return t('adminDashboard.quickAction.hintReady', { memberId: quickForm.memberId, bookId: quickForm.bookId });
+  }, [quickForm.bookId, quickForm.memberId, t]);
 
   const findRequestByStatus = (status: BorrowRequest['raw_status']) => {
     return allRequests.find(
@@ -231,7 +233,7 @@ export default function AdminDashboard() {
     if (!quickForm.memberId || !quickForm.bookId) {
       setQuickFeedback({
         tone: 'error',
-        message: 'Vui lòng nhập đầy đủ Member ID và Book ID.',
+        message: t('adminDashboard.quickAction.errorEmpty'),
       });
       return;
     }
@@ -240,7 +242,7 @@ export default function AdminDashboard() {
     if (!targetRequest) {
       setQuickFeedback({
         tone: 'error',
-        message: 'Không tìm thấy yêu cầu đang chờ duyệt cho cặp Member ID và Book ID này.',
+        message: t('adminDashboard.quickAction.errorPendingNotFound'),
       });
       return;
     }
@@ -252,12 +254,12 @@ export default function AdminDashboard() {
       await approveBorrow(targetRequest.id);
       setQuickFeedback({
         tone: 'success',
-        message: `Đã cho mượn sách cho Member ${quickForm.memberId} với Book ${quickForm.bookId}.`,
+        message: t('adminDashboard.quickAction.successBorrow', { memberId: quickForm.memberId, bookId: quickForm.bookId }),
       });
       emitToast({
         tone: 'success',
-        title: 'Đã cho mượn sách',
-        message: `Member ${quickForm.memberId} và Book ${quickForm.bookId} đã được xử lý.`,
+        title: t('adminDashboard.quickAction.borrowBtn'),
+        message: t('adminDashboard.quickAction.successBorrow', { memberId: quickForm.memberId, bookId: quickForm.bookId }),
       });
       await loadDashboard();
     } catch (error: unknown) {
@@ -265,7 +267,7 @@ export default function AdminDashboard() {
         return;
       }
 
-      const message = getErrorMessage(error, 'Không thể cho mượn sách lúc này.');
+      const message = getErrorMessage(error, t('adminDashboard.quickAction.errorBorrowNow', 'Unable to loan book at this time.'));
       setQuickFeedback({
         tone: 'error',
         message,
@@ -279,7 +281,7 @@ export default function AdminDashboard() {
     if (!quickForm.memberId || !quickForm.bookId) {
       setQuickFeedback({
         tone: 'error',
-        message: 'Vui lòng nhập đầy đủ Member ID và Book ID.',
+        message: t('adminDashboard.quickAction.errorEmpty'),
       });
       return;
     }
@@ -288,7 +290,7 @@ export default function AdminDashboard() {
     if (!targetRequest) {
       setQuickFeedback({
         tone: 'error',
-        message: 'Không tìm thấy phiếu đang mượn phù hợp để trả sách.',
+        message: t('adminDashboard.quickAction.errorBorrowedNotFound'),
       });
       return;
     }
@@ -300,12 +302,12 @@ export default function AdminDashboard() {
       await returnBook(targetRequest.id);
       setQuickFeedback({
         tone: 'success',
-        message: `Đã nhận trả sách cho Member ${quickForm.memberId} với Book ${quickForm.bookId}.`,
+        message: t('adminDashboard.quickAction.successReturn', { memberId: quickForm.memberId, bookId: quickForm.bookId }),
       });
       emitToast({
         tone: 'success',
-        title: 'Đã nhận trả sách',
-        message: `Member ${quickForm.memberId} và Book ${quickForm.bookId} đã được cập nhật.`,
+        title: t('adminDashboard.quickAction.returnBtn'),
+        message: t('adminDashboard.quickAction.successReturn', { memberId: quickForm.memberId, bookId: quickForm.bookId }),
       });
       await loadDashboard();
     } catch (error: unknown) {
@@ -313,7 +315,7 @@ export default function AdminDashboard() {
         return;
       }
 
-      const message = getErrorMessage(error, 'Không thể trả sách lúc này.');
+      const message = getErrorMessage(error, t('adminDashboard.quickAction.errorReturnNow', 'Unable to return book at this time.'));
       setQuickFeedback({
         tone: 'error',
         message,
@@ -326,29 +328,29 @@ export default function AdminDashboard() {
   const handlePendingApprove = async (loanId: number) => {
     try {
       await approveBorrow(loanId);
-      emitToast({ tone: 'success', title: 'Đã duyệt yêu cầu', message: `Phiếu #${loanId} đã được chuyển sang trạng thái mượn.` });
+      emitToast({ tone: 'success', title: t('adminDashboard.pendingApprovals.approveBtn'), message: t('events.borrow_request_approved', { book_title: `#${loanId}` }) });
       await loadDashboard();
     } catch (error: unknown) {
       if (isUnauthorizedError(error)) {
         return;
       }
 
-      const message = getErrorMessage(error, 'Không thể duyệt yêu cầu lúc này.');
-      emitToast({ tone: 'error', title: 'Không thể duyệt yêu cầu', message });
+      const message = getErrorMessage(error, t('adminDashboard.pendingApprovals.errorApprove', 'Unable to approve request at this time.'));
+      emitToast({ tone: 'error', title: t('common.error'), message });
     }
   };
 
   const handlePendingReject = async (loanId: number) => {
-    if (!confirm('Từ chối yêu cầu này từ dashboard?')) {
+    if (!confirm(t('adminRequests.rejectModalTitle', { id: loanId }))) {
       return;
     }
 
     try {
-      await rejectBorrow(loanId, 'Từ chối nhanh từ dashboard.');
+      await rejectBorrow(loanId, t('adminDashboard.quickAction.quickRejectionReason', 'Quick rejection from dashboard.'));
       emitToast({
         tone: 'success',
-        title: 'Đã từ chối yêu cầu',
-        message: `Phiếu #${loanId} đã được chuyển sang danh sách từ chối.`,
+        title: t('status.rejected'),
+        message: t('adminRequests.rejectionReasonLabel', { reason: `#${loanId}` }),
       });
       await loadDashboard();
     } catch (error: unknown) {
@@ -356,13 +358,13 @@ export default function AdminDashboard() {
         return;
       }
 
-      const message = getErrorMessage(error, 'Không thể từ chối yêu cầu lúc này.');
-      emitToast({ tone: 'error', title: 'Không thể từ chối yêu cầu', message });
+      const message = getErrorMessage(error, t('adminDashboard.pendingApprovals.errorReject', 'Unable to reject request at this time.'));
+      emitToast({ tone: 'error', title: t('common.error'), message });
     }
   };
 
   const handleInventoryDelete = async (book: DashboardInventoryBook) => {
-    if (!confirm(`Xóa "${book.title}" khỏi kho sách?`)) {
+    if (!confirm(t('adminDashboard.inventoryManage.confirmDelete', { title: book.title }))) {
       return;
     }
 
@@ -370,8 +372,8 @@ export default function AdminDashboard() {
       await deleteBook(book.id);
       emitToast({
         tone: 'success',
-        title: 'Đã xóa sách',
-        message: `"${book.title}" đã được xóa khỏi kho.`,
+        title: t('adminDashboard.inventoryManage.deleteSuccess', { title: book.title }),
+        message: t('adminDashboard.inventoryManage.deleteSuccess', { title: book.title }),
       });
       await loadDashboard();
     } catch (error: unknown) {
@@ -379,8 +381,8 @@ export default function AdminDashboard() {
         return;
       }
 
-      const message = getErrorMessage(error, 'Không thể xóa sách lúc này.');
-      emitToast({ tone: 'error', title: 'Không thể xóa sách', message });
+      const message = getErrorMessage(error, t('adminDashboard.inventoryManage.errorDelete', 'Unable to delete book at this time.'));
+      emitToast({ tone: 'error', title: t('common.error'), message });
     }
   };
 
@@ -388,8 +390,8 @@ export default function AdminDashboard() {
     if (filteredInventoryBooks.length === 0) {
       emitToast({
         tone: 'info',
-        title: 'Không có dữ liệu xuất',
-        message: 'Bộ lọc kho sách hiện tại không có bản ghi.',
+        title: t('adminRequests.emptyStateTitle'),
+        message: t('adminDashboard.inventoryManage.noBooksFiltered'),
       });
       return;
     }
@@ -400,11 +402,11 @@ export default function AdminDashboard() {
         String(book.id),
         book.title,
         book.author,
-        book.category,
+        book.category === 'other' ? t('common.other', 'Other') : book.category,
         book.location,
         String(book.quantity),
         String(book.availableQuantity),
-        book.status,
+        book.availableQuantity > 0 ? t('status.available') : t('status.borrowed'),
       ]),
     ];
     const csv = rows
@@ -426,7 +428,7 @@ export default function AdminDashboard() {
   return (
     <div className="p-8 space-y-8 max-w-7xl mx-auto w-full">
       {loadError ? (
-        <EmptyState icon="error" title="Không thể tải đầy đủ dashboard" message={loadError} />
+        <EmptyState icon="error" title={t('studentHome.loadError')} message={loadError} />
       ) : null}
 
       <div className="grid grid-cols-1 gap-6 md:grid-cols-5">
@@ -434,28 +436,28 @@ export default function AdminDashboard() {
           <div className="w-12 h-12 rounded-lg bg-primary/10 text-primary flex items-center justify-center mb-4">
             <span className="material-symbols-outlined">pending_actions</span>
           </div>
-          <p className="text-outline text-xs font-bold uppercase tracking-wider">Yêu cầu mới</p>
+          <p className="text-outline text-xs font-bold uppercase tracking-wider">{t('adminDashboard.quickStats.newRequests')}</p>
           <h3 className="text-3xl font-bold mt-1">{stats.requests}</h3>
         </div>
         <div className="bg-surface-bright p-6 rounded-xl scholar-shadow border border-surface-container-low">
           <div className="w-12 h-12 rounded-lg bg-tertiary/10 text-tertiary flex items-center justify-center mb-4">
             <span className="material-symbols-outlined">event_busy</span>
           </div>
-          <p className="text-outline text-xs font-bold uppercase tracking-wider">Quá hạn</p>
+          <p className="text-outline text-xs font-bold uppercase tracking-wider">{t('adminDashboard.quickStats.overdue')}</p>
           <h3 className="text-3xl font-bold mt-1">{stats.overdue}</h3>
         </div>
         <div className="bg-surface-bright p-6 rounded-xl scholar-shadow border border-surface-container-low">
           <div className="w-12 h-12 rounded-lg bg-green-100 text-green-700 flex items-center justify-center mb-4">
             <span className="material-symbols-outlined">inventory</span>
           </div>
-          <p className="text-outline text-xs font-bold uppercase tracking-wider">Tổng đầu sách</p>
+          <p className="text-outline text-xs font-bold uppercase tracking-wider">{t('adminDashboard.quickStats.totalBooks')}</p>
           <h3 className="text-3xl font-bold mt-1">{stats.books.toLocaleString('vi-VN')}</h3>
         </div>
         <div className="bg-surface-bright p-6 rounded-xl scholar-shadow border border-surface-container-low">
           <div className="w-12 h-12 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center mb-4">
             <span className="material-symbols-outlined">person_search</span>
           </div>
-          <p className="text-outline text-xs font-bold uppercase tracking-wider">Thành viên</p>
+          <p className="text-outline text-xs font-bold uppercase tracking-wider">{t('adminDashboard.quickStats.members')}</p>
           <h3 className="text-3xl font-bold mt-1">{stats.members.toLocaleString('vi-VN')}</h3>
         </div>
         <button
@@ -472,9 +474,9 @@ export default function AdminDashboard() {
               {healthIsOk ? 'monitor_heart' : 'warning'}
             </span>
           </div>
-          <p className="text-outline text-xs font-bold uppercase tracking-wider">System health</p>
+          <p className="text-outline text-xs font-bold uppercase tracking-wider">{t('adminDashboard.quickStats.systemHealth')}</p>
           <h3 className="text-3xl font-bold mt-1">{health ? (healthIsOk ? 'OK' : 'DEG') : '...'}</h3>
-          <p className="mt-1 text-[10px] font-medium text-outline">API docs & checks</p>
+          <p className="mt-1 text-[10px] font-medium text-outline">{t('adminDashboard.quickStats.apiDocs')}</p>
         </button>
       </div>
 
@@ -484,7 +486,7 @@ export default function AdminDashboard() {
             <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -translate-y-16 translate-x-16"></div>
             <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
               <span className="material-symbols-outlined text-primary filled">bolt</span>
-              Xử lý nhanh
+              {t('adminDashboard.quickAction.title')}
             </h3>
             <form
               className="space-y-4"
@@ -494,7 +496,7 @@ export default function AdminDashboard() {
             >
               <div>
                 <label className="block text-xs font-bold text-outline mb-1 uppercase tracking-wider">
-                  Mã thành viên (Member ID)
+                  {t('adminDashboard.quickAction.memberId')}
                 </label>
                 <input
                   type="text"
@@ -502,13 +504,13 @@ export default function AdminDashboard() {
                   onChange={(event) =>
                     setQuickForm((current) => ({ ...current, memberId: event.target.value }))
                   }
-                  placeholder="Ví dụ: 1"
+                  placeholder={t('adminDashboard.quickAction.placeholderMemberId', { defaultValue: 'e.g. 1' })}
                   className="w-full bg-surface-container border-none rounded-lg py-3 px-4 focus:ring-2 focus:ring-primary/20 transition-all outline-none"
                 />
               </div>
               <div>
                 <label className="block text-xs font-bold text-outline mb-1 uppercase tracking-wider">
-                  Mã sách (Book ID)
+                  {t('adminDashboard.quickAction.bookId')}
                 </label>
                 <input
                   type="text"
@@ -516,7 +518,7 @@ export default function AdminDashboard() {
                   onChange={(event) =>
                     setQuickForm((current) => ({ ...current, bookId: event.target.value }))
                   }
-                  placeholder="Ví dụ: 101"
+                  placeholder={t('adminDashboard.quickAction.placeholderBookId', { defaultValue: 'e.g. 101' })}
                   className="w-full bg-surface-container border-none rounded-lg py-3 px-4 focus:ring-2 focus:ring-primary/20 transition-all outline-none"
                 />
               </div>
@@ -545,7 +547,7 @@ export default function AdminDashboard() {
                   className="bg-primary text-white py-3 rounded-xl font-medium flex items-center justify-center gap-2 hover:opacity-90 transition-all disabled:opacity-60 disabled:cursor-wait"
                 >
                   <span className="material-symbols-outlined text-sm">output</span>
-                  {loadingAction === 'borrow' ? 'Đang xử lý...' : 'Cho mượn'}
+                  {loadingAction === 'borrow' ? t('adminDashboard.quickAction.processing') : t('adminDashboard.quickAction.borrowBtn')}
                 </button>
                 <button
                   type="button"
@@ -554,7 +556,7 @@ export default function AdminDashboard() {
                   className="bg-primary-container text-primary py-3 rounded-xl font-medium flex items-center justify-center gap-2 hover:bg-blue-200 transition-all disabled:opacity-60 disabled:cursor-wait"
                 >
                   <span className="material-symbols-outlined text-sm">input</span>
-                  {loadingAction === 'return' ? 'Đang xử lý...' : 'Trả sách'}
+                  {loadingAction === 'return' ? t('adminDashboard.quickAction.processing') : t('adminDashboard.quickAction.returnBtn')}
                 </button>
               </div>
             </form>
@@ -565,9 +567,9 @@ export default function AdminDashboard() {
           <section className="bg-surface-bright rounded-xl scholar-shadow border border-surface-container-low overflow-hidden h-full flex flex-col">
             <div className="p-6 border-b border-surface-container flex items-center justify-between">
               <div>
-                <h3 className="text-lg font-bold text-on-surface">Duyệt mượn mới</h3>
+                <h3 className="text-lg font-bold text-on-surface">{t('adminDashboard.pendingApprovals.title')}</h3>
                 <p className="text-xs text-outline mt-1">
-                  Danh sách các yêu cầu đang chờ xử lý từ sinh viên
+                  {t('adminDashboard.pendingApprovals.subtitle')}
                 </p>
               </div>
               <button
@@ -576,17 +578,17 @@ export default function AdminDashboard() {
                 className="flex items-center gap-2 text-sm text-primary font-medium hover:underline"
               >
                 <span className="material-symbols-outlined text-base">filter_list</span>
-                Lọc
+                {t('adminDashboard.pendingApprovals.filter')}
               </button>
             </div>
             <div className="overflow-x-auto flex-1">
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-surface-container-low border-b border-surface-container text-xs font-bold uppercase tracking-widest text-outline">
-                    <th className="px-6 py-4">Thành viên</th>
-                    <th className="px-6 py-4">Sách yêu cầu</th>
-                    <th className="px-6 py-4">Ngày yêu cầu</th>
-                    <th className="px-6 py-4 text-right">Thao tác</th>
+                    <th className="px-6 py-4">{t('adminDashboard.pendingApprovals.headerMember')}</th>
+                    <th className="px-6 py-4">{t('adminDashboard.pendingApprovals.headerBook')}</th>
+                    <th className="px-6 py-4">{t('adminDashboard.pendingApprovals.headerDate')}</th>
+                    <th className="px-6 py-4 text-right">{t('adminDashboard.pendingApprovals.headerActions')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-surface-container">
@@ -595,8 +597,8 @@ export default function AdminDashboard() {
                       <td colSpan={4} className="px-6 py-8">
                         <EmptyState
                           icon="assignment_turned_in"
-                          title="Không có yêu cầu chờ duyệt"
-                          message="Yêu cầu mượn mới của sinh viên sẽ xuất hiện tại đây."
+                          title={t('adminDashboard.pendingApprovals.noPending')}
+                          message={t('adminDashboard.pendingApprovals.noPendingDesc')}
                         />
                       </td>
                     </tr>
@@ -606,17 +608,17 @@ export default function AdminDashboard() {
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
                           <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold ${request.roleColor}`}>
-                            {request.role}
+                            {request.role === 'Student' ? t('common.student') : request.role === 'Librarian' ? t('common.librarian') : request.role}
                           </div>
                           <div>
                             <p className="text-sm font-semibold text-on-surface">{request.name}</p>
-                            <p className="text-[10px] text-outline">MSSV: {request.code}</p>
+                            <p className="text-[10px] text-outline">{t('common.studentId')}: {request.code}</p>
                           </div>
                         </div>
                       </td>
                       <td className="px-6 py-4">
                         <p className="text-sm font-medium text-on-surface">{request.book}</p>
-                            <p className="text-[10px] text-outline">Mã: {request.bookCode}</p>
+                            <p className="text-[10px] text-outline">{t('common.bookCode')}: {request.bookCode}</p>
                       </td>
                       <td className="px-6 py-4 text-xs text-on-surface-variant">{request.date}</td>
                       <td className="px-6 py-4 text-right">
@@ -626,7 +628,7 @@ export default function AdminDashboard() {
                             onClick={() => handlePendingApprove(request.id)}
                             className="px-3 py-1.5 rounded-lg text-xs font-medium bg-primary text-white hover:opacity-90"
                           >
-                            Duyệt
+                            {t('adminDashboard.pendingApprovals.approveBtn')}
                           </button>
                           <button
                             type="button"
@@ -649,7 +651,7 @@ export default function AdminDashboard() {
                 onClick={() => navigate('/admin/requests')}
                 className="text-xs font-bold text-primary uppercase tracking-widest hover:underline"
               >
-                Xem tất cả yêu cầu
+                {t('adminDashboard.pendingApprovals.viewAllBtn')}
               </button>
             </div>
           </section>
@@ -659,9 +661,9 @@ export default function AdminDashboard() {
       <section className="bg-surface-bright rounded-2xl scholar-shadow border border-surface-container-low overflow-hidden">
         <div className="p-8 flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-surface-container">
           <div>
-            <h3 className="text-2xl font-bold text-on-surface">Quản lý kho sách</h3>
+            <h3 className="text-2xl font-bold text-on-surface">{t('adminDashboard.inventoryManage.title')}</h3>
             <p className="text-on-surface-variant text-sm mt-1">
-              Quản lý danh mục, tình trạng và số lượng sách hiện có
+              {t('adminDashboard.inventoryManage.subtitle')}
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -671,13 +673,13 @@ export default function AdminDashboard() {
               className="px-6 py-3 bg-primary text-white rounded-xl font-semibold flex items-center gap-2 scholar-shadow hover:-translate-y-0.5 transition-all"
             >
               <span className="material-symbols-outlined">add</span>
-              Thêm sách mới
+              {t('adminDashboard.inventoryManage.addBtn')}
             </button>
             <button
               type="button"
               onClick={handleExportInventory}
               className="p-3 bg-surface-container text-on-surface-variant rounded-xl hover:bg-surface-container-high transition-all"
-              title="Xuất danh sách kho"
+              title={t('adminDashboard.inventoryManage.exportTooltip') || 'Export'}
             >
               <span className="material-symbols-outlined">file_download</span>
             </button>
@@ -688,10 +690,10 @@ export default function AdminDashboard() {
           <div className="flex flex-wrap gap-4 items-center justify-between">
             <div className="flex flex-wrap gap-2">
               {[
-                { label: 'Tất cả', value: 'all' },
-                { label: 'Sách giấy', value: 'paper' },
-                { label: 'E-Book', value: 'digital' },
-                { label: 'Tài liệu tham khảo', value: 'reference' },
+                { label: t('adminDashboard.inventoryManage.filterAll'), value: 'all' },
+                { label: t('adminDashboard.inventoryManage.filterPaper'), value: 'paper' },
+                { label: t('adminDashboard.inventoryManage.filterDigital'), value: 'digital' },
+                { label: t('adminDashboard.inventoryManage.filterReference'), value: 'reference' },
               ].map((filter) => (
                 <button
                   key={filter.value}
@@ -711,9 +713,9 @@ export default function AdminDashboard() {
               ))}
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-xs text-outline">Sắp xếp:</span>
+              <span className="text-xs text-outline">{t('adminDashboard.inventoryManage.sortBy')}:</span>
               <select
-                aria-label="Sắp xếp danh sách sách"
+                aria-label={t('adminDashboard.inventoryManage.sortBy') || 'Sort'}
                 value={inventorySort}
                 onChange={(event) => {
                   setInventorySort(event.target.value as typeof inventorySort);
@@ -721,9 +723,9 @@ export default function AdminDashboard() {
                 }}
                 className="text-xs font-medium border-none bg-transparent focus:ring-0 cursor-pointer outline-none"
               >
-                <option value="newest">Mới nhất</option>
-                <option value="title">Tên A-Z</option>
-                <option value="quantity">Số lượng</option>
+                <option value="newest">{t('adminDashboard.inventoryManage.sortNewest')}</option>
+                <option value="title">{t('adminDashboard.inventoryManage.sortTitle')}</option>
+                <option value="quantity">{t('adminDashboard.inventoryManage.sortQuantity')}</option>
               </select>
             </div>
           </div>
@@ -732,19 +734,19 @@ export default function AdminDashboard() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-surface-container-low text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
-                  <th className="px-6 py-4">Bìa sách</th>
-                  <th className="px-6 py-4">Thông tin sách</th>
-                  <th className="px-6 py-4">Phân loại</th>
-                  <th className="px-6 py-4">Vị trí kho</th>
-                  <th className="px-6 py-4">Tình trạng</th>
-                  <th className="px-6 py-4 text-right">Quản lý</th>
+                  <th className="px-6 py-4">{t('adminDashboard.inventoryManage.tableCover')}</th>
+                  <th className="px-6 py-4">{t('adminDashboard.inventoryManage.tableInfo')}</th>
+                  <th className="px-6 py-4">{t('adminDashboard.inventoryManage.tableCategory')}</th>
+                  <th className="px-6 py-4">{t('adminDashboard.inventoryManage.tableLocation')}</th>
+                  <th className="px-6 py-4">{t('adminDashboard.inventoryManage.tableStatus')}</th>
+                  <th className="px-6 py-4 text-right">{t('adminDashboard.inventoryManage.tableManage')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-surface-container">
                 {visibleInventoryBooks.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="px-6 py-8 text-center text-sm text-outline">
-                      Không có sách phù hợp với bộ lọc hiện tại.
+                      {t('adminDashboard.inventoryManage.noBooksFiltered')}
                     </td>
                   </tr>
                 ) : (
@@ -765,23 +767,25 @@ export default function AdminDashboard() {
                       <td className="px-6 py-4">
                         <div className="max-w-xs">
                           <p className="text-sm font-bold text-on-surface line-clamp-1">{book.title}</p>
-                          <p className="text-xs text-outline mt-0.5">Tác giả: {book.author}</p>
+                          <p className="text-xs text-outline mt-0.5">{t('studentHome.author')}: {book.author}</p>
                           <p className="text-[10px] font-mono text-primary mt-1">ISBN: {book.isbn}</p>
                         </div>
                       </td>
                       <td className="px-6 py-4">
                         <span className="px-2 py-1 rounded-md bg-surface-container-high text-on-surface-variant text-[10px] font-bold uppercase">
-                          {book.category}
+                          {book.category === 'other' ? t('common.other', 'Other') : book.category}
                         </span>
                       </td>
                       <td className="px-6 py-4 text-xs font-medium">{book.location}</td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
                           <div className={`w-2 h-2 rounded-full ${book.statusColor}`}></div>
-                          <span className="text-xs font-medium">{book.status}</span>
+                          <span className="text-xs font-medium">
+                            {book.availableQuantity > 0 ? t('status.available') : t('status.borrowed')}
+                          </span>
                         </div>
                         <p className="mt-1 text-[10px] text-outline">
-                          {book.availableQuantity}/{book.quantity} bản
+                          {t('adminDashboard.inventoryManage.copiesAvailable', { available: book.availableQuantity, total: book.quantity })}
                         </p>
                       </td>
                       <td className="px-6 py-4 text-right">
@@ -790,7 +794,7 @@ export default function AdminDashboard() {
                             type="button"
                             onClick={() => navigate(`/admin/inventory?search=${encodeURIComponent(book.title)}`)}
                             className="p-2 rounded-lg text-primary hover:bg-primary-container transition-all"
-                            title="Mở trong kho sách"
+                            title={t('adminDashboard.inventoryManage.editTooltip') || 'Open'}
                           >
                             <span className="material-symbols-outlined text-lg">edit</span>
                           </button>
@@ -798,7 +802,7 @@ export default function AdminDashboard() {
                             type="button"
                             onClick={() => navigate(`/admin/requests?book=${book.id}`)}
                             className="p-2 rounded-lg text-on-surface-variant hover:bg-surface-container transition-all"
-                            title="Xem lịch sử mượn"
+                            title={t('adminDashboard.inventoryManage.historyTooltip') || 'History'}
                           >
                             <span className="material-symbols-outlined text-lg">history</span>
                           </button>
@@ -806,7 +810,7 @@ export default function AdminDashboard() {
                             type="button"
                             onClick={() => handleInventoryDelete(book)}
                             className="p-2 rounded-lg text-tertiary hover:bg-tertiary-container transition-all"
-                            title="Xóa sách"
+                            title={t('adminDashboard.inventoryManage.deleteTooltip') || 'Delete'}
                           >
                             <span className="material-symbols-outlined text-lg">delete</span>
                           </button>
@@ -821,7 +825,7 @@ export default function AdminDashboard() {
 
           <div className="flex items-center justify-between pt-4">
             <p className="text-xs text-outline">
-              Hiển thị {inventoryStartItem} - {inventoryEndItem} trong tổng số {filteredInventoryBooks.length} sách
+              {t('common.paginationRange', { start: inventoryStartItem, end: inventoryEndItem, total: filteredInventoryBooks.length })}
             </p>
             <div className="flex gap-1">
               <button
@@ -862,7 +866,7 @@ export default function AdminDashboard() {
       <section className="bg-surface-bright rounded-2xl scholar-shadow border border-surface-container-low overflow-hidden">
         <div className="p-6 border-b border-surface-container flex items-center gap-2">
           <span className="material-symbols-outlined text-tertiary">published_with_changes</span>
-          <h3 className="text-lg font-bold text-on-surface">Xác nhận trả sách gần đây</h3>
+          <h3 className="text-lg font-bold text-on-surface">{t('adminDashboard.recentReturns.title')}</h3>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left">
@@ -870,7 +874,7 @@ export default function AdminDashboard() {
               {recentReturns.length === 0 ? (
                 <tr>
                   <td className="px-8 py-6 text-sm text-on-surface-variant">
-                    Chưa có giao dịch trả sách nào gần đây.
+                    {t('adminDashboard.recentReturns.empty')}
                   </td>
                 </tr>
               ) : (
@@ -883,10 +887,10 @@ export default function AdminDashboard() {
                         </span>
                         <div>
                           <p className="text-sm font-semibold">
-                            {request.name} đã trả "{request.book}"
+                            {t('adminDashboard.recentReturns.returnedMsg', { name: request.name, book: request.book })}
                           </p>
                           <p className="text-[10px] text-outline mt-0.5">
-                            Hoàn tất lúc: {request.return_date || request.date}
+                            {t('adminDashboard.recentReturns.completedAt', { date: request.return_date || request.date })}
                           </p>
                         </div>
                       </div>
@@ -897,7 +901,7 @@ export default function AdminDashboard() {
                         onClick={() => navigate('/admin/requests')}
                         className="px-4 py-2 bg-surface-container text-on-surface text-xs font-bold rounded-lg hover:bg-surface-container-high transition-all"
                       >
-                        Chi tiết
+                        {t('adminRequests.details')}
                       </button>
                     </td>
                   </tr>
@@ -909,16 +913,16 @@ export default function AdminDashboard() {
       </section>
 
       <footer className="mt-auto border-t border-surface-container py-6 flex flex-col md:flex-row items-center justify-between text-[10px] font-bold text-outline uppercase tracking-widest">
-        <p>© 2023 HCMUE DIGITAL LIBRARY SYSTEM - LIBRARIAN PANEL V2.4</p>
+        <p>{t('adminDashboard.footer.copyright')}</p>
         <div className="flex gap-6 mt-4 md:mt-0">
           <button type="button" onClick={() => navigate('/admin/reports')} className="hover:text-primary transition-colors">
-            Hướng dẫn sử dụng
+            {t('adminDashboard.footer.userGuide')}
           </button>
           <a href="mailto:it-support@hcmue.edu.vn?subject=Library%20system%20incident" className="hover:text-primary transition-colors">
-            Báo cáo sự cố
+            {t('adminDashboard.footer.reportIncident')}
           </a>
           <button type="button" onClick={() => navigate('/admin/settings')} className="hover:text-primary transition-colors">
-            Chính sách bảo mật
+            {t('adminDashboard.footer.privacyPolicy')}
           </button>
         </div>
       </footer>

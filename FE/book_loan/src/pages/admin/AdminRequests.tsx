@@ -1,5 +1,6 @@
 import React, { startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Scanner } from '@yudiel/react-qr-scanner';
 import {
   approveBorrow,
@@ -20,12 +21,12 @@ import { echoClient } from '../../lib/echo';
 type RequestTab = 'ALL' | 'APPROVED' | 'BORROWED' | 'HISTORY' | 'REJECTED' | 'CANCELLED';
 
 const TAB_LABELS: Record<RequestTab, string> = {
-  ALL: 'Yêu cầu chờ duyệt',
-  APPROVED: 'Chờ nhận sách',
-  BORROWED: 'Đang mượn',
-  HISTORY: 'Lịch sử trả sách',
-  REJECTED: 'Yêu cầu từ chối',
-  CANCELLED: 'Đã hủy',
+  ALL: 'adminRequests.tabPending',
+  APPROVED: 'adminRequests.tabApproved',
+  BORROWED: 'adminRequests.tabBorrowed',
+  HISTORY: 'adminRequests.tabHistory',
+  REJECTED: 'adminRequests.tabRejected',
+  CANCELLED: 'adminRequests.tabCancelled',
 };
 
 const TAB_STATUS: Record<RequestTab, BorrowRequest['raw_status'] | null> = {
@@ -37,20 +38,20 @@ const TAB_STATUS: Record<RequestTab, BorrowRequest['raw_status'] | null> = {
   CANCELLED: 'cancelled',
 };
 
-function getOptimisticStatusLabel(status: BorrowRequest['raw_status']) {
-  if (status === 'approved') return 'Chờ nhận sách';
-  if (status === 'borrowed') return 'Đang mượn';
-  if (status === 'returned') return 'Đã trả';
-  if (status === 'pending') return 'Chờ duyệt';
-  if (status === 'cancelled') return 'Đã hủy';
-  return 'Từ chối';
+function getOptimisticStatusLabel(status: BorrowRequest['raw_status'], t: any) {
+  if (status === 'approved') return t('status.approved');
+  if (status === 'borrowed') return t('status.borrowed');
+  if (status === 'returned') return t('status.returned');
+  if (status === 'pending') return t('status.pending');
+  if (status === 'cancelled') return t('status.cancelled');
+  return t('status.rejected');
 }
 
 function getTodayLabel() {
   return new Date().toISOString().slice(0, 10);
 }
 
-function getDueBadge(request: BorrowRequest) {
+function getDueBadge(request: BorrowRequest, t: any) {
   if (request.raw_status !== 'borrowed' || !request.due_date) return null;
   const { due_status, days_overdue } = request;
 
@@ -58,21 +59,21 @@ function getDueBadge(request: BorrowRequest) {
     return (
       <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-700">
         <span className="material-symbols-outlined text-[11px]">warning</span>
-        Quá hạn {days_overdue} ngày
+        {t('adminRequests.dueOverdue', { count: days_overdue })}
       </span>
     );
   }
   if (due_status === 'due_today') {
     return (
       <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">
-        Đến hạn hôm nay
+        {t('adminRequests.dueToday')}
       </span>
     );
   }
   if (due_status === 'due_soon') {
     return (
       <span className="inline-flex items-center gap-1 rounded-full bg-yellow-100 px-2 py-0.5 text-[10px] font-bold text-yellow-700">
-        Sắp đến hạn
+        {t('adminRequests.dueSoon')}
       </span>
     );
   }
@@ -80,6 +81,7 @@ function getDueBadge(request: BorrowRequest) {
 }
 
 export default function AdminRequests() {
+  const { t, i18n } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const [tab, setTab] = useState<RequestTab>('ALL');
   const [requests, setRequests] = useState<BorrowRequest[]>([]);
@@ -120,13 +122,13 @@ export default function AdminRequests() {
       setRequests(data);
     } catch (error: unknown) {
       if (isUnauthorizedError(error)) return;
-      const message = getErrorMessage(error, 'Không thể tải danh sách yêu cầu.');
+      const message = getErrorMessage(error, t('adminRequests.loadError', 'Unable to load requests list.'));
       setLoadError(message);
-      emitToast({ tone: 'error', title: 'Không thể tải yêu cầu', message });
+      emitToast({ tone: 'error', title: t('common.error'), message });
     } finally {
       if (showLoader) setIsLoading(false);
     }
-  }, [searchQuery]);
+  }, [searchQuery, t]);
 
   useEffect(() => {
     void fetchRequests();
@@ -144,7 +146,7 @@ export default function AdminRequests() {
         name: newRequest.member_name,
         bookCode: String(newRequest.book_id),
         book: newRequest.book_title,
-        status: getOptimisticStatusLabel('pending'),
+        status: getOptimisticStatusLabel('pending', t),
         raw_status: 'pending',
         date: newRequest.created_at ? newRequest.created_at.slice(0, 10) : getTodayLabel(),
         requested_at: newRequest.created_at,
@@ -168,8 +170,8 @@ export default function AdminRequests() {
       // Screen Toast notification
       emitToast({
         tone: 'info',
-        title: 'Yêu cầu mượn mới',
-        message: `Độc giả ${mappedRequest.name} vừa yêu cầu mượn "${mappedRequest.book}"`
+        title: t('adminRequests.newRequestTitle'),
+        message: t('adminRequests.newRequestMsg', { name: mappedRequest.name, book: mappedRequest.book })
       });
     });
 
@@ -183,7 +185,7 @@ export default function AdminRequests() {
     return () => {
       echoClient.leave('librarians');
     };
-  }, []);
+  }, [fetchRequests, t]);
 
   // Debounced search
   const handleSearchChange = (value: string) => {
@@ -212,7 +214,7 @@ export default function AdminRequests() {
     setRequests((current) =>
       current.map((request) =>
         request.id === loanId
-          ? { ...request, raw_status: nextStatus, status: getOptimisticStatusLabel(nextStatus), date: getTodayLabel(), ...patch }
+          ? { ...request, raw_status: nextStatus, status: getOptimisticStatusLabel(nextStatus, t), date: getTodayLabel(), ...patch }
           : request,
       ),
     );
@@ -226,7 +228,7 @@ export default function AdminRequests() {
       void fetchRequests(false);
     } catch (error: unknown) {
       if (isUnauthorizedError(error)) return;
-      emitToast({ tone: 'error', title: 'Không thể duyệt yêu cầu', message: getErrorMessage(error, 'Lỗi khi duyệt') });
+      emitToast({ tone: 'error', title: t('common.error'), message: getErrorMessage(error, t('adminRequests.approveError', 'Error approving request')) });
     } finally {
       setActiveRequestId(null);
     }
@@ -251,7 +253,7 @@ export default function AdminRequests() {
     if (!pickupTarget) return;
     const barcode = pickupBarcode.trim();
     if (!barcode) {
-      setPickupError('Vui lòng nhập hoặc quét mã vạch bản sao.');
+      setPickupError(t('adminRequests.pickupErrorEmpty'));
       return;
     }
 
@@ -261,10 +263,10 @@ export default function AdminRequests() {
       startTransition(() => applyOptimisticUpdate(pickupTarget.id, 'borrowed', { barcode }));
       closePickupDialog();
       void fetchRequests(false);
-      emitToast({ tone: 'success', title: 'Đã giao sách', message: `Đã gán bản sao ${barcode}.` });
+      emitToast({ tone: 'success', title: t('adminRequests.actionConfirmPickup'), message: `${t('adminRequests.pickupBarcodeLabel')}: ${barcode}.` });
     } catch (error: unknown) {
       if (isUnauthorizedError(error)) return;
-      emitToast({ tone: 'error', title: 'Không thể xác nhận giao sách', message: getErrorMessage(error, 'Lỗi khi giao sách') });
+      emitToast({ tone: 'error', title: t('common.error'), message: getErrorMessage(error, t('adminRequests.issueError', 'Error issuing book')) });
     } finally {
       setActiveRequestId(null);
     }
@@ -286,7 +288,7 @@ export default function AdminRequests() {
     event.preventDefault();
     if (!rejectTarget) return;
     const reason = rejectReason.trim();
-    if (reason.length < 3) { setRejectError('Vui lòng nhập lý do từ chối từ 3 ký tự trở lên.'); return; }
+    if (reason.length < 3) { setRejectError(t('adminRequests.rejectErrorShort')); return; }
     setActiveRequestId(rejectTarget.id);
     try {
       await rejectBorrow(rejectTarget.id, reason);
@@ -298,7 +300,7 @@ export default function AdminRequests() {
       void fetchRequests(false);
     } catch (error: unknown) {
       if (isUnauthorizedError(error)) return;
-      emitToast({ tone: 'error', title: 'Không thể từ chối yêu cầu', message: getErrorMessage(error, 'Lỗi khi từ chối yêu cầu') });
+      emitToast({ tone: 'error', title: t('common.error'), message: getErrorMessage(error, t('adminRequests.rejectError', 'Error rejecting request')) });
     } finally {
       setActiveRequestId(null);
     }
@@ -322,10 +324,10 @@ export default function AdminRequests() {
       startTransition(() => applyOptimisticUpdate(returnTarget.id, 'returned', { barcode: barcode ?? returnTarget.barcode }));
       setReturnTarget(null);
       void fetchRequests(false);
-      emitToast({ tone: 'success', title: 'Thành công', message: 'Đã xử lý trả sách.' });
+      emitToast({ tone: 'success', title: t('common.success'), message: t('common.success') });
     } catch (error: unknown) {
       if (isUnauthorizedError(error)) return;
-      emitToast({ tone: 'error', title: 'Không thể nhận trả sách', message: getErrorMessage(error, 'Lỗi khi trả sách') });
+      emitToast({ tone: 'error', title: t('common.error'), message: getErrorMessage(error, t('adminRequests.returnError', 'Error returning book')) });
     } finally {
       setActiveRequestId(null);
     }
@@ -354,10 +356,10 @@ export default function AdminRequests() {
       );
       setExtendTarget(null);
       void fetchRequests(false);
-      emitToast({ tone: 'success', title: 'Gia hạn thành công', message: `Hạn trả mới: ${result.new_due_date}` });
+      emitToast({ tone: 'success', title: t('common.success'), message: t('adminRequests.newDue', { date: result.new_due_date }) });
     } catch (error: unknown) {
       if (isUnauthorizedError(error)) return;
-      emitToast({ tone: 'error', title: 'Không thể gia hạn', message: getErrorMessage(error, 'Lỗi khi gia hạn') });
+      emitToast({ tone: 'error', title: t('common.error'), message: getErrorMessage(error, t('adminRequests.extendError', 'Error extending loan')) });
     } finally {
       setActiveRequestId(null);
     }
@@ -368,11 +370,11 @@ export default function AdminRequests() {
     setActiveRequestId(detailTarget.id);
     try {
       await import('../../api/fineApi').then((m) => m.payFine(fineId));
-      emitToast({ tone: 'success', title: 'Thành công', message: 'Đã xác nhận đóng phí phạt thành công.' });
+      emitToast({ tone: 'success', title: t('common.success'), message: t('common.success') });
       setDetailTarget({ ...detailTarget, fine: detailTarget.fine ? { ...detailTarget.fine, status: 'paid', paid_at: new Date().toISOString() } : null });
       void fetchRequests(false);
     } catch (error: unknown) {
-      emitToast({ tone: 'error', title: 'Không thể thu phí phạt', message: getErrorMessage(error, 'Lỗi khi thu phí phạt') });
+      emitToast({ tone: 'error', title: t('common.error'), message: getErrorMessage(error, t('adminRequests.collectFineError', 'Error collecting fine')) });
     } finally {
       setActiveRequestId(null);
     }
@@ -380,7 +382,7 @@ export default function AdminRequests() {
 
   const handleExportRequests = () => {
     if (filteredRequests.length === 0) {
-      emitToast({ tone: 'info', title: 'Không có dữ liệu xuất', message: 'Bộ lọc hiện tại không có bản ghi.' });
+      emitToast({ tone: 'info', title: t('adminRequests.emptyStateTitle'), message: t('adminRequests.emptyStateTitle') });
       return;
     }
 
@@ -395,11 +397,23 @@ export default function AdminRequests() {
     };
 
     const rows = [
-      ['Mã phiếu', 'Mã độc giả', 'Tên độc giả', 'Mã sách', 'Tên sách', 'Trạng thái', 'Ngày yêu cầu', 'Hạn trả', 'Ngày trả', 'Quá hạn', 'Lý do từ chối'],
+      [
+        t('adminRequests.tableHeaderId'),
+        t('adminDashboard.quickAction.memberId'),
+        t('adminDashboard.pendingApprovals.headerMember'),
+        t('adminDashboard.quickAction.bookId'),
+        t('adminDashboard.pendingApprovals.headerBook'),
+        t('adminRequests.tableHeaderStatus'),
+        t('adminDashboard.pendingApprovals.headerDate'),
+        t('adminRequests.tableHeaderDue'),
+        t('adminRequests.returnDateLabel'),
+        t('adminDashboard.quickStats.overdue'),
+        t('adminRequests.rejectReasonLabel')
+      ],
       ...filteredRequests.map((r) => [
-        String(r.id), r.code, r.name, r.bookCode, r.book, r.status,
+        String(r.id), r.code, r.name, r.bookCode, r.book, t(`status.${r.raw_status}`),
         formatCSVDate(r.requested_at), formatCSVDate(r.due_date), formatCSVDate(r.return_date),
-        r.is_overdue ? 'Có' : 'Không', r.rejection_reason || '',
+        r.is_overdue ? 'Yes' : 'No', r.rejection_reason || '',
       ]),
     ];
     const tsvContent = '\ufeff' + rows.map(row => row.map(v => {
@@ -430,10 +444,10 @@ export default function AdminRequests() {
       await cancelBorrow(loanId);
       startTransition(() => applyOptimisticUpdate(loanId, 'cancelled'));
       void fetchRequests(false);
-      emitToast({ tone: 'success', title: 'Đã hủy', message: 'Đã hủy yêu cầu mượn sách.' });
+      emitToast({ tone: 'success', title: t('status.cancelled'), message: t('status.cancelled') });
     } catch (error: unknown) {
       if (isUnauthorizedError(error)) return;
-      emitToast({ tone: 'error', title: 'Không thể hủy', message: getErrorMessage(error, 'Lỗi khi hủy yêu cầu') });
+      emitToast({ tone: 'error', title: t('common.error'), message: getErrorMessage(error, t('adminRequests.cancelError', 'Error cancelling request')) });
     } finally {
       setActiveRequestId(null);
     }
@@ -446,8 +460,8 @@ export default function AdminRequests() {
       {/* Header */}
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
         <div>
-          <h2 className="text-2xl sm:text-3xl font-bold text-on-surface">Duyệt mượn trả</h2>
-          <p className="mt-1 text-xs sm:text-sm text-on-surface-variant">Xử lý các yêu cầu mượn mới và theo dõi sách đang luân chuyển.</p>
+          <h2 className="text-2xl sm:text-3xl font-bold text-on-surface">{t('adminRequests.title')}</h2>
+          <p className="mt-1 text-xs sm:text-sm text-on-surface-variant">{t('adminRequests.subtitle')}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {bookFilter ? (
@@ -456,11 +470,11 @@ export default function AdminRequests() {
               onClick={() => { const p = new URLSearchParams(searchParams); p.delete('book'); setSearchParams(p, { replace: true }); }}
               className="rounded-full bg-primary-container px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary-container/80"
             >
-              Mã sách {bookFilter} ×
+              {t('adminDashboard.quickAction.bookId')}: {bookFilter} ×
             </button>
           ) : null}
           <div className="rounded-full bg-surface-container px-3 py-1.5 text-xs font-semibold text-outline">
-            {filteredRequests.length} mục
+            {t('common.countItems', { count: filteredRequests.length })}
           </div>
           <button
             type="button"
@@ -468,7 +482,7 @@ export default function AdminRequests() {
             className="flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3.5 py-2 text-xs font-bold text-white shadow-md shadow-indigo-600/20 transition-all active:scale-95 sm:hover:-translate-y-0.5"
           >
             <span className="material-symbols-outlined text-[16px]">qr_code_scanner</span>
-            Quét mã QR
+            {t('adminRequests.scanQrBtn')}
           </button>
           <button
             type="button"
@@ -476,7 +490,7 @@ export default function AdminRequests() {
             className="flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-2 text-xs font-bold text-white shadow-md shadow-primary/20 transition-all active:scale-95 sm:hover:-translate-y-0.5"
           >
             <span className="material-symbols-outlined text-[16px]">file_download</span>
-            Xuất CSV
+            {t('adminRequests.exportCsvBtn')}
           </button>
         </div>
       </div>
@@ -488,7 +502,7 @@ export default function AdminRequests() {
           type="search"
           value={searchQuery}
           onChange={(e) => handleSearchChange(e.target.value)}
-          placeholder="Tìm sinh viên, sách, tác giả..."
+          placeholder={t('adminRequests.searchPlaceholder') || 'Search...'}
           className="flex-1 bg-transparent text-sm text-on-surface outline-none placeholder:text-outline"
           id="admin-requests-search"
         />
@@ -513,7 +527,7 @@ export default function AdminRequests() {
                   : 'border-transparent text-slate-500 hover:bg-slate-100 hover:text-slate-700'
               }`}
             >
-              {TAB_LABELS[tabKey]}
+              {t(TAB_LABELS[tabKey])}
             </button>
           ))}
         </div>
@@ -523,26 +537,26 @@ export default function AdminRequests() {
           <table className="w-full min-w-[900px] text-left">
             <thead>
               <tr className="border-b border-surface-container bg-white text-xs font-bold uppercase tracking-widest text-slate-500">
-                <th className="px-6 py-4">Mã phiếu</th>
-                <th className="px-6 py-4">Thông tin độc giả</th>
-                <th className="px-6 py-4">Tài liệu</th>
-                <th className="px-6 py-4">Thời gian</th>
-                {tab === 'BORROWED' && <th className="px-6 py-4">Hạn trả</th>}
-                <th className="px-6 py-4">Trạng thái</th>
-                <th className="px-6 py-4 text-right">Hành động</th>
+                <th className="px-6 py-4">{t('adminRequests.tableHeaderId')}</th>
+                <th className="px-6 py-4">{t('adminRequests.tableHeaderMember')}</th>
+                <th className="px-6 py-4">{t('adminRequests.tableHeaderBook')}</th>
+                <th className="px-6 py-4">{t('adminRequests.tableHeaderTime')}</th>
+                {tab === 'BORROWED' && <th className="px-6 py-4">{t('adminRequests.tableHeaderDue')}</th>}
+                <th className="px-6 py-4">{t('adminRequests.tableHeaderStatus')}</th>
+                <th className="px-6 py-4 text-right">{t('adminRequests.tableHeaderAction')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-surface-container">
               {isLoading ? (
-                <tr><td colSpan={tab === 'BORROWED' ? 7 : 6} className="px-6 py-8 text-center text-slate-500">Đang tải dữ liệu...</td></tr>
+                <tr><td colSpan={tab === 'BORROWED' ? 7 : 6} className="px-6 py-8 text-center text-slate-500">{t('common.loading')}</td></tr>
               ) : loadError ? (
-                <tr><td colSpan={tab === 'BORROWED' ? 7 : 6} className="px-6 py-8"><EmptyState icon="error" title="Không thể tải yêu cầu" message={loadError} /></td></tr>
+                <tr><td colSpan={tab === 'BORROWED' ? 7 : 6} className="px-6 py-8"><EmptyState icon="error" title={t('common.error')} message={loadError} /></td></tr>
               ) : filteredRequests.length === 0 ? (
-                <tr><td colSpan={tab === 'BORROWED' ? 7 : 6} className="px-6 py-8"><EmptyState icon="assignment" title="Không có bản ghi phù hợp" message="Các phiếu mượn sẽ xuất hiện khi sinh viên gửi yêu cầu hoặc thủ thư xử lý phiếu." /></td></tr>
+                <tr><td colSpan={tab === 'BORROWED' ? 7 : 6} className="px-6 py-8"><EmptyState icon="assignment" title={t('adminRequests.emptyStateTitle')} message={t('adminRequests.emptyStateDesc')} /></td></tr>
               ) : (
                 filteredRequests.map((request) => {
                   const isBusy = activeRequestId === request.id;
-                  const dueBadge = getDueBadge(request);
+                  const dueBadge = getDueBadge(request, t);
 
                   return (
                     <tr key={request.id} className={`transition-colors hover:bg-slate-50 ${request.is_overdue ? 'bg-red-50/30' : ''}`}>
@@ -551,21 +565,23 @@ export default function AdminRequests() {
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          <div className={`flex h-8 w-8 items-center justify-center rounded-full text-[10px] font-bold ${request.roleColor}`}>{request.role}</div>
+                          <div className={`flex h-8 w-8 items-center justify-center rounded-full text-[10px] font-bold ${request.roleColor}`}>
+                            {request.role === 'Student' ? t('common.student') : request.role === 'Librarian' ? t('common.librarian') : request.role}
+                          </div>
                           <div>
                             <p className="text-sm font-semibold text-slate-800">{request.name}</p>
-                            <p className="text-[10px] text-slate-500">ID: {request.code}</p>
+                            <p className="text-[10px] text-slate-500">{t('common.studentId')}: {request.code}</p>
                           </div>
                         </div>
                       </td>
                       <td className="px-6 py-4">
                         <p className="text-sm font-bold text-slate-700">{request.book}</p>
-                        <p className="text-[10px] text-slate-500">Mã kho: {request.bookCode}</p>
+                        <p className="text-[10px] text-slate-500">{t('common.bookCode')}: {request.bookCode}</p>
                         {request.barcode ? (
                           <p className="mt-1 font-mono text-[10px] font-semibold text-indigo-600">{request.barcode}</p>
                         ) : null}
                         {request.raw_status === 'rejected' && request.rejection_reason ? (
-                          <p className="mt-1 max-w-xs text-xs text-red-600">Lý do: {request.rejection_reason}</p>
+                          <p className="mt-1 max-w-xs text-xs text-red-600">{t('adminRequests.rejectionReasonLabel', { reason: request.rejection_reason })}</p>
                         ) : null}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -584,7 +600,7 @@ export default function AdminRequests() {
                       )}
                       <td className="px-6 py-4">
                         <span className="rounded-md border border-slate-200 bg-slate-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-700">
-                          {request.status}
+                          {t(`status.${request.raw_status}`)}
                         </span>
                       </td>
                       <td className="px-6 py-4 text-right">
@@ -592,39 +608,39 @@ export default function AdminRequests() {
                           <div className="flex justify-end gap-2">
                             <button onClick={() => handleApprove(request.id)} disabled={isBusy}
                               className="rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white shadow-sm shadow-primary/30 transition-opacity hover:opacity-90 disabled:cursor-wait disabled:opacity-60">
-                              {isBusy ? 'Đang xử lý...' : 'Duyệt'}
+                              {isBusy ? t('common.processing') : t('adminDashboard.pendingApprovals.approveBtn')}
                             </button>
                             <button onClick={() => openRejectDialog(request)} disabled={isBusy}
                               className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-bold text-red-600 transition-colors hover:bg-red-50 disabled:cursor-wait disabled:opacity-60">
-                              Từ chối
+                              {t('status.rejected')}
                             </button>
                           </div>
                         ) : request.raw_status === 'approved' ? (
                           <div className="flex justify-end gap-2">
                             <button onClick={() => openPickupDialog(request)} disabled={isBusy}
                               className="whitespace-nowrap rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm shadow-indigo-600/30 transition-opacity hover:opacity-90 disabled:cursor-wait disabled:opacity-60">
-                              {isBusy ? 'Đang xử lý...' : 'Xác nhận giao sách'}
+                              {isBusy ? t('common.processing') : t('adminRequests.actionConfirmPickup')}
                             </button>
                             <button onClick={() => handleAdminCancel(request.id)} disabled={isBusy}
                               className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-wait disabled:opacity-60">
-                              Hủy
+                              {t('common.cancel')}
                             </button>
                           </div>
                         ) : request.raw_status === 'borrowed' ? (
                           <div className="flex justify-end gap-2">
                             <button onClick={() => openReturnDialog(request)} disabled={isBusy}
                               className="whitespace-nowrap rounded-lg bg-tertiary px-3 py-1.5 text-xs font-bold text-white shadow-sm shadow-tertiary/30 transition-opacity hover:opacity-90 disabled:cursor-wait disabled:opacity-60">
-                              {isBusy ? 'Đang xử lý...' : 'Nhận trả sách'}
+                              {isBusy ? t('common.processing') : t('adminRequests.actionReturnBook')}
                             </button>
                             <button onClick={() => openExtendDialog(request)} disabled={isBusy}
                               className="whitespace-nowrap rounded-lg border border-indigo-200 px-3 py-1.5 text-xs font-bold text-indigo-600 transition-colors hover:bg-indigo-50 disabled:cursor-wait disabled:opacity-60">
-                              Gia hạn
+                              {t('adminRequests.actionExtend')}
                             </button>
                           </div>
                         ) : (
                           <button type="button" onClick={() => setDetailTarget(request)}
                             className="px-3 py-1.5 text-xs font-semibold text-primary hover:underline">
-                            Chi tiết
+                            {t('adminRequests.details')}
                           </button>
                         )}
                       </td>
@@ -639,46 +655,46 @@ export default function AdminRequests() {
         {/* 2. MOBILE VIEW (CARDS): Visible only on small screens */}
         <div className="block md:hidden divide-y divide-slate-100 bg-white">
           {isLoading ? (
-            <div className="py-8 text-center text-slate-500 text-sm">Đang tải dữ liệu...</div>
+            <div className="py-8 text-center text-slate-500 text-sm">{t('common.loading')}</div>
           ) : loadError ? (
-            <div className="py-8 px-4"><EmptyState icon="error" title="Không thể tải yêu cầu" message={loadError} /></div>
+            <div className="py-8 px-4"><EmptyState icon="error" title={t('common.error')} message={loadError} /></div>
           ) : filteredRequests.length === 0 ? (
-            <div className="py-8 px-4"><EmptyState icon="assignment" title="Không có bản ghi phù hợp" message="Các phiếu mượn sẽ xuất hiện khi sinh viên gửi yêu cầu hoặc thủ thư xử lý." /></div>
+            <div className="py-8 px-4"><EmptyState icon="assignment" title={t('adminRequests.emptyStateTitle')} message={t('adminRequests.emptyStateDesc')} /></div>
           ) : (
             filteredRequests.map((request) => {
               const isBusy = activeRequestId === request.id;
-              const dueBadge = getDueBadge(request);
+              const dueBadge = getDueBadge(request, t);
 
               return (
                 <div key={request.id} className={`p-4 space-y-3 transition-colors ${request.is_overdue ? 'bg-red-50/40' : 'active:bg-slate-50/50'}`}>
-                  {/* Top line ID & Status */}
+                   {/* Top line ID & Status */}
                   <div className="flex items-center justify-between">
                     <span className="rounded bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-700">#{request.id}</span>
                     <span className="rounded-md border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-700">
-                      {request.status}
+                      {t(`status.${request.raw_status}`)}
                     </span>
                   </div>
 
                   {/* Student Info */}
                   <div className="flex items-center gap-3">
                     <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${request.roleColor}`}>
-                      {request.role}
+                      {request.role === 'Student' ? t('common.student') : request.role === 'Librarian' ? t('common.librarian') : request.role}
                     </div>
                     <div>
                       <p className="text-sm font-bold text-slate-800 leading-tight">{request.name}</p>
-                      <p className="text-[10px] text-slate-500 mt-0.5">MSSV: {request.code}</p>
+                      <p className="text-[10px] text-slate-500 mt-0.5">{t('common.studentId')}: {request.code}</p>
                     </div>
                   </div>
 
                   {/* Book Card */}
                   <div className="rounded-xl bg-slate-50/70 p-3 space-y-1.5 border border-slate-100">
                     <p className="text-xs font-bold text-slate-800 leading-snug">{request.book}</p>
-                    <p className="text-[10px] text-slate-500">Mã kho: {request.bookCode}</p>
+                    <p className="text-[10px] text-slate-500">{t('common.bookCode')}: {request.bookCode}</p>
                     {request.barcode && (
-                      <p className="font-mono text-[10px] font-bold text-indigo-600">Bản sao: {request.barcode}</p>
+                      <p className="font-mono text-[10px] font-bold text-indigo-600">{t('adminRequests.pickupBarcodeLabel')}: {request.barcode}</p>
                     )}
                     {request.raw_status === 'rejected' && request.rejection_reason && (
-                      <p className="text-[11px] text-red-600 font-medium">Lý do từ chối: {request.rejection_reason}</p>
+                      <p className="text-[11px] text-red-600 font-medium">{t('adminRequests.rejectionReasonLabel', { reason: request.rejection_reason })}</p>
                     )}
                   </div>
 
@@ -686,11 +702,11 @@ export default function AdminRequests() {
                   <div className="flex flex-wrap items-center justify-between gap-2 text-xs pt-1">
                     <div className="flex items-center gap-1 text-slate-600">
                       <span className="material-symbols-outlined text-[13px]">calendar_today</span>
-                      <span className="text-[11px]">Yêu cầu: {request.date}</span>
+                      <span className="text-[11px]">{t('adminDashboard.pendingApprovals.headerDate')}: {request.date}</span>
                     </div>
                     {tab === 'BORROWED' && request.due_date && (
                       <div className="flex flex-col items-end gap-1">
-                        <span className="text-[11px] font-bold text-slate-700">Hạn: {request.due_date}</span>
+                        <span className="text-[11px] font-bold text-slate-700">{t('adminRequests.tableHeaderDue')}: {request.due_date}</span>
                         {dueBadge}
                       </div>
                     )}
@@ -702,39 +718,39 @@ export default function AdminRequests() {
                       <>
                         <button onClick={() => openRejectDialog(request)} disabled={isBusy}
                           className="flex-1 rounded-xl border border-red-200 py-2.5 text-xs font-bold text-red-600 transition-colors active:bg-red-50 disabled:opacity-60">
-                          Từ chối
+                          {t('status.rejected')}
                         </button>
                         <button onClick={() => handleApprove(request.id)} disabled={isBusy}
                           className="flex-1 rounded-xl bg-primary py-2.5 text-xs font-bold text-white shadow-sm shadow-primary/30 transition-opacity active:opacity-90 disabled:opacity-60">
-                          {isBusy ? 'Đang duyệt...' : 'Phê duyệt'}
+                          {isBusy ? t('common.processing') : t('adminDashboard.pendingApprovals.approveBtn')}
                         </button>
                       </>
                     ) : request.raw_status === 'approved' ? (
                       <>
                         <button onClick={() => handleAdminCancel(request.id)} disabled={isBusy}
                           className="flex-1 rounded-xl border border-slate-200 py-2.5 text-xs font-bold text-slate-600 transition-colors active:bg-slate-50 disabled:opacity-60">
-                          Hủy phiếu
+                          {t('common.cancel')}
                         </button>
                         <button onClick={() => openPickupDialog(request)} disabled={isBusy}
                           className="flex-2 rounded-xl bg-indigo-600 py-2.5 px-4 text-xs font-bold text-white shadow-sm shadow-indigo-600/30 transition-opacity active:opacity-90 disabled:opacity-60">
-                          {isBusy ? 'Đang xử lý...' : 'Giao sách'}
+                          {isBusy ? t('common.processing') : t('adminRequests.actionConfirmPickup')}
                         </button>
                       </>
                     ) : request.raw_status === 'borrowed' ? (
                       <>
                         <button onClick={() => openExtendDialog(request)} disabled={isBusy}
                           className="flex-1 rounded-xl border border-indigo-200 py-2.5 text-xs font-bold text-indigo-600 transition-colors active:bg-indigo-50 disabled:opacity-60">
-                          Gia hạn
+                          {t('adminRequests.actionExtend')}
                         </button>
                         <button onClick={() => openReturnDialog(request)} disabled={isBusy}
                           className="flex-2 rounded-xl bg-tertiary py-2.5 px-4 text-xs font-bold text-white shadow-sm shadow-tertiary/30 transition-opacity active:opacity-90 disabled:opacity-60">
-                          {isBusy ? 'Đang xử lý...' : 'Nhận trả'}
+                          {isBusy ? t('common.processing') : t('adminRequests.actionReturnBook')}
                         </button>
                       </>
                     ) : (
                       <button type="button" onClick={() => setDetailTarget(request)}
                         className="w-full rounded-xl border border-slate-200 py-2.5 text-xs font-semibold text-primary active:bg-slate-50 transition-colors">
-                        Xem chi tiết
+                        {t('adminRequests.details')}
                       </button>
                     )}
                   </div>
@@ -752,7 +768,7 @@ export default function AdminRequests() {
           <div className="w-full max-w-md rounded-t-2xl sm:rounded-xl border border-surface-container bg-white p-6 shadow-xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <h3 id="pickup-dialog-title" className="text-lg font-bold text-slate-900">Xác nhận giao sách #{pickupTarget.id}</h3>
+                <h3 id="pickup-dialog-title" className="text-lg font-bold text-slate-900">{t('adminRequests.pickupModalTitle', { id: pickupTarget.id })}</h3>
                 <p className="mt-1 text-sm text-slate-600">{pickupTarget.book} — {pickupTarget.name}</p>
               </div>
               <button type="button" onClick={closePickupDialog}
@@ -762,20 +778,20 @@ export default function AdminRequests() {
             </div>
 
             <div className="mt-5">
-              <label htmlFor="pickup-barcode" className="text-xs font-bold uppercase tracking-widest text-slate-500">Mã vạch bản sao</label>
+              <label htmlFor="pickup-barcode" className="text-xs font-bold uppercase tracking-widest text-slate-500">{t('adminRequests.pickupBarcodeLabel')}</label>
               <div className="mt-2 flex gap-2">
                 <input
                   id="pickup-barcode"
-                  aria-label="Mã vạch bản sao"
+                  aria-label={t('adminRequests.pickupBarcodeLabel') || 'Barcode'}
                   value={pickupBarcode}
                   onChange={(event) => { setPickupBarcode(event.target.value); setPickupError(null); }}
                   autoFocus
                   className="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2.5 font-mono text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-                  placeholder="BC-SACH-104-01"
+                  placeholder={t('adminRequests.pickupPlaceholder') || 'BC-SACH-104-01'}
                 />
                 <button type="button" onClick={() => setShowPickupScanner((value) => !value)}
                   className="rounded-lg border border-indigo-200 px-3 py-2 text-indigo-600 hover:bg-indigo-50 active:bg-indigo-100"
-                  title="Quét camera">
+                  title={t('adminRequests.scanQrBtn') || 'Scan'}>
                   <span className="material-symbols-outlined text-[18px]">qr_code_scanner</span>
                 </button>
               </div>
@@ -800,11 +816,11 @@ export default function AdminRequests() {
             <div className="mt-6 flex justify-end gap-2 pb-2">
               <button type="button" onClick={closePickupDialog} disabled={activeRequestId === pickupTarget.id}
                 className="flex-1 rounded-xl border border-slate-200 py-3 text-sm font-semibold text-slate-600 hover:bg-slate-50 active:bg-slate-100 disabled:opacity-60">
-                Hủy
+                {t('common.cancel')}
               </button>
               <button type="button" onClick={handleConfirmPickup} disabled={activeRequestId === pickupTarget.id}
                 className="flex-1 rounded-xl bg-indigo-600 py-3 text-sm font-bold text-white hover:bg-indigo-700 active:opacity-90 disabled:cursor-wait disabled:opacity-60">
-                {activeRequestId === pickupTarget.id ? 'Đang xử lý...' : 'Xác nhận'}
+                {activeRequestId === pickupTarget.id ? t('common.processing') : t('common.confirm')}
               </button>
             </div>
           </div>
@@ -817,23 +833,23 @@ export default function AdminRequests() {
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/40 p-0 sm:p-4 backdrop-blur-xs">
           <form onSubmit={handleRejectSubmit}
             className="w-full max-w-md rounded-t-2xl sm:rounded-xl border border-surface-container bg-white p-6 shadow-xl max-h-[90vh] overflow-y-auto">
-            <h3 id="reject-request-title" className="text-lg font-bold text-slate-900">Từ chối yêu cầu #{rejectTarget.id}</h3>
-            <p className="mt-1 text-sm text-slate-600">Nhập lý do để sinh viên có thể xem lại trong lịch sử yêu cầu.</p>
+            <h3 id="reject-request-title" className="text-lg font-bold text-slate-900">{t('adminRequests.rejectModalTitle', { id: rejectTarget.id })}</h3>
+            <p className="mt-1 text-sm text-slate-600">{t('adminRequests.rejectModalDesc')}</p>
             <label className="mt-5 block space-y-2">
-              <span className="text-xs font-bold uppercase tracking-widest text-slate-500">Lý do từ chối</span>
+              <span className="text-xs font-bold uppercase tracking-widest text-slate-500">{t('adminRequests.rejectReasonLabel')}</span>
               <textarea value={rejectReason} onChange={(e) => { setRejectReason(e.target.value); setRejectError(null); }} rows={4}
                 className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-                placeholder="Ví dụ: Sách đang được kiểm kê hoặc thông tin yêu cầu chưa hợp lệ." />
+                placeholder={t('adminRequests.rejectReasonPlaceholder') || 'Enter reason...'} />
             </label>
             {rejectError ? <p role="alert" className="mt-2 text-sm text-red-600">{rejectError}</p> : null}
             <div className="mt-6 flex justify-end gap-2 pb-2">
               <button type="button" onClick={closeRejectDialog} disabled={activeRequestId === rejectTarget.id}
                 className="flex-1 rounded-xl border border-slate-200 py-3 text-sm font-semibold text-slate-600 hover:bg-slate-50 active:bg-slate-100 disabled:cursor-wait disabled:opacity-60">
-                Hủy
+                {t('common.cancel')}
               </button>
               <button type="submit" disabled={activeRequestId === rejectTarget.id}
                 className="flex-1 rounded-xl bg-red-600 py-3 text-sm font-bold text-white hover:bg-red-700 active:opacity-90 disabled:cursor-wait disabled:opacity-60">
-                {activeRequestId === rejectTarget.id ? 'Đang từ chối...' : 'Từ chối'}
+                {activeRequestId === rejectTarget.id ? t('common.processing') : t('status.rejected')}
               </button>
             </div>
           </form>
@@ -845,26 +861,34 @@ export default function AdminRequests() {
         <div role="dialog" aria-modal="true" aria-labelledby="return-dialog-title"
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/40 p-0 sm:p-4 backdrop-blur-xs">
           <div className="w-full max-w-md rounded-t-2xl sm:rounded-xl border border-surface-container bg-white p-6 shadow-xl max-h-[90vh] overflow-y-auto">
-            <h3 id="return-dialog-title" className="text-lg font-bold text-slate-900">Nhận trả sách #{returnTarget.id}</h3>
+            <h3 id="return-dialog-title" className="text-lg font-bold text-slate-900">{t('adminRequests.returnModalTitle', { id: returnTarget.id })}</h3>
             <p className="mt-1 text-sm text-slate-600">{returnTarget.book} — {returnTarget.name}</p>
 
             <div className="mt-5">
-              <label htmlFor="return-barcode" className="text-xs font-bold uppercase tracking-widest text-slate-500">Mã vạch bản sao</label>
+              <label htmlFor="return-barcode" className="text-xs font-bold uppercase tracking-widest text-slate-500">{t('adminRequests.pickupBarcodeLabel')}</label>
               <input
                 id="return-barcode"
-                aria-label="Mã vạch bản sao"
+                aria-label={t('adminRequests.pickupBarcodeLabel') || 'Barcode'}
                 value={returnBarcode}
                 onChange={(event) => setReturnBarcode(event.target.value)}
                 className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2.5 font-mono text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-                placeholder="Quét hoặc nhập mã trên cuốn sách"
+                placeholder={t('adminRequests.returnBarcodePlaceholder') || 'Enter copy barcode...'}
               />
             </div>
 
-            <p className="mt-5 text-xs font-bold uppercase tracking-widest text-slate-500">Tình trạng sách khi trả</p>
+            <p className="mt-5 text-xs font-bold uppercase tracking-widest text-slate-500">{t('adminRequests.returnConditionLabel')}</p>
             <div className="mt-3 flex flex-col gap-2">
               {(['good', 'damaged', 'lost'] as BookCondition[]).map((cond) => {
-                const labels = { good: '✅ Bình thường', damaged: '⚠️ Hư hỏng', lost: '❌ Mất sách' };
-                const subtext = { good: 'Không phát sinh phí phạt bổ sung', damaged: 'Phát sinh phí bồi thường hư hỏng', lost: 'Phát sinh phí bồi thường mất sách — không hoàn lại tồn kho' };
+                const labels = {
+                  good: `✅ ${t('adminRequests.returnConditionGood')}`,
+                  damaged: `⚠️ ${t('adminRequests.returnConditionDamaged')}`,
+                  lost: `❌ ${t('adminRequests.returnConditionLost')}`
+                };
+                const subtext = {
+                  good: t('adminRequests.returnConditionGoodDesc'),
+                  damaged: t('adminRequests.returnConditionDamagedDesc'),
+                  lost: t('adminRequests.returnConditionLostDesc')
+                };
                 return (
                   <label key={cond} className={`flex cursor-pointer items-start gap-3 rounded-lg border-2 p-3 transition-colors ${returnCondition === cond ? 'border-primary bg-primary/5' : 'border-slate-200 hover:border-slate-300'}`}>
                     <input type="radio" name="condition" value={cond} checked={returnCondition === cond}
@@ -880,9 +904,9 @@ export default function AdminRequests() {
 
             {returnCondition !== 'good' && (
               <div className="mt-4">
-                <label className="text-xs font-bold uppercase tracking-widest text-slate-500">Ghi chú (tuỳ chọn)</label>
+                <label className="text-xs font-bold uppercase tracking-widest text-slate-500">{t('adminRequests.returnNoteLabel')}</label>
                 <textarea value={returnNote} onChange={(e) => setReturnNote(e.target.value)} rows={2}
-                  placeholder="Mô tả tình trạng cụ thể..."
+                  placeholder={t('adminRequests.returnNotePlaceholder') || 'Describe damage...'}
                   className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" />
               </div>
             )}
@@ -890,11 +914,11 @@ export default function AdminRequests() {
             <div className="mt-6 flex justify-end gap-2 pb-2">
               <button type="button" onClick={() => setReturnTarget(null)} disabled={activeRequestId === returnTarget.id}
                 className="flex-1 rounded-xl border border-slate-200 py-3 text-sm font-semibold text-slate-600 hover:bg-slate-50 active:bg-slate-100 disabled:opacity-60">
-                Hủy
+                {t('common.cancel')}
               </button>
               <button type="button" onClick={handleReturnSubmit} disabled={activeRequestId === returnTarget.id}
                 className={`flex-1 rounded-xl py-3 text-sm font-bold text-white active:opacity-90 disabled:cursor-wait disabled:opacity-60 ${returnCondition === 'lost' ? 'bg-red-600 hover:bg-red-700' : returnCondition === 'damaged' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-tertiary hover:bg-tertiary/90'}`}>
-                {activeRequestId === returnTarget.id ? 'Đang xử lý...' : 'Xác nhận'}
+                {activeRequestId === returnTarget.id ? t('common.processing') : t('common.confirm')}
               </button>
             </div>
           </div>
@@ -906,13 +930,13 @@ export default function AdminRequests() {
         <div role="dialog" aria-modal="true" aria-labelledby="extend-dialog-title"
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/40 p-0 sm:p-4 backdrop-blur-xs">
           <div className="w-full max-w-sm rounded-t-2xl sm:rounded-xl border border-surface-container bg-white p-6 shadow-xl max-h-[90vh] overflow-y-auto">
-            <h3 id="extend-dialog-title" className="text-lg font-bold text-slate-900">Gia hạn phiếu #{extendTarget.id}</h3>
+            <h3 id="extend-dialog-title" className="text-lg font-bold text-slate-900">{t('adminRequests.extendModalTitle', { id: extendTarget.id })}</h3>
             <p className="mt-1 text-sm text-slate-600">{extendTarget.book} — {extendTarget.name}</p>
             {extendTarget.due_date && (
-              <p className="mt-2 text-xs text-slate-500">Hạn hiện tại: <span className="font-bold text-slate-700">{extendTarget.due_date}</span></p>
+              <p className="mt-2 text-xs text-slate-500">{t('adminRequests.currentDue', { date: extendTarget.due_date })}</p>
             )}
             <div className="mt-5">
-              <label className="text-xs font-bold uppercase tracking-widest text-slate-500">Số ngày gia hạn thêm (tối đa 30)</label>
+              <label className="text-xs font-bold uppercase tracking-widest text-slate-500">{t('adminRequests.extendDaysLabel')}</label>
               <div className="mt-2 flex items-center justify-center gap-3">
                 <button type="button" onClick={() => setExtendDays((d) => Math.max(1, d - 1))}
                   className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 active:bg-slate-100 font-bold">−</button>
@@ -921,22 +945,22 @@ export default function AdminRequests() {
                   className="w-20 rounded-lg border border-slate-200 px-3 py-2 text-center text-sm font-bold outline-none focus:border-primary" />
                 <button type="button" onClick={() => setExtendDays((d) => Math.min(30, d + 1))}
                   className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 active:bg-slate-100 font-bold">+</button>
-                <span className="text-sm text-slate-500">ngày</span>
+                <span className="text-sm text-slate-500">{t('adminRequests.extendDaysValue', { count: extendDays }).replace(/[0-9\s]/g, '')}</span>
               </div>
               {extendTarget.due_date && (
                 <p className="mt-3 text-xs text-primary font-medium text-center bg-primary/5 rounded-lg py-1.5">
-                  Hạn mới: {new Date(new Date(extendTarget.due_date).getTime() + extendDays * 86400000).toISOString().slice(0, 10)}
+                  {t('adminRequests.newDue', { date: new Date(new Date(extendTarget.due_date).getTime() + extendDays * 86400000).toISOString().slice(0, 10) })}
                 </p>
               )}
             </div>
             <div className="mt-6 flex justify-end gap-2 pb-2">
               <button type="button" onClick={() => setExtendTarget(null)} disabled={activeRequestId === extendTarget.id}
                 className="flex-1 rounded-xl border border-slate-200 py-3 text-sm font-semibold text-slate-600 hover:bg-slate-50 active:bg-slate-100 disabled:opacity-60">
-                Hủy
+                {t('common.cancel')}
               </button>
               <button type="button" onClick={handleExtendSubmit} disabled={activeRequestId === extendTarget.id}
                 className="flex-1 rounded-xl bg-indigo-600 py-3 text-sm font-bold text-white hover:bg-indigo-700 active:opacity-90 disabled:cursor-wait disabled:opacity-60">
-                {activeRequestId === extendTarget.id ? 'Gia hạn...' : 'Gia hạn'}
+                {activeRequestId === extendTarget.id ? t('adminRequests.extending', 'Extending...') : t('adminRequests.extend', 'Extend')}
               </button>
             </div>
           </div>
@@ -950,8 +974,8 @@ export default function AdminRequests() {
           <div className="w-full max-w-lg rounded-t-2xl sm:rounded-xl border border-surface-container bg-white p-6 shadow-xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <h3 id="request-detail-title" className="text-lg font-bold text-slate-900">Chi tiết phiếu #{detailTarget.id}</h3>
-                <p className="mt-1 text-sm text-slate-600">{detailTarget.status} | Cập nhật: {detailTarget.date || 'N/A'}</p>
+                <h3 id="request-detail-title" className="text-lg font-bold text-slate-900">{t('adminRequests.details')} #{detailTarget.id}</h3>
+                <p className="mt-1 text-sm text-slate-600">{t(`status.${detailTarget.raw_status}`)} | {t('adminRequests.lastUpdated', { date: detailTarget.date || 'N/A' })}</p>
               </div>
               <button type="button" onClick={() => setDetailTarget(null)}
                 className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 active:scale-95">
@@ -960,17 +984,17 @@ export default function AdminRequests() {
             </div>
 
             <dl className="mt-6 grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
-              <div><dt className="text-xs font-bold uppercase tracking-widest text-slate-500">Độc giả</dt><dd className="mt-1 font-semibold text-slate-800">{detailTarget.name} ({detailTarget.code})</dd></div>
-              <div><dt className="text-xs font-bold uppercase tracking-widest text-slate-500">Tài liệu</dt><dd className="mt-1 font-semibold text-slate-800">{detailTarget.book} ({detailTarget.bookCode})</dd></div>
-              <div><dt className="text-xs font-bold uppercase tracking-widest text-slate-500">Ngày yêu cầu</dt><dd className="mt-1 text-slate-700">{detailTarget.requested_at || 'N/A'}</dd></div>
-              <div><dt className="text-xs font-bold uppercase tracking-widest text-slate-500">Hạn trả</dt><dd className="mt-1 text-slate-700">{detailTarget.due_date || 'N/A'}</dd></div>
-              <div><dt className="text-xs font-bold uppercase tracking-widest text-slate-500">Ngày trả</dt><dd className="mt-1 text-slate-700">{detailTarget.return_date || 'N/A'}</dd></div>
-              <div><dt className="text-xs font-bold uppercase tracking-widest text-slate-500">Ngày từ chối</dt><dd className="mt-1 text-slate-700">{detailTarget.rejected_at || 'N/A'}</dd></div>
+              <div><dt className="text-xs font-bold uppercase tracking-widest text-slate-500">{t('adminRequests.tableHeaderMember')}</dt><dd className="mt-1 font-semibold text-slate-800">{detailTarget.name} ({detailTarget.code})</dd></div>
+              <div><dt className="text-xs font-bold uppercase tracking-widest text-slate-500">{t('adminRequests.tableHeaderBook')}</dt><dd className="mt-1 font-semibold text-slate-800">{detailTarget.book} ({detailTarget.bookCode})</dd></div>
+              <div><dt className="text-xs font-bold uppercase tracking-widest text-slate-500">{t('adminRequests.requestedDateLabel')}</dt><dd className="mt-1 text-slate-700">{detailTarget.requested_at || 'N/A'}</dd></div>
+              <div><dt className="text-xs font-bold uppercase tracking-widest text-slate-500">{t('adminRequests.tableHeaderDue')}</dt><dd className="mt-1 text-slate-700">{detailTarget.due_date || 'N/A'}</dd></div>
+              <div><dt className="text-xs font-bold uppercase tracking-widest text-slate-500">{t('adminRequests.returnDateLabel')}</dt><dd className="mt-1 text-slate-700">{detailTarget.return_date || 'N/A'}</dd></div>
+              <div><dt className="text-xs font-bold uppercase tracking-widest text-slate-500">{t('adminRequests.rejectedDateLabel')}</dt><dd className="mt-1 text-slate-700">{detailTarget.rejected_at || 'N/A'}</dd></div>
             </dl>
 
             {detailTarget.rejection_reason ? (
               <div className="mt-5 rounded-lg border border-red-100 bg-red-50 p-3 text-sm text-red-700">
-                <span className="font-bold">Lý do từ chối: </span>{detailTarget.rejection_reason}
+                <span className="font-bold">{t('adminRequests.rejectReasonLabel')}: </span>{detailTarget.rejection_reason}
               </div>
             ) : null}
 
@@ -978,16 +1002,16 @@ export default function AdminRequests() {
               <div className={`mt-5 rounded-lg border p-4 text-sm ${detailTarget.fine.status === 'paid' ? 'border-green-200 bg-green-50 text-green-800' : detailTarget.fine.status === 'waived' ? 'border-sky-200 bg-sky-50 text-sky-800' : 'border-red-200 bg-red-50 text-red-800'}`}>
                 <div className="flex items-center justify-between">
                   <div>
-                    <span className="font-bold">Khoản phạt:</span>
+                    <span className="font-bold">{t('nav.fines')}:</span>
                     <span className="ml-2 text-base font-extrabold">{detailTarget.fine.amount.toLocaleString('vi-VN')} VND</span>
                     {detailTarget.fine.reason && <span className="ml-2 text-xs opacity-70">({detailTarget.fine.reason})</span>}
                   </div>
                   <span className={`rounded px-2 py-0.5 text-xs font-bold uppercase ${detailTarget.fine.status === 'paid' ? 'bg-green-200 text-green-800' : detailTarget.fine.status === 'waived' ? 'bg-sky-200 text-sky-800' : 'bg-red-200 text-red-800'}`}>
-                    {detailTarget.fine.status === 'paid' ? 'Đã đóng' : detailTarget.fine.status === 'waived' ? 'Đã miễn' : 'Chưa đóng'}
+                    {detailTarget.fine.status === 'paid' ? t('status.paid') : detailTarget.fine.status === 'waived' ? t('status.waived') : t('status.unpaid')}
                   </span>
                 </div>
                 {detailTarget.fine.status === 'paid' && detailTarget.fine.paid_at && (
-                  <p className="mt-2 text-xs text-green-600">Đã thanh toán vào lúc: {new Date(detailTarget.fine.paid_at).toLocaleString('vi-VN')}</p>
+                  <p className="mt-2 text-xs text-green-600">{t('adminRequests.finePaidAt', { date: new Date(detailTarget.fine.paid_at).toLocaleString(i18n.language) })}</p>
                 )}
               </div>
             ) : null}
@@ -996,25 +1020,25 @@ export default function AdminRequests() {
               {detailTarget.fine && detailTarget.fine.status === 'unpaid' && (
                 <button type="button" onClick={() => handlePayFine(detailTarget.fine!.fine_id)} disabled={activeRequestId === detailTarget.id}
                   className="flex-1 min-w-[120px] rounded-xl bg-emerald-600 py-3 text-sm font-bold text-white hover:bg-emerald-700 disabled:cursor-wait disabled:opacity-60 active:opacity-90">
-                  {activeRequestId === detailTarget.id ? 'Đang xử lý...' : 'Thu phí phạt'}
+                  {activeRequestId === detailTarget.id ? t('common.processing') : t('adminRequests.finePayBtn')}
                 </button>
               )}
               {detailTarget.raw_status === 'pending' ? (
                 <>
                   <button onClick={() => { setDetailTarget(null); openRejectDialog(detailTarget); }}
-                    className="flex-1 min-w-[100px] rounded-xl border border-red-200 py-3 text-sm font-bold text-red-600 hover:bg-red-50 active:bg-red-100">Từ chối</button>
+                    className="flex-1 min-w-[100px] rounded-xl border border-red-200 py-3 text-sm font-bold text-red-600 hover:bg-red-50 active:bg-red-100">{t('status.rejected')}</button>
                   <button onClick={() => { setDetailTarget(null); handleApprove(detailTarget.id); }}
-                    className="flex-1 min-w-[100px] rounded-xl bg-primary py-3 text-sm font-bold text-white hover:opacity-90 active:opacity-80">Duyệt</button>
+                    className="flex-1 min-w-[100px] rounded-xl bg-primary py-3 text-sm font-bold text-white hover:opacity-90 active:opacity-80">{t('adminDashboard.pendingApprovals.approveBtn')}</button>
                 </>
               ) : detailTarget.raw_status === 'approved' ? (
                 <button onClick={() => openPickupDialog(detailTarget)}
-                  className="w-full rounded-xl bg-indigo-600 py-3 text-sm font-bold text-white hover:opacity-90 active:opacity-80">Xác nhận giao sách</button>
+                  className="w-full rounded-xl bg-indigo-600 py-3 text-sm font-bold text-white hover:opacity-90 active:opacity-80">{t('adminRequests.actionConfirmPickup')}</button>
               ) : detailTarget.raw_status === 'borrowed' ? (
                 <>
                   <button onClick={() => openExtendDialog(detailTarget)}
-                    className="flex-1 min-w-[100px] rounded-xl border border-indigo-200 py-3 text-sm font-bold text-indigo-600 hover:bg-indigo-50 active:bg-indigo-100">Gia hạn</button>
+                    className="flex-1 min-w-[100px] rounded-xl border border-indigo-200 py-3 text-sm font-bold text-indigo-600 hover:bg-indigo-50 active:bg-indigo-100">{t('adminRequests.actionExtend')}</button>
                   <button onClick={() => openReturnDialog(detailTarget)}
-                    className="flex-1 min-w-[100px] rounded-xl bg-tertiary py-3 text-sm font-bold text-white hover:opacity-90 active:opacity-80">Nhận trả sách</button>
+                    className="flex-1 min-w-[100px] rounded-xl bg-tertiary py-3 text-sm font-bold text-white hover:opacity-90 active:opacity-80">{t('adminRequests.actionReturnBook')}</button>
                 </>
               ) : null}
             </div>
@@ -1027,7 +1051,7 @@ export default function AdminRequests() {
         <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-slate-900/80 p-0 sm:p-4 backdrop-blur-xs">
           <div className="w-full max-w-md overflow-hidden rounded-t-2xl sm:rounded-2xl bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
-              <h3 className="text-lg font-bold text-slate-900">Quét mã QR Phiếu mượn</h3>
+              <h3 className="text-lg font-bold text-slate-900">{t('adminRequests.qrModalTitle')}</h3>
               <button onClick={() => setShowScanner(false)} className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 active:scale-95">
                 <span className="material-symbols-outlined text-[20px]">close</span>
               </button>
@@ -1046,13 +1070,13 @@ export default function AdminRequests() {
                       setShowScanner(false);
                       if (target?.raw_status === 'borrowed') {
                         openReturnDialog(target);
-                        emitToast({ tone: 'success', title: 'Đã nhận diện bản sao', message: scannedValue });
+                        emitToast({ tone: 'success', title: t('adminRequests.pickupBarcodeLabel'), message: scannedValue });
                       } else if (target?.raw_status === 'approved') {
                         openPickupDialog(target);
                         setPickupBarcode(scannedValue);
                       } else {
                         handleSearchChange(scannedValue);
-                        emitToast({ tone: 'info', title: 'Đang tìm mã bản sao', message: scannedValue });
+                        emitToast({ tone: 'info', title: t('adminRequests.pickupBarcodeLabel'), message: scannedValue });
                       }
                       return;
                     }
@@ -1076,8 +1100,8 @@ export default function AdminRequests() {
                         }
                         emitToast({
                           tone: 'success',
-                          title: 'Đã nhận diện sách',
-                          message: `Mã sách ${scannedValue}: "${target.book}"`,
+                          title: t('adminDashboard.pendingApprovals.headerBook'),
+                          message: `${t('adminDashboard.quickAction.bookId')} ${scannedValue}: "${target.book}"`,
                         });
                       } else if (activeRequests.length > 1) {
                         setShowScanner(false);
@@ -1086,8 +1110,8 @@ export default function AdminRequests() {
                         setSearchParams(nextParams, { replace: true });
                         emitToast({
                           tone: 'info',
-                          title: 'Nhiều yêu cầu hoạt động',
-                          message: `Tìm thấy ${activeRequests.length} phiếu mượn/trả hoạt động cho sách này.`,
+                          title: t('adminRequests.multipleRequests', 'Multiple active requests'),
+                          message: `Found ${activeRequests.length} active transactions for this book.`,
                         });
                       } else {
                         // Look for any history for this book
@@ -1100,8 +1124,8 @@ export default function AdminRequests() {
                         }
                         emitToast({
                           tone: 'warning',
-                          title: 'Không có phiếu mượn hoạt động',
-                          message: `Không có sinh viên nào đang mượn hoặc chờ nhận cuốn sách này (Mã: ${scannedValue}).`,
+                          title: t('adminRequests.noActiveLoans', 'No active loans'),
+                          message: `No active borrow/pickup for this book (Code: ${scannedValue}).`,
                         });
                       }
                       return;
@@ -1112,16 +1136,16 @@ export default function AdminRequests() {
                     if (!isNaN(parsedId)) {
                       const found = requests.find((r) => r.id === parsedId);
                       if (found) { setShowScanner(false); setDetailTarget(found); }
-                      else emitToast({ tone: 'error', title: 'Lỗi', message: 'Không tìm thấy phiếu mượn có ID: ' + scannedValue });
+                      else emitToast({ tone: 'error', title: t('common.error'), message: 'No borrow request found with ID: ' + scannedValue });
                     } else {
-                      emitToast({ tone: 'error', title: 'Mã không hợp lệ', message: 'Mã quét không đúng định dạng phiếu mượn hoặc mã sách.' });
+                      emitToast({ tone: 'error', title: t('adminRequests.invalidCode', 'Invalid code'), message: t('adminRequests.invalidCodeDesc', 'The scanned code is invalid.') });
                     }
                   }
                 }}
                 components={{ finder: true }}
               />
             </div>
-            <div className="bg-slate-50 p-4 text-center text-xs text-slate-500 pb-6 sm:pb-4">Đưa mã QR của sinh viên hoặc mã vạch của sách (SACH-XXXXX) vào khung camera để tự động xử lý.</div>
+            <div className="bg-slate-50 p-4 text-center text-xs text-slate-500 pb-6 sm:pb-4">{t('adminRequests.qrModalScannerDesc')}</div>
           </div>
         </div>
       )}

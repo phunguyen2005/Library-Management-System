@@ -22,7 +22,7 @@ export default function AdminHeader({ onOpenPolicy, onToggleSidebar }: AdminHead
             type="button"
             onClick={onToggleSidebar}
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-on-surface-variant hover:bg-surface-container lg:hidden cursor-pointer"
-            aria-label="Mở thanh điều hướng"
+            aria-label={t('adminHeader.openSidebar', 'Mở thanh điều hướng')}
           >
             <span className="material-symbols-outlined text-2xl">menu</span>
           </button>
@@ -32,7 +32,7 @@ export default function AdminHeader({ onOpenPolicy, onToggleSidebar }: AdminHead
       <div className="flex items-center gap-4">
         <button
           onClick={onOpenPolicy}
-          title="Chính sách & Quy định Thư viện"
+          title={t('adminHeader.policyRules', 'Chính sách & Quy định Thư viện')}
           className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl border border-surface-container-high bg-surface-bright text-on-surface shadow-sm transition-all hover:bg-surface-container-low hover:text-primary active:scale-95"
         >
           <span className="material-symbols-outlined text-[22px] font-light">menu_book</span>

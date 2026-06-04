@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import {
@@ -14,83 +15,20 @@ import { emitToast } from '../../notifications/events';
 import CSVExportSelector from '../../components/CSVExportSelector';
 import { API_BASE_URL } from '../../api/client';
 import { getStoredToken } from '../../auth/storage';
-
-const AVAILABLE_EXPORT_COLUMNS_FINES = [
-  { key: 'fine_id', label: 'Mã phạt / Giao dịch' },
-  { key: 'student_name', label: 'Tên độc giả' },
-  { key: 'student_email', label: 'Email độc giả' },
-  { key: 'amount', label: 'Số tiền phạt' },
-  { key: 'status', label: 'Trạng thái thu nợ' },
-  { key: 'payment_method', label: 'Phương thức nộp' },
-  { key: 'transaction_ref', label: 'Mã tham chiếu' },
-  { key: 'reason', label: 'Lý do phạt' },
-  { key: 'processor_name', label: 'Người xử lý' },
-  { key: 'created_at', label: 'Thời gian phạt' },
-  { key: 'paid_at', label: 'Thời gian nộp' },
-];
+import { getIntlLocale } from '../../i18n';
 
 const DEFAULT_EXPORT_COLUMNS_FINES = ['fine_id', 'student_name', 'amount', 'status', 'payment_method', 'paid_at'];
 
-const AVAILABLE_EXPORT_COLUMNS_OVERDUE = [
-  { key: 'member_id', label: 'Mã sinh viên' },
-  { key: 'member_name', label: 'Họ và tên' },
-  { key: 'email', label: 'Địa chỉ Email' },
-  { key: 'phone', label: 'Số điện thoại' },
-  { key: 'book_title', label: 'Tên sách' },
-  { key: 'loan_id', label: 'Mã phiếu mượn' },
-  { key: 'borrow_date', label: 'Ngày mượn' },
-  { key: 'due_date', label: 'Hạn trả' },
-  { key: 'days_overdue', label: 'Số ngày quá hạn' },
-  { key: 'accrued_fine', label: 'Phạt lũy kế (VND)' },
-  { key: 'status', label: 'Trạng thái' }
-];
-
 const DEFAULT_EXPORT_COLUMNS_OVERDUE = [
   'member_id', 'member_name', 'book_title', 'due_date', 'days_overdue', 'accrued_fine'
-];
-
-const AVAILABLE_EXPORT_COLUMNS_CIRCULATION = [
-  { key: 'book_id', label: 'Mã tài liệu' },
-  { key: 'title', label: 'Tên tài liệu' },
-  { key: 'genre', label: 'Thể loại' },
-  { key: 'total_quantity', label: 'Tổng số bản sách' },
-  { key: 'total_borrows', label: 'Tổng số lượt mượn' },
-  { key: 'avg_borrow_days', label: 'Số ngày mượn TB' },
-  { key: 'turn_rate', label: 'Hệ số xoay vòng kho' },
-  { key: 'last_borrowed_at', label: 'Lượt mượn cuối' },
-  { key: 'circulation_status', label: 'Đánh giá lưu thông' }
 ];
 
 const DEFAULT_EXPORT_COLUMNS_CIRCULATION = [
   'book_id', 'title', 'total_quantity', 'total_borrows', 'turn_rate', 'circulation_status'
 ];
 
-const AVAILABLE_EXPORT_COLUMNS_ASSETS = [
-  { key: 'book_id', label: 'Mã tài sản' },
-  { key: 'title', label: 'Tên tài liệu' },
-  { key: 'unit_price', label: 'Nguyên giá (VND)' },
-  { key: 'total_quantity', label: 'Tổng bản đăng ký' },
-  { key: 'good_quantity', label: 'Số bản tốt' },
-  { key: 'damaged_quantity', label: 'Số bản hỏng' },
-  { key: 'lost_quantity', label: 'Số bản đã mất' },
-  { key: 'depreciation_rate', label: 'Tỷ lệ khấu hao (%)' },
-  { key: 'current_value', label: 'Giá trị tài sản (VND)' }
-];
-
 const DEFAULT_EXPORT_COLUMNS_ASSETS = [
   'book_id', 'title', 'unit_price', 'total_quantity', 'good_quantity', 'current_value'
-];
-
-const AVAILABLE_EXPORT_COLUMNS_DIGITAL = [
-  { key: 'book_id', label: 'Mã tài nguyên số' },
-  { key: 'title', label: 'Tên tài liệu' },
-  { key: 'author', label: 'Tác giả' },
-  { key: 'genre', label: 'Thể loại' },
-  { key: 'file_format', label: 'Định dạng tệp' },
-  { key: 'file_size', label: 'Dung lượng tệp' },
-  { key: 'download_count', label: 'Số lượt tải về' },
-  { key: 'online_views', label: 'Số lượt xem online' },
-  { key: 'average_rating', label: 'Đánh giá học giả' }
 ];
 
 const DEFAULT_EXPORT_COLUMNS_DIGITAL = [
@@ -124,29 +62,23 @@ function formatDateDMY(dateStr: string) {
   return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : dateStr;
 }
 
-function filterLabel(filter: ReportFilter): string {
-  if (!filter) return 'Tất cả thời gian';
-  if (filter.filter_type === 'day') return `Ngày ${formatDateDMY(filter.filter_value)}`;
+function filterLabel(filter: ReportFilter, t: any): string {
+  if (!filter) return t('adminReports.allTime', 'Tất cả thời gian');
+  if (filter.filter_type === 'day') return t('adminReports.filterDayLabel', { date: formatDateDMY(filter.filter_value), defaultValue: `Ngày ${formatDateDMY(filter.filter_value)}` });
   if (filter.filter_type === 'range') {
     const [start, end] = filter.filter_value.split(',');
-    return `Ngày ${formatDateDMY(start)} – ${formatDateDMY(end)}`;
+    return t('adminReports.filterRangeLabel', { start: formatDateDMY(start), end: formatDateDMY(end), defaultValue: `Ngày ${formatDateDMY(start)} – ${formatDateDMY(end)}` });
   }
   if (filter.filter_type === 'month') {
     const [y, m] = filter.filter_value.split('-');
-    return `Tháng ${parseInt(m, 10)}/${y}`;
+    return t('adminReports.filterMonthLabel', { month: parseInt(m, 10), year: y, defaultValue: `Tháng ${parseInt(m, 10)}/${y}` });
   }
-  return `Năm ${filter.filter_value}`;
+  return t('adminReports.filterYearLabel', { year: filter.filter_value, defaultValue: `Năm ${filter.filter_value}` });
 }
 
 // ─── Tab config ──────────────────────────────────────────────────────────────
 
 type TabKey = 'overview' | 'finance' | 'rankings';
-
-const TABS: { key: TabKey; label: string; icon: string }[] = [
-  { key: 'overview',  label: 'Tổng quan',   icon: 'dashboard' },
-  { key: 'finance',   label: 'Tài chính',   icon: 'payments' },
-  { key: 'rankings',  label: 'Bảng xếp hạng', icon: 'leaderboard' },
-];
 
 // ─── Chart section card wrapper ───────────────────────────────────────────────
 
@@ -174,6 +106,78 @@ function ChartCard({
 // ─── Main component ──────────────────────────────────────────────────────────
 
 export default function AdminReports() {
+  const { t } = useTranslation();
+
+  const AVAILABLE_EXPORT_COLUMNS_FINES = [
+    { key: 'fine_id', label: `${t('adminReports.tableHeaderId', 'Mã')} ${t('adminReports.reasonOverdue', 'phạt').toLowerCase()} / ${t('adminReports.tableHeaderTxRef', 'Giao dịch')}` },
+    { key: 'student_name', label: t('adminReports.tableHeaderMember', 'Tên độc giả') },
+    { key: 'student_email', label: `Email ${t('adminReports.tableHeaderMember', 'độc giả').toLowerCase()}` },
+    { key: 'amount', label: `${t('adminReports.tableHeaderAmount', 'Số tiền')} ${t('adminReports.reasonOverdue', 'phạt').toLowerCase()}` },
+    { key: 'status', label: t('adminReports.debtStatus', 'Trạng thái thu nợ') },
+    { key: 'payment_method', label: t('adminReports.paymentMethodLabel', 'Phương thức nộp') },
+    { key: 'transaction_ref', label: `${t('adminReports.tableHeaderId', 'Mã')} ${t('adminReports.tableHeaderTxRef', 'tham chiếu')}` },
+    { key: 'reason', label: `${t('adminReports.tableHeaderReason', 'Lý do')} ${t('adminReports.reasonOverdue', 'phạt').toLowerCase()}` },
+    { key: 'processor_name', label: t('adminReports.tableHeaderProcessor', 'Người xử lý') },
+    { key: 'created_at', label: t('adminReports.timeFine', 'Thời gian phạt') },
+    { key: 'paid_at', label: t('adminReports.timePaid', 'Thời gian nộp') },
+  ];
+
+  const AVAILABLE_EXPORT_COLUMNS_OVERDUE = [
+    { key: 'member_id', label: `${t('adminReports.tableHeaderId', 'Mã')} ${t('common.student', 'sinh viên').toLowerCase()}` },
+    { key: 'member_name', label: t('adminReports.membersHeaderName', 'Họ và tên') },
+    { key: 'email', label: t('adminReports.membersHeaderEmail', 'Địa chỉ Email') },
+    { key: 'phone', label: t('adminReports.membersHeaderPhone', 'Số điện thoại') },
+    { key: 'book_title', label: t('adminReports.booksHeaderTitle', 'Tên sách') },
+    { key: 'loan_id', label: `${t('adminReports.tableHeaderId', 'Mã')} phiếu mượn` },
+    { key: 'borrow_date', label: t('adminReports.borrowDateLabel', 'Ngày mượn') },
+    { key: 'due_date', label: t('adminReports.dueDateLabel', 'Hạn trả') },
+    { key: 'days_overdue', label: t('adminReports.daysOverdueLabel', 'Số ngày quá hạn') },
+    { key: 'accrued_fine', label: t('adminReports.accruedFineLabel', 'Phạt lũy kế (VND)') },
+    { key: 'status', label: t('adminReports.statusLabel', 'Trạng thái') }
+  ];
+
+  const AVAILABLE_EXPORT_COLUMNS_CIRCULATION = [
+    { key: 'book_id', label: `${t('adminReports.tableHeaderId', 'Mã')} tài liệu` },
+    { key: 'title', label: t('adminReports.booksHeaderTitle', 'Tên tài liệu') },
+    { key: 'genre', label: t('adminReports.genreLabel', 'Thể loại') },
+    { key: 'total_quantity', label: t('adminReports.totalQuantityLabel', 'Tổng số bản sách') },
+    { key: 'total_borrows', label: t('adminReports.totalBorrowsLabel', 'Tổng số lượt mượn') },
+    { key: 'avg_borrow_days', label: t('adminReports.avgBorrowDaysLabel', 'Số ngày mượn TB') },
+    { key: 'turn_rate', label: t('adminReports.turnRateLabel', 'Hệ số xoay vòng kho') },
+    { key: 'last_borrowed_at', label: t('adminReports.lastBorrowedAtLabel', 'Lượt mượn cuối') },
+    { key: 'circulation_status', label: t('adminReports.circulationStatusLabel', 'Đánh giá lưu thông') }
+  ];
+
+  const AVAILABLE_EXPORT_COLUMNS_ASSETS = [
+    { key: 'book_id', label: `${t('adminReports.tableHeaderId', 'Mã')} tài sản` },
+    { key: 'title', label: t('adminReports.booksHeaderTitle', 'Tên tài liệu') },
+    { key: 'unit_price', label: t('adminReports.unitPriceLabel', 'Nguyên giá (VND)') },
+    { key: 'total_quantity', label: t('adminReports.totalQuantityRegLabel', 'Tổng bản đăng ký') },
+    { key: 'good_quantity', label: t('adminReports.goodQuantityLabel', 'Số bản tốt') },
+    { key: 'damaged_quantity', label: t('adminReports.damagedQuantityLabel', 'Số bản hỏng') },
+    { key: 'lost_quantity', label: t('adminReports.lostQuantityLabel', 'Số bản đã mất') },
+    { key: 'depreciation_rate', label: t('adminReports.depreciationRateLabel', 'Tỷ lệ khấu hao (%)') },
+    { key: 'current_value', label: t('adminReports.currentValueLabel', 'Giá trị tài sản (VND)') }
+  ];
+
+  const AVAILABLE_EXPORT_COLUMNS_DIGITAL = [
+    { key: 'book_id', label: `${t('adminReports.tableHeaderId', 'Mã')} tài nguyên số` },
+    { key: 'title', label: t('adminReports.booksHeaderTitle', 'Tên tài liệu') },
+    { key: 'author', label: t('adminReports.authorLabel', 'Tác giả') },
+    { key: 'genre', label: t('adminReports.genreLabel', 'Thể loại') },
+    { key: 'file_format', label: t('adminReports.fileFormatLabel', 'Định dạng tệp') },
+    { key: 'file_size', label: t('adminReports.fileSizeLabel', 'Dung lượng tệp') },
+    { key: 'download_count', label: t('adminReports.downloadCountLabel', 'Số lượt tải về') },
+    { key: 'online_views', label: t('adminReports.onlineViewsLabel', 'Số lượt xem online') },
+    { key: 'average_rating', label: t('adminReports.averageRatingLabel', 'Đánh giá học giả') }
+  ];
+
+  const tabs: { key: TabKey; label: string; icon: string }[] = [
+    { key: 'overview',  label: t('nav.dashboard', 'Tổng quan'),   icon: 'dashboard' },
+    { key: 'finance',   label: t('nav.fines', 'Tài chính'),   icon: 'payments' },
+    { key: 'rankings',  label: t('nav.gamify', 'Bảng xếp hạng'), icon: 'leaderboard' },
+  ];
+
   const [data, setData] = useState<ReportData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -280,11 +284,11 @@ export default function AdminReports() {
   const handleExportCSV = () => {
     const token = getStoredToken();
     if (!token) {
-      emitToast({ tone: 'error', title: 'Lỗi', message: 'Không thể xác thực để tải báo cáo.' });
+      emitToast({ tone: 'error', title: t('common.error'), message: t('adminReports.toastAuthError', 'Không thể xác thực để tải báo cáo.') });
       return;
     }
     try {
-      emitToast({ tone: 'info', title: 'Xuất báo cáo', message: 'Đang khởi tạo tải báo cáo offline...' });
+      emitToast({ tone: 'info', title: t('adminReports.btnExport'), message: t('adminReports.toastExportInit', 'Đang khởi tạo tải báo cáo offline...') });
 
       let exportUrl = `${API_BASE_URL}/reports/export`;
       if (activeFilter) {
@@ -295,7 +299,7 @@ export default function AdminReports() {
       }
 
       fetch(exportUrl, { headers: { Authorization: `Bearer ${token}` } })
-        .then((res) => { if (!res.ok) throw new Error('Yêu cầu xuất báo cáo thất bại.'); return res.blob(); })
+        .then((res) => { if (!res.ok) throw new Error(t('adminReports.exportFailed', 'Yêu cầu xuất báo cáo thất bại.')); return res.blob(); })
         .then((blob) => {
           const url = window.URL.createObjectURL(blob);
           const a = Object.assign(document.createElement('a'), {
@@ -306,11 +310,11 @@ export default function AdminReports() {
           a.click();
           document.body.removeChild(a);
           window.URL.revokeObjectURL(url);
-          emitToast({ tone: 'success', title: 'Thành công', message: 'Đã tải xuống báo cáo CSV thành công.' });
+          emitToast({ tone: 'success', title: t('common.success'), message: t('adminReports.toastDownloadSuccess', 'Đã tải xuống báo cáo CSV thành công.') });
         })
-        .catch((err: Error) => emitToast({ tone: 'error', title: 'Thất bại', message: err.message }));
+        .catch((err: Error) => emitToast({ tone: 'error', title: t('common.error'), message: err.message }));
     } catch {
-      emitToast({ tone: 'error', title: 'Lỗi', message: 'Không thể xác thực để tải báo cáo.' });
+      emitToast({ tone: 'error', title: t('common.error'), message: t('adminReports.toastAuthError', 'Không thể xác thực để tải báo cáo.') });
     }
   };
 
@@ -318,11 +322,11 @@ export default function AdminReports() {
     if (!activeExportType) return;
     const token = getStoredToken();
     if (!token) {
-      emitToast({ tone: 'error', title: 'Lỗi', message: 'Không thể xác thực để xuất dữ liệu.' });
+      emitToast({ tone: 'error', title: t('common.error'), message: t('adminReports.toastAuthError', 'Không thể xác thực để tải dữ liệu.') });
       return;
     }
     try {
-      emitToast({ tone: 'info', title: 'Xuất dữ liệu', message: 'Đang khởi tạo tải báo cáo nghiệp vụ...' });
+      emitToast({ tone: 'info', title: t('adminReports.btnExport'), message: t('adminReports.toastExportCirculationInit', 'Đang khởi tạo tải báo cáo nghiệp vụ...') });
 
       const endpointMap: Record<ExportReportType, string> = {
         system_overview: 'export',
@@ -351,7 +355,7 @@ export default function AdminReports() {
       exportUrl += '?' + new URLSearchParams(params).toString();
 
       fetch(exportUrl, { headers: { Authorization: `Bearer ${token}` } })
-        .then((res) => { if (!res.ok) throw new Error('Yêu cầu xuất tệp dữ liệu thất bại.'); return res.blob(); })
+        .then((res) => { if (!res.ok) throw new Error(t('adminReports.exportFailed', 'Yêu cầu xuất tệp dữ liệu thất bại.')); return res.blob(); })
         .then((blob) => {
           const url = window.URL.createObjectURL(blob);
           const a = Object.assign(document.createElement('a'), {
@@ -362,12 +366,12 @@ export default function AdminReports() {
           a.click();
           document.body.removeChild(a);
           window.URL.revokeObjectURL(url);
-          emitToast({ tone: 'success', title: 'Thành công', message: 'Tải xuống tệp CSV thành công.' });
+          emitToast({ tone: 'success', title: t('common.success'), message: t('adminReports.toastDownloadSuccess', 'Tải xuống tệp CSV thành công.') });
           setActiveExportType(null);
         })
-        .catch((err: Error) => emitToast({ tone: 'error', title: 'Thất bại', message: err.message }));
+        .catch((err: Error) => emitToast({ tone: 'error', title: t('common.error'), message: err.message }));
     } catch {
-      emitToast({ tone: 'error', title: 'Lỗi', message: 'Không thể xác thực để tải dữ liệu.' });
+      emitToast({ tone: 'error', title: t('common.error'), message: t('adminReports.toastAuthError', 'Không thể xác thực để tải dữ liệu.') });
     }
   };
 
@@ -377,11 +381,11 @@ export default function AdminReports() {
   const handleExportFines = (columns: string[]) => {
     const token = getStoredToken();
     if (!token) {
-      emitToast({ tone: 'error', title: 'Lỗi', message: 'Không thể xác thực để xuất dữ liệu.' });
+      emitToast({ tone: 'error', title: t('common.error'), message: t('adminReports.toastAuthError', 'Không thể xác thực để tải dữ liệu.') });
       return;
     }
     try {
-      emitToast({ tone: 'info', title: 'Xuất dữ liệu phạt', message: 'Đang khởi tạo tải báo cáo nộp phạt...' });
+      emitToast({ tone: 'info', title: t('adminReports.toastExportFines', 'Xuất dữ liệu phạt'), message: t('adminReports.toastExportFinesInit', 'Đang khởi tạo tải báo cáo nộp phạt...') });
 
       let exportUrl = `${API_BASE_URL}/reports/export-fines`;
       const params: Record<string, string> = {
@@ -394,7 +398,7 @@ export default function AdminReports() {
       exportUrl += '?' + new URLSearchParams(params).toString();
 
       fetch(exportUrl, { headers: { Authorization: `Bearer ${token}` } })
-        .then((res) => { if (!res.ok) throw new Error('Yêu cầu xuất tệp dữ liệu thất bại.'); return res.blob(); })
+        .then((res) => { if (!res.ok) throw new Error(t('adminReports.toastRequestFailed', 'Yêu cầu xuất tệp dữ liệu thất bại.')); return res.blob(); })
         .then((blob) => {
           const url = window.URL.createObjectURL(blob);
           const a = Object.assign(document.createElement('a'), {
@@ -405,11 +409,11 @@ export default function AdminReports() {
           a.click();
           document.body.removeChild(a);
           window.URL.revokeObjectURL(url);
-          emitToast({ tone: 'success', title: 'Thành công', message: 'Tải xuống tệp CSV thành công.' });
+          emitToast({ tone: 'success', title: t('common.success'), message: t('adminReports.toastDownloadSuccess', 'Tải xuống tệp CSV thành công.') });
         })
-        .catch((err: Error) => emitToast({ tone: 'error', title: 'Thất bại', message: err.message }));
+        .catch((err: Error) => emitToast({ tone: 'error', title: t('common.error'), message: err.message }));
     } catch {
-      emitToast({ tone: 'error', title: 'Lỗi', message: 'Không thể xác thực để tải dữ liệu.' });
+      emitToast({ tone: 'error', title: t('common.error'), message: t('adminReports.toastAuthError', 'Không thể xác thực để tải dữ liệu.') });
     }
   };
 
@@ -421,38 +425,38 @@ export default function AdminReports() {
     let filename = '';
 
     const METHOD_LABEL_MAP: Record<string, string> = {
-      cash: 'Tiền mặt',
+      cash: t('adminReports.methodCash', 'Tiền mặt'),
       momo: 'MoMo',
       vnpay: 'VNPay',
-      transfer: 'Chuyển khoản',
+      transfer: t('adminReports.methodTransfer', 'Chuyển khoản'),
     };
 
     const REASON_LABEL_MAP: Record<string, string> = {
-      overdue: 'Quá hạn trả',
-      damaged: 'Hư hỏng sách',
-      lost: 'Mất sách',
+      overdue: t('adminReports.reasonOverdue', 'Quá hạn trả'),
+      damaged: t('adminReports.reasonDamaged', 'Hư hỏng sách'),
+      lost: t('adminReports.reasonLost', 'Mất sách'),
     };
 
     if (detailType === 'collected') {
       filename = `chi-tiet-thuc-thu-nop-phat-${new Date().toISOString().slice(0, 10)}.csv`;
       headers = [
-        'Mã',
-        'Tên độc giả',
-        'Email độc giả',
-        'Sách vi phạm',
-        'Lý do',
-        'Số tiền (VND)',
-        'Cổng thanh toán',
-        'Mã giao dịch',
-        'Ngày thu',
-        'Người xác nhận'
+        t('adminReports.tableHeaderId', 'Mã'),
+        t('adminReports.tableHeaderMemberName', 'Tên độc giả'),
+        t('adminReports.tableHeaderMemberEmail', 'Email độc giả'),
+        t('adminReports.tableHeaderBook', 'Sách vi phạm'),
+        t('adminReports.tableHeaderReason', 'Lý do'),
+        t('adminReports.tableHeaderAmountVnd', 'Số tiền (VND)'),
+        t('adminReports.tableHeaderMethod', 'Cổng thanh toán'),
+        t('adminReports.tableHeaderTxRef', 'Mã giao dịch'),
+        t('adminReports.tableHeaderPaidAt', 'Ngày thu'),
+        t('adminReports.tableHeaderProcessor', 'Người xác nhận')
       ];
       rows = filteredDetailData.map((item) => [
         `#${item.id}`,
-        item.student_name || 'Sinh viên ẩn danh',
+        item.student_name || t('adminReports.anonymousStudent', 'Sinh viên ẩn danh'),
         item.student_email || '',
-        item.book_title || 'Sách đã xóa',
-        REASON_LABEL_MAP[item.reason] || item.reason || 'Khác',
+        item.book_title || t('adminReports.deletedBook', 'Sách đã xóa'),
+        REASON_LABEL_MAP[item.reason] || item.reason || t('adminReports.otherReason', 'Khác'),
         String(item.amount),
         METHOD_LABEL_MAP[item.method] ?? item.method,
         item.transaction_ref || '—',
@@ -462,21 +466,21 @@ export default function AdminReports() {
     } else if (detailType === 'unpaid') {
       filename = `chi-tiet-no-phat-ton-dong-${new Date().toISOString().slice(0, 10)}.csv`;
       headers = [
-        'Mã',
-        'Tên độc giả',
-        'Email độc giả',
-        'Sách vi phạm',
-        'Lý do',
-        'Số tiền (VND)',
-        'Ngày tạo',
-        'Ghi chú'
+        t('adminReports.tableHeaderId', 'Mã'),
+        t('adminReports.tableHeaderMemberName', 'Tên độc giả'),
+        t('adminReports.tableHeaderMemberEmail', 'Email độc giả'),
+        t('adminReports.tableHeaderBook', 'Sách vi phạm'),
+        t('adminReports.tableHeaderReason', 'Lý do'),
+        t('adminReports.tableHeaderAmountVnd', 'Số tiền (VND)'),
+        t('adminReports.tableHeaderCreatedAt', 'Ngày tạo'),
+        t('adminReports.tableHeaderNote', 'Ghi chú')
       ];
       rows = filteredDetailData.map((item) => [
         `#${item.id}`,
-        item.student_name || 'Sinh viên ẩn danh',
+        item.student_name || t('adminReports.anonymousStudent', 'Sinh viên ẩn danh'),
         item.student_email || '',
-        item.book_title || 'Sách đã xóa',
-        REASON_LABEL_MAP[item.reason] || item.reason || 'Khác',
+        item.book_title || t('adminReports.deletedBook', 'Sách đã xóa'),
+        REASON_LABEL_MAP[item.reason] || item.reason || t('adminReports.otherReason', 'Khác'),
         String(item.amount),
         item.created_at || '',
         item.notes || '—'
@@ -484,26 +488,26 @@ export default function AdminReports() {
     } else if (detailType === 'waived') {
       filename = `chi-tiet-phat-da-mien-giam-${new Date().toISOString().slice(0, 10)}.csv`;
       headers = [
-        'Mã',
-        'Tên độc giả',
-        'Email độc giả',
-        'Sách vi phạm',
-        'Lý do',
-        'Số tiền (VND)',
-        'Lý do miễn giảm',
-        'Ngày duyệt',
-        'Thủ thư duyệt'
+        t('adminReports.tableHeaderId', 'Mã'),
+        t('adminReports.tableHeaderMemberName', 'Tên độc giả'),
+        t('adminReports.tableHeaderMemberEmail', 'Email độc giả'),
+        t('adminReports.tableHeaderBook', 'Sách vi phạm'),
+        t('adminReports.tableHeaderReason', 'Lý do'),
+        t('adminReports.tableHeaderAmountVnd', 'Số tiền (VND)'),
+        t('adminReports.tableHeaderWaiveReason', 'Lý do miễn giảm'),
+        t('adminReports.tableHeaderWaivedAt', 'Ngày duyệt'),
+        t('adminReports.tableHeaderApprovedBy', 'Thủ thư duyệt')
       ];
       rows = filteredDetailData.map((item) => [
         `#${item.id}`,
-        item.student_name || 'Sinh viên ẩn danh',
+        item.student_name || t('adminReports.anonymousStudent', 'Sinh viên ẩn danh'),
         item.student_email || '',
-        item.book_title || 'Sách đã xóa',
-        REASON_LABEL_MAP[item.reason] || item.reason || 'Khác',
+        item.book_title || t('adminReports.deletedBook', 'Sách đã xóa'),
+        REASON_LABEL_MAP[item.reason] || item.reason || t('adminReports.otherReason', 'Khác'),
         String(item.amount),
         item.waived_reason || '—',
         item.created_at || '',
-        item.processor_name || 'Hệ thống'
+        item.processor_name || t('adminReports.systemProcessor', 'Hệ thống')
       ]);
     }
 
@@ -530,7 +534,7 @@ export default function AdminReports() {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-    emitToast({ tone: 'success', title: 'Thành công', message: 'Tải xuống tệp CSV chi tiết thành công.' });
+    emitToast({ tone: 'success', title: t('common.success'), message: t('adminReports.toastDetailDownloadSuccess', 'Tải xuống tệp CSV chi tiết thành công.') });
   };
 
   // ─── render ─────────────────────────────────────────────────────────────────
@@ -542,10 +546,10 @@ export default function AdminReports() {
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
         <div>
           <h2 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">
-            Báo Cáo &amp; Phân Tích
+            {t('adminReports.title', 'Báo Cáo & Phân Tích')}
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Thống kê tình hình mượn trả, chỉ số tài chính và tổng quan hệ thống.
+            {t('adminReports.subtitle', 'Thống kê tình hình mượn trả, chỉ số tài chính và tổng quan hệ thống.')}
           </p>
         </div>
         <div className="relative">
@@ -556,7 +560,7 @@ export default function AdminReports() {
             className="flex items-center gap-2 rounded-xl bg-primary hover:bg-primary-hover px-5 py-2.5 font-bold text-white shadow-lg shadow-primary/20 transition-all hover:-translate-y-0.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
           >
             <span className="material-symbols-outlined text-[16px]">file_download</span>
-            Tải báo cáo nghiệp vụ
+            {t('adminReports.btnExportBusiness', 'Tải báo cáo nghiệp vụ')}
             <span className="material-symbols-outlined text-[16px] transition-transform duration-200" style={{ transform: isExportMenuOpen ? 'rotate(180deg)' : 'none' }}>expand_more</span>
           </button>
 
@@ -576,7 +580,7 @@ export default function AdminReports() {
                   className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
                 >
                   <span className="material-symbols-outlined text-[18px] text-slate-400">dashboard</span>
-                  Báo cáo tổng quan hệ thống
+                  {t('adminReports.exportOverviewTitle', 'Báo cáo tổng quan hệ thống')}
                 </button>
                 <button
                   type="button"
@@ -587,7 +591,7 @@ export default function AdminReports() {
                   className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
                 >
                   <span className="material-symbols-outlined text-[18px] text-slate-400">warning</span>
-                  Độc giả quá hạn &amp; Vi phạm
+                  {t('adminReports.exportOverdueShort', 'Độc giả quá hạn & Vi phạm')}
                 </button>
                 <button
                   type="button"
@@ -598,7 +602,7 @@ export default function AdminReports() {
                   className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
                 >
                   <span className="material-symbols-outlined text-[18px] text-slate-400">sync_alt</span>
-                  Tần suất lưu thông sách
+                  {t('adminReports.exportCirculationShort', 'Tần suất lưu thông sách')}
                 </button>
                 <button
                   type="button"
@@ -609,7 +613,7 @@ export default function AdminReports() {
                   className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
                 >
                   <span className="material-symbols-outlined text-[18px] text-slate-400">inventory_2</span>
-                  Kiểm kê &amp; Khấu hao tài sản
+                  {t('adminReports.exportAssetsShort', 'Kiểm kê & Khấu hao tài sản')}
                 </button>
                 <button
                   type="button"
@@ -620,7 +624,7 @@ export default function AdminReports() {
                   className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
                 >
                   <span className="material-symbols-outlined text-[18px] text-slate-400">menu_book</span>
-                  Thư viện số &amp; Tài nguyên
+                  {t('adminReports.exportDigitalShort', 'Thư viện số & Tài nguyên')}
                 </button>
               </div>
             </>
@@ -637,20 +641,25 @@ export default function AdminReports() {
         <div className="flex flex-wrap items-end gap-4">
           {/* Filter type selector */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Lọc theo</label>
+            <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{t('adminReports.filterBy', 'Lọc theo')}</label>
             <div className="flex rounded-xl border border-border overflow-hidden">
-              {(['all', 'range', 'month', 'year'] as const).map((t) => {
-                const labels = { all: 'Tất cả', range: 'Ngày', month: 'Tháng', year: 'Năm' };
+              {(['all', 'range', 'month', 'year'] as const).map((fType) => {
+                const labels = {
+                  all: t('adminReports.filterAll', 'Tất cả'),
+                  range: t('adminReports.filterRange', 'Ngày'),
+                  month: t('adminReports.filterMonth', 'Tháng'),
+                  year: t('adminReports.filterYear', 'Năm')
+                };
                 return (
                   <button
-                    key={t}
+                    key={fType}
                     type="button"
-                    onClick={() => setFilterType(t)}
+                    onClick={() => setFilterType(fType)}
                     className={`px-4 py-2 text-sm font-semibold transition-colors ${
-                      filterType === t ? 'bg-primary text-white' : 'bg-transparent text-muted-foreground hover:bg-muted'
+                      filterType === fType ? 'bg-primary text-white' : 'bg-transparent text-muted-foreground hover:bg-muted'
                     }`}
                   >
-                    {labels[t]}
+                    {labels[fType]}
                   </button>
                 );
               })}
@@ -661,12 +670,12 @@ export default function AdminReports() {
           {filterType === 'range' && (
             <>
               <div className="flex flex-col gap-1.5">
-                <label htmlFor="filter-start-date" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Từ ngày</label>
+                <label htmlFor="filter-start-date" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{t('adminReports.fromDate', 'Từ ngày')}</label>
                 <input id="filter-start-date" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)}
                   className="rounded-xl border border-border bg-muted px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50" />
               </div>
               <div className="flex flex-col gap-1.5">
-                <label htmlFor="filter-end-date" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Đến ngày</label>
+                <label htmlFor="filter-end-date" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{t('adminReports.toDate', 'Đến ngày')}</label>
                 <input id="filter-end-date" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)}
                   className="rounded-xl border border-border bg-muted px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50" />
               </div>
@@ -674,14 +683,14 @@ export default function AdminReports() {
           )}
           {filterType === 'month' && (
             <div className="flex flex-col gap-1.5">
-              <label htmlFor="filter-month" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Chọn tháng</label>
+              <label htmlFor="filter-month" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{t('adminReports.selectMonth', 'Chọn tháng')}</label>
               <input id="filter-month" type="month" value={monthValue} onChange={(e) => setMonthValue(e.target.value)}
                 className="rounded-xl border border-border bg-muted px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50" />
             </div>
           )}
           {filterType === 'year' && (
             <div className="flex flex-col gap-1.5">
-              <label htmlFor="filter-year" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Chọn năm</label>
+              <label htmlFor="filter-year" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{t('adminReports.selectYear', 'Chọn năm')}</label>
               <input id="filter-year" type="number" min="2000" max="2099" value={yearValue} onChange={(e) => setYearValue(e.target.value)}
                 className="w-28 rounded-xl border border-border bg-muted px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50" />
             </div>
@@ -692,12 +701,12 @@ export default function AdminReports() {
             {activeFilter && (
               <button type="button" onClick={handleResetFilter}
                 className="flex items-center gap-1.5 rounded-xl border border-border bg-muted px-4 py-2 text-sm font-semibold text-muted-foreground hover:bg-border transition-colors">
-                <span className="material-symbols-outlined text-[15px]">close</span>Xoá lọc
+                <span className="material-symbols-outlined text-[15px]">close</span>{t('adminReports.btnResetFilter', 'Xoá lọc')}
               </button>
             )}
             <button type="button" onClick={handleApplyFilter} disabled={isLoading}
               className="flex items-center gap-1.5 rounded-xl bg-primary hover:bg-primary-hover px-5 py-2 text-sm font-bold text-white shadow shadow-primary/20 transition-all hover:-translate-y-0.5 disabled:opacity-50">
-              <span className="material-symbols-outlined text-[15px]">filter_alt</span>Áp dụng
+              <span className="material-symbols-outlined text-[15px]">filter_alt</span>{t('adminReports.btnApplyFilter', 'Áp dụng')}
             </button>
           </div>
         </div>
@@ -705,10 +714,10 @@ export default function AdminReports() {
         {/* Active filter badge */}
         {activeFilter && (
           <div className="mt-3 flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">Đang xem:</span>
+            <span className="text-xs text-muted-foreground">{t('adminReports.viewingLabel', 'Đang xem:')}</span>
             <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary text-xs font-bold px-3 py-1">
               <span className="material-symbols-outlined text-[13px]">calendar_today</span>
-              {filterLabel(activeFilter)}
+              {filterLabel(activeFilter, t)}
             </span>
           </div>
         )}
@@ -725,18 +734,18 @@ export default function AdminReports() {
       {isLoading ? (
         <div className="flex flex-col items-center justify-center py-32 gap-3 bg-surface border border-border rounded-2xl shadow-sm">
           <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-          <p className="text-sm text-muted-foreground animate-pulse">Đang kết xuất báo cáo dữ liệu...</p>
+          <p className="text-sm text-muted-foreground animate-pulse">{t('adminReports.renderingReport', 'Đang kết xuất báo cáo dữ liệu...')}</p>
         </div>
 
       ) : !data ? (
-        <EmptyState icon="analytics" title="Không có dữ liệu báo cáo" message="Không tìm thấy số liệu tổng hợp trong hệ thống." />
+        <EmptyState icon="analytics" title={t('adminReports.noDataTitle', 'Không có dữ liệu báo cáo')} message={t('adminReports.noDataDesc', 'Không tìm thấy số liệu tổng hợp trong hệ thống.')} />
 
       ) : (
         <div className="space-y-6">
 
           {/* ── Tab navigation ──────────────────────────────────────────── */}
           <div className="flex gap-1 bg-muted/60 border border-border rounded-2xl p-1.5 w-fit">
-            {TABS.map((tab) => (
+            {tabs.map((tab) => (
               <button
                 key={tab.key}
                 type="button"
@@ -771,12 +780,12 @@ export default function AdminReports() {
                 <>
                   {/* KPI counters */}
                   <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-                    <StatCard label="Lượt mượn trả"  value={data.total_borrowings} icon="swap_horiz" iconColor="text-blue-500"    iconBg="bg-blue-500/10"    delay={0}   />
-                    <StatCard label="Tổng đầu sách"   value={data.total_books}      icon="auto_stories" iconColor="text-green-500" iconBg="bg-green-500/10"   delay={50}  />
-                    <StatCard label="Sinh viên"        value={data.total_members}    icon="group"     iconColor="text-indigo-500"  iconBg="bg-indigo-500/10"  delay={100} />
+                    <StatCard label={t('adminReports.statCirculation', 'Lượt mượn trả')}  value={data.total_borrowings} icon="swap_horiz" iconColor="text-blue-500"    iconBg="bg-blue-500/10"    delay={0}   />
+                    <StatCard label={t('adminDashboard.inventoryManage.totalBooks', 'Tổng đầu sách')}   value={data.total_books}      icon="auto_stories" iconColor="text-green-500" iconBg="bg-green-500/10"   delay={50}  />
+                    <StatCard label={t('common.student', 'Sinh viên')}        value={data.total_members}    icon="group"     iconColor="text-indigo-500"  iconBg="bg-indigo-500/10"  delay={100} />
                     <StatCard
-                      label="Thực thu phạt"
-                      value={<span className="text-emerald-600">{data.financials.collected.toLocaleString('vi-VN')} đ</span>}
+                      label={t('adminReports.statCollectedFine', 'Thực thu nộp phạt')}
+                      value={<span className="text-emerald-600">{data.financials.collected.toLocaleString(getIntlLocale())} {t('common.currencySymbol')}</span>}
                       icon="payments"
                       iconColor="text-emerald-500"
                       iconBg="bg-emerald-500/10"
@@ -787,16 +796,16 @@ export default function AdminReports() {
                   {/* Borrowing + return-rate charts */}
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <ChartCard
-                      title={activeFilter ? `Xu hướng mượn sách — ${filterLabel(activeFilter)}` : 'Xu hướng mượn sách 6 tháng qua'}
-                      description="Số lượng phiếu mượn được duyệt qua từng tháng."
+                      title={activeFilter ? `${t('adminReports.chartTitleBorrows', 'Tình hình mượn trả theo thời gian')} — ${filterLabel(activeFilter, t)}` : t('adminReports.chartTitleBorrows', 'Tình hình mượn trả theo thời gian')}
+                      description={t('adminReports.defaultTrendDesc', 'Số lượng phiếu mượn được duyệt qua từng tháng.')}
                       className="min-h-[320px]"
                     >
                       <TrendLineChart trends={data.monthly_trends} />
                     </ChartCard>
 
                     <ChartCard
-                      title="Tình trạng trả ấn phẩm &amp; Quá hạn"
-                      description="Phân tích tính hiệu quả thu hồi sách theo tỷ lệ trễ hạn."
+                      title={t('adminReports.overdueStatusTitle', 'Tình trạng trả ấn phẩm & Quá hạn')}
+                      description={t('adminReports.overdueStatusDesc', 'Phân tích tính hiệu quả thu hồi sách theo tỷ lệ trễ hạn.')}
                       className="min-h-[320px]"
                     >
                       <DonutChart rates={data.return_rates} />
@@ -813,9 +822,9 @@ export default function AdminReports() {
                   {/* Finance KPI cards */}
                   <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
                     <FinanceCard
-                      label="Thực thu nộp phạt"
-                      hint="Tiền phạt thực tế thu về"
-                      value={`${data.financials.collected.toLocaleString('vi-VN')} đ`}
+                      label={t('adminReports.statCollectedFine', 'Thực thu nộp phạt')}
+                      hint={t('adminReports.statCollectedFineDesc', 'Tiền phạt thực tế thu về')}
+                      value={`${data.financials.collected.toLocaleString(getIntlLocale())} ${t('common.currencySymbol')}`}
                       icon="account_balance_wallet"
                       accentBorder="border-l-emerald-500"
                       textColor="text-emerald-600"
@@ -824,9 +833,9 @@ export default function AdminReports() {
                       onClick={() => handleOpenDetail('collected')}
                     />
                     <FinanceCard
-                      label="Nợ phạt tồn đọng"
-                      hint="Tiền phạt chưa thu hồi"
-                      value={`${data.financials.unpaid.toLocaleString('vi-VN')} đ`}
+                      label={t('adminReports.statUnpaidFine', 'Nợ phạt tồn đọng')}
+                      hint={t('adminReports.statUnpaidFineDesc', 'Tiền phạt chưa thu hồi')}
+                      value={`${data.financials.unpaid.toLocaleString(getIntlLocale())} ${t('common.currencySymbol')}`}
                       icon="credit_card_off"
                       accentBorder="border-l-rose-500"
                       textColor="text-rose-600"
@@ -835,9 +844,9 @@ export default function AdminReports() {
                       onClick={() => handleOpenDetail('unpaid')}
                     />
                     <FinanceCard
-                      label="Phạt đã miễn giảm"
-                      hint="Xoá nợ nộp phạt hợp lệ"
-                      value={`${data.financials.waived.toLocaleString('vi-VN')} đ`}
+                      label={t('adminReports.statWaivedFine', 'Phạt đã miễn giảm')}
+                      hint={t('adminReports.statWaivedFineDesc', 'Xoá nợ nộp phạt hợp lệ')}
+                      value={`${data.financials.waived.toLocaleString(getIntlLocale())} ${t('common.currencySymbol')}`}
                       icon="card_membership"
                       accentBorder="border-l-blue-500"
                       textColor="text-blue-600"
@@ -850,16 +859,16 @@ export default function AdminReports() {
                   {/* Revenue trend + payment method split */}
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <ChartCard
-                      title="Xu hướng dòng tiền thu nộp phạt"
-                      description="Dòng tiền thực tế thu về qua các ngày."
+                      title={t('adminReports.trendCashFlowTitle', 'Xu hướng dòng tiền thu nộp phạt')}
+                      description={t('adminReports.trendCashFlowDesc', 'Dòng tiền thực tế thu về qua các ngày.')}
                       className="lg:col-span-2 min-h-[320px]"
                     >
                       <RevenueTrendChart trends={data.revenue_trends} />
                     </ChartCard>
 
                     <ChartCard
-                      title="Phân bổ phương thức thanh toán"
-                      description="Tỷ lệ nguồn doanh thu nộp phạt thực tế."
+                      title={t('adminReports.paymentDistTitle', 'Phân bổ phương thức thanh toán')}
+                      description={t('adminReports.paymentDistDesc', 'Tỷ lệ nguồn doanh thu nộp phạt thực tế.')}
                       className="min-h-[320px]"
                     >
                       <PaymentMethodsChart byMethod={data.financials.by_method} />
@@ -870,8 +879,8 @@ export default function AdminReports() {
                   <section className="bg-surface border border-border rounded-2xl p-6 shadow-sm space-y-4">
                     <div className="flex justify-between items-center">
                       <div>
-                        <h3 className="text-base font-bold text-foreground">Nhật ký giao dịch gần đây</h3>
-                        <p className="text-xs text-muted-foreground mt-0.5">Danh sách các khoản nộp phạt thực tế đã hoàn thành.</p>
+                        <h3 className="text-base font-bold text-foreground">{t('adminReports.recentTransactionsTitle', 'Nhật ký giao dịch gần đây')}</h3>
+                        <p className="text-xs text-muted-foreground mt-0.5">{t('adminReports.recentTransactionsDesc', 'Danh sách các khoản nộp phạt thực tế đã hoàn thành.')}</p>
                       </div>
                       <button
                         type="button"
@@ -879,7 +888,7 @@ export default function AdminReports() {
                         className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors shadow-sm"
                       >
                         <span className="material-symbols-outlined text-[16px]">download</span>
-                        Xuất báo cáo phạt
+                        {t('adminReports.btnExportFines', 'Xuất báo cáo phạt')}
                       </button>
                     </div>
                     <RecentTransactionsTable transactions={data.recent_transactions} />
@@ -895,8 +904,8 @@ export default function AdminReports() {
                   {/* Top Books */}
                   <section className="bg-surface border border-border rounded-2xl p-6 shadow-sm space-y-4">
                     <div>
-                      <h3 className="text-base font-bold text-foreground">Top 5 sách được mượn nhiều nhất</h3>
-                      <p className="text-xs text-muted-foreground mt-0.5">Những ấn phẩm thu hút lượng độc giả sinh viên nhiều nhất.</p>
+                      <h3 className="text-base font-bold text-foreground">{t('adminReports.topBooksTitle', 'Top 5 sách được mượn nhiều nhất')}</h3>
+                      <p className="text-xs text-muted-foreground mt-0.5">{t('adminReports.topBooksDesc', 'Những ấn phẩm thu hút lượng độc giả sinh viên nhiều nhất.')}</p>
                     </div>
                     <TopBooksList books={data.top_books} />
                   </section>
@@ -904,8 +913,8 @@ export default function AdminReports() {
                   {/* Top Members by Borrow Count */}
                   <section className="bg-surface border border-border rounded-2xl p-6 shadow-sm space-y-4">
                     <div>
-                      <h3 className="text-base font-bold text-foreground">Top 5 sinh viên mượn nhiều nhất</h3>
-                      <p className="text-xs text-muted-foreground mt-0.5">Những độc giả chăm chỉ mượn trả tài liệu học tập nhiều nhất.</p>
+                      <h3 className="text-base font-bold text-foreground">{t('adminReports.topStudentsTitle', 'Top 5 sinh viên mượn nhiều nhất')}</h3>
+                      <p className="text-xs text-muted-foreground mt-0.5">{t('adminReports.topStudentsDesc', 'Những độc giả chăm chỉ mượn trả tài liệu học tập nhiều nhất.')}</p>
                     </div>
                     <TopMembersList members={data.top_members} />
                   </section>
@@ -915,9 +924,9 @@ export default function AdminReports() {
                     <div>
                       <h3 className="text-base font-bold text-foreground flex items-center gap-1.5">
                         <span className="material-symbols-outlined text-primary text-[20px]">workspace_premium</span>
-                        Top 5 Học giả tích lũy XP
+                        {t('adminReports.topScholarsTitle', 'Top 5 Học giả tích lũy XP')}
                       </h3>
-                      <p className="text-xs text-muted-foreground mt-0.5">Những sinh viên tích cực tham gia các hoạt động thư viện nhất.</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{t('adminReports.topScholarsDesc', 'Những sinh viên tích cực tham gia các hoạt động thư viện nhất.')}</p>
                     </div>
                     <TopScholarsList scholars={data.top_xp_members || []} />
                   </section>
@@ -927,9 +936,9 @@ export default function AdminReports() {
                     <div>
                       <h3 className="text-base font-bold text-foreground flex items-center gap-1.5">
                         <span className="material-symbols-outlined text-amber-500 text-[20px]">military_tech</span>
-                        Thống kê quy đổi phần thưởng
+                        {t('adminReports.rewardRedemptionsTitle', 'Thống kê quy đổi phần thưởng')}
                       </h3>
-                      <p className="text-xs text-muted-foreground mt-0.5">Tổng quan số lượng vật phẩm/vận hành đã được kích hoạt.</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{t('adminReports.rewardRedemptionsDesc', 'Tổng quan số lượng vật phẩm/vận hành đã được kích hoạt.')}</p>
                     </div>
                     <RewardsStatsWidget stats={data.rewards_stats} />
                   </section>
@@ -966,17 +975,17 @@ export default function AdminReports() {
               <div className="flex items-center justify-between border-b border-border p-5 shrink-0 bg-slate-50/50 dark:bg-slate-800/20">
                 <div className="space-y-1">
                   <h3 className="text-lg font-extrabold text-foreground tracking-tight">
-                    {detailType === 'collected' && 'Chi tiết Thực thu nộp phạt'}
-                    {detailType === 'unpaid' && 'Chi tiết Nợ phạt tồn đọng'}
-                    {detailType === 'waived' && 'Chi tiết Phạt đã miễn giảm'}
+                    {detailType === 'collected' && t('adminReports.detailsCollected', 'Chi tiết Thực thu nộp phạt')}
+                    {detailType === 'unpaid' && t('adminReports.detailsUnpaid', 'Chi tiết Nợ phạt tồn đọng')}
+                    {detailType === 'waived' && t('adminReports.detailsWaived', 'Chi tiết Phạt đã miễn giảm')}
                   </h3>
                   <div className="flex items-center gap-2">
                     <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary text-[10px] font-bold px-2 py-0.5">
                       <span className="material-symbols-outlined text-[11px]">calendar_today</span>
-                      {filterLabel(activeFilter)}
+                      {filterLabel(activeFilter, t)}
                     </span>
                     <span className="text-[10px] text-muted-foreground font-medium">
-                      Tổng số bản ghi: {filteredDetailData.length}
+                      {t('adminReports.totalRecordsLabel', 'Tổng số bản ghi:')} {filteredDetailData.length}
                     </span>
                   </div>
                 </div>
@@ -997,7 +1006,7 @@ export default function AdminReports() {
                   </span>
                   <input
                     type="text"
-                    placeholder="Tìm kiếm theo sinh viên, email, tên sách, thủ thư hoặc lý do..."
+                    placeholder={t('adminReports.searchPlaceholder', 'Tìm kiếm theo sinh viên, email, tên sách, thủ thư hoặc lý do...')}
                     value={detailSearch}
                     onChange={(e) => setDetailSearch(e.target.value)}
                     className="w-full rounded-xl border border-border bg-muted/50 pl-10 pr-9 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all focus:bg-surface"
@@ -1014,10 +1023,10 @@ export default function AdminReports() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2 text-xs shrink-0">
-                  <span className="font-bold text-muted-foreground">Khoảng ngày:</span>
+                  <span className="font-bold text-muted-foreground">{t('adminReports.dateRangeLabel', 'Khoảng ngày:')}</span>
                   <div className="flex items-center gap-1.5">
                     <input
-                      aria-label="Từ ngày"
+                      aria-label={t('adminReports.fromDate', 'Từ ngày')}
                       type="date"
                       value={modalStartDate}
                       onChange={(e) => setModalStartDate(e.target.value)}
@@ -1025,7 +1034,7 @@ export default function AdminReports() {
                     />
                     <span className="text-muted-foreground font-medium">—</span>
                     <input
-                      aria-label="Đến ngày"
+                      aria-label={t('adminReports.toDate', 'Đến ngày')}
                       type="date"
                       value={modalEndDate}
                       onChange={(e) => setModalEndDate(e.target.value)}
@@ -1040,10 +1049,10 @@ export default function AdminReports() {
                         setModalEndDate('');
                       }}
                       className="flex items-center gap-1 rounded-xl border border-border bg-muted px-2.5 py-1.5 font-bold text-muted-foreground hover:bg-border transition-colors cursor-pointer"
-                      title="Xóa bộ lọc khoảng ngày"
+                      title={t('adminReports.btnClearFilter', 'Xóa bộ lọc khoảng ngày')}
                     >
                       <span className="material-symbols-outlined text-[13px] font-bold">close</span>
-                      <span>Xóa lọc</span>
+                      <span>{t('adminReports.btnResetFilter', 'Xóa lọc')}</span>
                     </button>
                   )}
                   <button
@@ -1051,10 +1060,10 @@ export default function AdminReports() {
                     onClick={handleExportDetailCSV}
                     disabled={isDetailLoading || filteredDetailData.length === 0}
                     className="flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 px-3.5 py-1.5 font-bold text-white shadow-sm transition-all hover:-translate-y-0.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 shrink-0"
-                    title="Xuất dữ liệu chi tiết ra file CSV"
+                    title={t('adminReports.btnExport', 'Xuất dữ liệu chi tiết ra file CSV')}
                   >
                     <span className="material-symbols-outlined text-[15px] font-bold">download</span>
-                    <span>Xuất báo cáo</span>
+                    <span>{t('adminReports.btnExport', 'Xuất báo cáo')}</span>
                   </button>
                 </div>
               </div>
@@ -1064,7 +1073,7 @@ export default function AdminReports() {
                 {isDetailLoading ? (
                   <div className="flex flex-col items-center justify-center py-20 gap-3">
                     <div className="w-8 h-8 border-3 border-primary border-t-transparent rounded-full animate-spin" />
-                    <p className="text-xs text-muted-foreground animate-pulse">Đang tải lịch sử chi tiết...</p>
+                    <p className="text-xs text-muted-foreground animate-pulse">{t('adminReports.loadingHistory', 'Đang tải lịch sử chi tiết...')}</p>
                   </div>
                 ) : detailError ? (
                   <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-xs text-red-900 font-semibold shadow-sm">
@@ -1073,38 +1082,38 @@ export default function AdminReports() {
                 ) : filteredDetailData.length === 0 ? (
                   <EmptyState
                     icon="search_off"
-                    title="Không có kết quả phù hợp"
-                    message="Vui lòng điều chỉnh từ khóa tìm kiếm hoặc kiểm tra khoảng thời gian lọc."
+                    title={t('adminReports.noResultsTitle', 'Không có kết quả phù hợp')}
+                    message={t('adminReports.noResultsDesc', 'Vui lòng điều chỉnh từ khóa tìm kiếm hoặc kiểm tra khoảng thời gian lọc.')}
                   />
                 ) : (
                   <div className="overflow-x-auto border border-border rounded-xl">
                     <table className="w-full text-left border-collapse text-xs">
                       <thead>
                         <tr className="bg-slate-50 dark:bg-slate-800/40 border-b border-border text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                          <th className="px-4 py-3">Mã</th>
-                          <th className="px-4 py-3">Độc giả</th>
-                          <th className="px-4 py-3">Sách vi phạm</th>
-                          <th className="px-4 py-3">Lý do</th>
-                          <th className="px-4 py-3">Số tiền</th>
+                          <th className="px-4 py-3">{t('adminReports.tableHeaderId', 'Mã')}</th>
+                          <th className="px-4 py-3">{t('adminReports.tableHeaderMember', 'Độc giả')}</th>
+                          <th className="px-4 py-3">{t('adminReports.tableHeaderBook', 'Sách vi phạm')}</th>
+                          <th className="px-4 py-3">{t('adminReports.tableHeaderReason', 'Lý do')}</th>
+                          <th className="px-4 py-3">{t('adminReports.tableHeaderAmount', 'Số tiền')}</th>
                           {detailType === 'collected' && (
                             <>
-                              <th className="px-4 py-3">Cổng thanh toán</th>
-                              <th className="px-4 py-3">Mã giao dịch</th>
-                              <th className="px-4 py-3">Ngày thu</th>
-                              <th className="px-4 py-3">Người xác nhận</th>
+                              <th className="px-4 py-3">{t('adminReports.tableHeaderMethod', 'Cổng thanh toán')}</th>
+                              <th className="px-4 py-3">{t('adminReports.tableHeaderTxRef', 'Mã giao dịch')}</th>
+                              <th className="px-4 py-3">{t('adminReports.tableHeaderPaidAt', 'Ngày thu')}</th>
+                              <th className="px-4 py-3">{t('adminReports.tableHeaderProcessor', 'Người xác nhận')}</th>
                             </>
                           )}
                           {detailType === 'unpaid' && (
                             <>
-                              <th className="px-4 py-3">Ngày tạo</th>
-                              <th className="px-4 py-3">Ghi chú</th>
+                              <th className="px-4 py-3">{t('adminReports.tableHeaderCreatedAt', 'Ngày tạo')}</th>
+                              <th className="px-4 py-3">{t('adminReports.tableHeaderNote', 'Ghi chú')}</th>
                             </>
                           )}
                           {detailType === 'waived' && (
                             <>
-                              <th className="px-4 py-3">Lý do miễn giảm</th>
-                              <th className="px-4 py-3">Ngày duyệt</th>
-                              <th className="px-4 py-3">Thủ thư duyệt</th>
+                              <th className="px-4 py-3">{t('adminReports.tableHeaderWaiveReason', 'Lý do miễn giảm')}</th>
+                              <th className="px-4 py-3">{t('adminReports.tableHeaderWaivedAt', 'Ngày duyệt')}</th>
+                              <th className="px-4 py-3">{t('adminReports.tableHeaderApprovedBy', 'Thủ thư duyệt')}</th>
                             </>
                           )}
                         </tr>
@@ -1112,10 +1121,10 @@ export default function AdminReports() {
                       <tbody className="divide-y divide-border/60 text-slate-700 dark:text-slate-300">
                         {filteredDetailData.map((item, index) => {
                           const METHOD_LABEL_MAP: Record<string, string> = {
-                            cash: 'Tiền mặt',
+                            cash: t('adminReports.methodCash', 'Tiền mặt'),
                             momo: 'MoMo',
                             vnpay: 'VNPay',
-                            transfer: 'Chuyển khoản',
+                            transfer: t('adminReports.methodTransfer', 'Chuyển khoản'),
                           };
                           const METHOD_STYLE_MAP: Record<string, string> = {
                             cash: 'bg-green-50 text-green-700 border-green-200 dark:bg-green-500/10 dark:text-green-400 dark:border-green-500/20',
@@ -1125,9 +1134,9 @@ export default function AdminReports() {
                           };
 
                           const REASON_LABEL_MAP: Record<string, string> = {
-                            overdue: 'Quá hạn trả',
-                            damaged: 'Hư hỏng sách',
-                            lost: 'Mất sách',
+                            overdue: t('adminReports.reasonOverdue', 'Quá hạn trả'),
+                            damaged: t('adminReports.reasonDamaged', 'Hư hỏng sách'),
+                            lost: t('adminReports.reasonLost', 'Mất sách'),
                           };
 
                           return (
@@ -1138,12 +1147,12 @@ export default function AdminReports() {
                               <td className="px-4 py-3 font-mono font-bold text-slate-500">#{item.id}</td>
                               <td className="px-4 py-3 min-w-[150px]">
                                 <div className="font-semibold text-slate-800 dark:text-slate-200">
-                                  {item.student_name}
+                                  {item.student_name || t('adminReports.anonymousStudent', 'Sinh viên ẩn danh')}
                                 </div>
                                 <div className="text-[10px] text-slate-400">{item.student_email}</div>
                               </td>
                               <td className="px-4 py-3 max-w-[200px] truncate" title={item.book_title}>
-                                {item.book_title}
+                                {item.book_title || t('adminReports.deletedBook', 'Sách đã xóa')}
                               </td>
                               <td className="px-4 py-3">
                                 <span className="inline-flex items-center gap-1 text-[10px] font-medium text-slate-600 dark:text-slate-400">
@@ -1155,7 +1164,7 @@ export default function AdminReports() {
                                 detailType === 'unpaid' ? 'text-rose-600 dark:text-rose-400' :
                                 'text-blue-600 dark:text-blue-400'
                               }`}>
-                                {item.amount.toLocaleString('vi-VN')} đ
+                                {item.amount.toLocaleString(getIntlLocale())} {t('common.currencySymbol')}
                               </td>
                               {detailType === 'collected' && (
                                 <>
@@ -1192,7 +1201,7 @@ export default function AdminReports() {
                                   </td>
                                   <td className="px-4 py-3 text-slate-500 whitespace-nowrap">{item.created_at}</td>
                                   <td className="px-4 py-3 text-slate-600 dark:text-slate-400 font-medium">
-                                    {item.processor_name}
+                                    {item.processor_name || t('adminReports.systemProcessor', 'Hệ thống')}
                                   </td>
                                 </>
                               )}
@@ -1215,8 +1224,8 @@ export default function AdminReports() {
             onExport={handleExportFines}
             availableColumns={AVAILABLE_EXPORT_COLUMNS_FINES}
             defaultColumns={DEFAULT_EXPORT_COLUMNS_FINES}
-            title="Xuất báo cáo Giao dịch thu phạt"
-            description="Lọc và xuất nhật ký giao dịch nộp phạt thô ra tệp CSV để đối chiếu tài chính."
+            title={t('adminReports.exportFinesTitle', 'Xuất báo cáo Giao dịch thu phạt')}
+            description={t('adminReports.exportFinesDesc', 'Lọc và xuất nhật ký giao dịch nộp phạt thô ra tệp CSV để đối chiếu tài chính.')}
           />
         )}
 
@@ -1227,8 +1236,8 @@ export default function AdminReports() {
             onExport={handleExportProfessionalReport}
             availableColumns={AVAILABLE_EXPORT_COLUMNS_OVERDUE}
             defaultColumns={DEFAULT_EXPORT_COLUMNS_OVERDUE}
-            title="Xuất báo cáo Độc giả Quá hạn &amp; Vi phạm"
-            description="Lọc và xuất danh sách sinh viên đang giữ sách quá hạn cùng phí phạt lũy kế liên đới."
+            title={t('adminReports.exportOverdueTitle', 'Xuất báo cáo Độc giả Quá hạn & Vi phạm')}
+            description={t('adminReports.exportOverdueDesc', 'Lọc và xuất danh sách sinh viên đang giữ sách quá hạn cùng phí phạt lũy kế liên đới.')}
           />
         )}
 
@@ -1239,8 +1248,8 @@ export default function AdminReports() {
             onExport={handleExportProfessionalReport}
             availableColumns={AVAILABLE_EXPORT_COLUMNS_CIRCULATION}
             defaultColumns={DEFAULT_EXPORT_COLUMNS_CIRCULATION}
-            title="Xuất báo cáo Tần suất lưu thông sách"
-            description="Lọc và xuất hiệu suất xoay vòng kho sách vật lý, xác định sách lưu thông cao hoặc sách tồn kho lâu."
+            title={t('adminReports.exportCirculationTitle', 'Xuất báo cáo Tần suất lưu thông sách')}
+            description={t('adminReports.exportCirculationDesc', 'Lọc và xuất hiệu suất xoay vòng kho sách vật lý, xác định sách lưu thông cao hoặc sách tồn kho lâu.')}
           />
         )}
 
@@ -1251,8 +1260,8 @@ export default function AdminReports() {
             onExport={handleExportProfessionalReport}
             availableColumns={AVAILABLE_EXPORT_COLUMNS_ASSETS}
             defaultColumns={DEFAULT_EXPORT_COLUMNS_ASSETS}
-            title="Xuất báo cáo Kiểm kê &amp; Khấu hao tài sản"
-            description="Xuất giá trị kho sách vật lý thực tế, tính toán khấu hao qua số năm xuất bản và giá trị hao hụt do mất/hỏng."
+            title={t('adminReports.exportAssetsTitle', 'Xuất báo cáo Kiểm kê & Khấu hao tài sản')}
+            description={t('adminReports.exportAssetsDesc', 'Xuất giá trị kho sách vật lý thực tế, tính toán khấu hao qua số năm xuất bản và giá trị hao hụt do mất/hỏng.')}
           />
         )}
 
@@ -1263,8 +1272,8 @@ export default function AdminReports() {
             onExport={handleExportProfessionalReport}
             availableColumns={AVAILABLE_EXPORT_COLUMNS_DIGITAL}
             defaultColumns={DEFAULT_EXPORT_COLUMNS_DIGITAL}
-            title="Xuất báo cáo Thư viện số &amp; Tài nguyên"
-            description="Xuất hiệu suất tải về, lượt đọc trực tuyến và đánh giá chất lượng đối với tài nguyên số PDF/E-books."
+            title={t('adminReports.exportDigitalTitle', 'Xuất báo cáo Thư viện số & Tài nguyên')}
+            description={t('adminReports.exportDigitalDesc', 'Xuất hiệu suất tải về, lượt đọc trực tuyến và đánh giá chất lượng đối với tài nguyên số PDF/E-books.')}
           />
         )}
       </AnimatePresence>

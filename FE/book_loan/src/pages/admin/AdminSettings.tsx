@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { fetchLibrarySettings, updateLibrarySettings, type LibrarySettings } from '../../api/librarySettingsApi';
 import { getActiveDevices, revokeDevice, type DeviceSession } from '../../api/authApi';
 import { updateMyProfile, sendPasswordOtp, verifyPasswordOtp } from '../../api/userApi';
@@ -40,6 +41,7 @@ const emptyProfileForm: ProfileForm = {
 };
 
 export default function AdminSettings() {
+  const { t, i18n } = useTranslation();
   const { user, updateUser } = useAuth();
   const [settings, setSettings] = useState<LibrarySettings>(defaultSettings);
   const [profileForm, setProfileForm] = useState<ProfileForm>(emptyProfileForm);
@@ -93,10 +95,10 @@ export default function AdminSettings() {
   const handleRevoke = async (tokenId: string) => {
     try {
       await revokeDevice(tokenId);
-      emitToast({ tone: 'success', title: 'Thành công', message: 'Đã hủy phiên làm việc của thiết bị thành công.' });
+      emitToast({ tone: 'success', title: t('common.success', 'Thành công'), message: t('studentSettings.toastRevokeSuccess', 'Đã hủy phiên làm việc của thiết bị thành công.') });
       setDevices((prev) => prev.filter((d) => d.token_id !== tokenId));
     } catch (error: any) {
-      emitToast({ tone: 'error', title: 'Thất bại', message: error?.message || 'Không thể hủy phiên đăng nhập.' });
+      emitToast({ tone: 'error', title: t('common.error', 'Thất bại'), message: error?.message || t('studentSettings.toastRevokeError', 'Không thể hủy phiên đăng nhập.') });
     }
   };
 
@@ -139,9 +141,9 @@ export default function AdminSettings() {
           return;
         }
 
-        const message = getErrorMessage(error, 'Không thể tải quy tắc mượn sách.');
+        const message = getErrorMessage(error, t('adminSettings.toastLoadError', 'Không thể tải quy tắc mượn sách.'));
         setSettingsError(message);
-        emitToast({ tone: 'error', title: 'Không thể tải quy tắc mượn sách', message });
+        emitToast({ tone: 'error', title: t('adminSettings.toastLoadError', 'Không thể tải quy tắc mượn sách'), message });
       })
       .finally(() => {
         if (isMounted) {
@@ -177,17 +179,17 @@ export default function AdminSettings() {
       });
 
       updateUser(response.user);
-      const message = response.message || 'Đã cập nhật hồ sơ quản trị.';
+      const message = response.message || t('studentSettings.toastSaved', 'Đã cập nhật hồ sơ quản trị.');
       setProfileFeedback(message);
-      emitToast({ tone: 'success', title: 'Đã cập nhật hồ sơ', message });
+      emitToast({ tone: 'success', title: t('studentSettings.toastSaved', 'Đã cập nhật hồ sơ'), message });
     } catch (error: unknown) {
       if (isUnauthorizedError(error)) {
         return;
       }
 
-      const message = getErrorMessage(error, 'Không thể cập nhật hồ sơ quản trị.');
+      const message = getErrorMessage(error, t('studentSettings.toastSaveError', 'Không thể cập nhật hồ sơ quản trị.'));
       setProfileFeedback(message);
-      emitToast({ tone: 'error', title: 'Không thể cập nhật hồ sơ', message });
+      emitToast({ tone: 'error', title: t('studentSettings.toastSaveError', 'Không thể cập nhật hồ sơ'), message });
     } finally {
       setIsSavingProfile(false);
     }
@@ -210,16 +212,16 @@ export default function AdminSettings() {
       setShowPasswordModal(true);
       emitToast({
         tone: 'success',
-        title: 'Mã OTP đã gửi',
-        message: 'Vui lòng kiểm tra email của bạn để nhận mã xác thực.',
+        title: t('studentSettings.toastOtpSent', 'Mã OTP đã gửi'),
+        message: t('studentSettings.toastOtpSentMsg', 'Vui lòng kiểm tra email của bạn để nhận mã xác thực.'),
       });
     } catch (error: unknown) {
       setIsSendingOtp(false);
-      const message = getErrorMessage(error, 'Không thể gửi mã xác thực OTP.');
+      const message = getErrorMessage(error, t('studentSettings.toastOtpError', 'Không thể gửi mã xác thực OTP.'));
       setProfileFeedback(message);
       emitToast({
         tone: 'error',
-        title: 'Không thể gửi OTP',
+        title: t('studentSettings.toastOtpError', 'Không thể gửi OTP'),
         message,
       });
     }
@@ -238,11 +240,11 @@ export default function AdminSettings() {
       setOtpError(null);
       emitToast({
         tone: 'success',
-        title: 'Xác thực thành công',
-        message: 'Vui lòng thiết lập mật khẩu mới của bạn.',
+        title: t('common.success', 'Xác thực thành công'),
+        message: t('adminSettings.setNewPasswordDesc', 'Vui lòng thiết lập mật khẩu mới của bạn.'),
       });
     } catch (error: unknown) {
-      const message = getErrorMessage(error, 'Mã OTP không chính xác hoặc đã hết hạn.');
+      const message = getErrorMessage(error, t('studentSettings.otpErrorMsg', 'Mã OTP không chính xác hoặc đã hết hạn.'));
       setOtpError(message);
     } finally {
       setIsVerifyingOtp(false);
@@ -270,16 +272,16 @@ export default function AdminSettings() {
         password_confirmation: '',
       }));
 
-      const message = response.message || 'Thay đổi mật khẩu thành công.';
+      const message = response.message || t('studentSettings.toastPasswordChanged', 'Thay đổi mật khẩu thành công.');
       setProfileFeedback(message);
       emitToast({
         tone: 'success',
-        title: 'Thành công',
-        message: response.message || 'Đổi mật khẩu thành công.',
+        title: t('common.success', 'Thành công'),
+        message: response.message || t('studentSettings.toastPasswordChanged', 'Đổi mật khẩu thành công.'),
       });
       setShowPasswordModal(false);
     } catch (error: unknown) {
-      const message = getErrorMessage(error, 'Không thể cập nhật mật khẩu mới.');
+      const message = getErrorMessage(error, t('studentSettings.toastSaveError', 'Không thể cập nhật mật khẩu mới.'));
       setOtpError(message);
     } finally {
       setIsSavingProfile(false);
@@ -296,11 +298,11 @@ export default function AdminSettings() {
       setPasswordForm((prev) => ({ ...prev, otp: '' }));
       emitToast({
         tone: 'success',
-        title: 'Mã OTP mới đã gửi',
-        message: 'Mã xác thực mới đã được gửi về email của bạn.',
+        title: t('studentSettings.toastOtpSent', 'Mã OTP mới đã gửi'),
+        message: t('studentSettings.toastOtpSentMsg', 'Mã xác thực mới đã được gửi về email của bạn.'),
       });
     } catch (error: unknown) {
-      const message = getErrorMessage(error, 'Không thể gửi lại mã xác thực.');
+      const message = getErrorMessage(error, t('studentSettings.toastOtpError', 'Không thể gửi lại mã xác thực.'));
       setOtpError(message);
     } finally {
       setResendingOtp(false);
@@ -357,17 +359,17 @@ export default function AdminSettings() {
         suspension_duration_days: response.suspension_duration_days,
       });
 
-      const message = 'Đã cập nhật quy tắc mượn sách.';
+      const message = t('adminSettings.toastSaved', 'Đã cập nhật quy tắc mượn sách.');
       setSettingsFeedback(message);
-      emitToast({ tone: 'success', title: 'Đã lưu quy tắc mượn sách', message });
+      emitToast({ tone: 'success', title: t('adminSettings.toastSaved', 'Đã lưu quy tắc mượn sách'), message });
     } catch (error: unknown) {
       if (isUnauthorizedError(error)) {
         return;
       }
 
-      const message = getErrorMessage(error, 'Không thể lưu quy tắc mượn sách.');
+      const message = getErrorMessage(error, t('adminSettings.toastSaveError', 'Không thể lưu quy tắc mượn sách.'));
       setSettingsError(message);
-      emitToast({ tone: 'error', title: 'Không thể lưu quy tắc mượn sách', message });
+      emitToast({ tone: 'error', title: t('adminSettings.toastSaveError', 'Không thể lưu quy tắc mượn sách'), message });
     } finally {
       setIsSavingSettings(false);
     }
@@ -377,9 +379,9 @@ export default function AdminSettings() {
     <div className="mx-auto w-full max-w-5xl space-y-8 p-8">
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
         <div>
-          <h2 className="text-3xl font-bold text-on-surface">Cài đặt quản trị</h2>
+          <h2 className="text-3xl font-bold text-on-surface">{t('adminSettings.title', 'Cấu Hình Hệ Thống')}</h2>
           <p className="mt-1 text-sm text-on-surface-variant">
-            Quản lý hồ sơ thủ thư và quy tắc mượn sách.
+            {t('adminSettings.subtitle', 'Thiết lập các tham số vận hành, nội quy mượn trả và cấu hình phòng tự học.')}
           </p>
         </div>
       </div>
@@ -389,9 +391,9 @@ export default function AdminSettings() {
         className="space-y-6 rounded-2xl border border-surface-container-low bg-surface-bright p-8 scholar-shadow"
       >
         <div>
-          <h3 className="text-xl font-bold text-on-surface">Thông tin cá nhân</h3>
+          <h3 className="text-xl font-bold text-on-surface">{t('studentSettings.profileSection', 'Thông tin cá nhân')}</h3>
           <p className="mt-1 text-sm text-on-surface-variant">
-            Các thông tin này được lưu qua API hồ sơ Laravel.
+            {t('studentSettings.profileSectionDesc', 'Các thông tin này được lưu qua API hồ sơ Laravel.')}
           </p>
         </div>
 
@@ -408,10 +410,10 @@ export default function AdminSettings() {
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
           <label className="space-y-2">
             <span className="block text-xs font-bold uppercase tracking-widest text-slate-500">
-              Họ và tên
+              {t('studentSettings.fullName', 'Họ và tên')}
             </span>
             <input
-              aria-label="Họ tên quản trị"
+              aria-label={t('studentSettings.fullName', 'Họ tên quản trị')}
               data-testid="admin-name"
               required
               type="text"
@@ -425,10 +427,10 @@ export default function AdminSettings() {
 
           <label className="space-y-2">
             <span className="block text-xs font-bold uppercase tracking-widest text-slate-500">
-              Mã thủ thư
+              {t('studentSettings.memberId', 'Mã thủ thư')}
             </span>
             <input
-              aria-label="Mã thủ thư"
+              aria-label={t('studentSettings.memberId', 'Mã thủ thư')}
               data-testid="admin-librarian-id"
               type="text"
               value={user?.librarian_id ?? ''}
@@ -439,10 +441,10 @@ export default function AdminSettings() {
 
           <label className="space-y-2">
             <span className="block text-xs font-bold uppercase tracking-widest text-slate-500">
-              Email
+              {t('studentSettings.email', 'Email')}
             </span>
             <input
-              aria-label="Email quản trị"
+              aria-label={t('studentSettings.email', 'Email quản trị')}
               data-testid="admin-email"
               type="email"
               value={profileForm.email}
@@ -453,10 +455,10 @@ export default function AdminSettings() {
 
           <label className="space-y-2">
             <span className="block text-xs font-bold uppercase tracking-widest text-slate-500">
-              Số điện thoại
+              {t('studentSettings.phone', 'Số điện thoại')}
             </span>
             <input
-              aria-label="Số điện thoại quản trị"
+              aria-label={t('studentSettings.phone', 'Số điện thoại quản trị')}
               data-testid="admin-phone"
               type="tel"
               value={profileForm.phone_number}
@@ -472,13 +474,13 @@ export default function AdminSettings() {
         <div className="flex justify-end">
           <button
             type="submit"
-            aria-label="Lưu hồ sơ quản trị"
+            aria-label={t('studentSettings.btnSave', 'Lưu hồ sơ')}
             data-testid="save-admin-profile"
             disabled={isSavingProfile}
             className="flex items-center gap-2 rounded-xl bg-primary px-6 py-2.5 font-medium text-white shadow-lg shadow-primary/20 transition-all hover:-translate-y-0.5 disabled:cursor-wait disabled:opacity-60"
           >
             <span className="material-symbols-outlined text-sm" aria-hidden="true">save</span>
-            {isSavingProfile ? 'Đang lưu...' : 'Lưu hồ sơ quản trị'}
+            {isSavingProfile ? t('studentSettings.saving', 'Đang lưu...') : t('studentSettings.btnSave', 'Lưu hồ sơ')}
           </button>
         </div>
       </form>
@@ -489,17 +491,17 @@ export default function AdminSettings() {
             <span className="material-symbols-outlined filled text-[20px] text-orange-500">
               lock
             </span>
-            Bảo mật tài khoản
+            {t('studentSettings.securitySection', 'Bảo mật tài khoản')}
           </h3>
           <p className="mt-1 text-sm text-on-surface-variant">
-            Thay đổi mật khẩu tài khoản của bạn để bảo mật thông tin.
+            {t('studentSettings.passwordDesc', 'Thay đổi mật khẩu tài khoản của bạn để bảo mật thông tin.')}
           </p>
         </div>
 
         <div className="flex flex-col sm:flex-row sm:items-center justify-between border border-slate-100 rounded-xl p-4 bg-slate-50/50 hover:bg-slate-50 transition-colors gap-3">
           <div>
-            <p className="text-sm font-semibold text-slate-800">Mật khẩu tài khoản</p>
-            <p className="text-xs text-slate-500 mt-1">Hệ thống sẽ gửi mã OTP xác thực về email quản trị trước khi đặt lại.</p>
+            <p className="text-sm font-semibold text-slate-800">{t('studentSettings.passwordLabel', 'Mật khẩu tài khoản')}</p>
+            <p className="text-xs text-slate-500 mt-1">{t('studentSettings.passwordDesc', 'Hệ thống sẽ gửi mã OTP xác thực về email quản trị trước khi đặt lại.')}</p>
           </div>
           <button
             type="button"
@@ -507,7 +509,7 @@ export default function AdminSettings() {
             disabled={isSendingOtp}
             className="w-full sm:w-auto text-center text-xs font-bold text-primary hover:text-white bg-white border border-primary hover:bg-primary px-4 py-2 rounded-xl transition-all shadow-sm cursor-pointer disabled:opacity-50 disabled:cursor-wait"
           >
-            {isSendingOtp ? 'Đang gửi mã...' : 'Thay đổi mật khẩu'}
+            {isSendingOtp ? t('studentSettings.btnSendingOtp', 'Đang gửi mã...') : t('studentSettings.btnChangePassword', 'Thay đổi mật khẩu')}
           </button>
         </div>
       </section>
@@ -517,10 +519,9 @@ export default function AdminSettings() {
           data-testid="borrow-settings-note"
           className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900"
         >
-          <p className="font-semibold">Quy tắc mượn sách được lưu trên hệ thống.</p>
+          <p className="font-semibold">{t('adminSettings.rulesSaveNoteTitle', 'Quy tắc mượn sách được lưu trên hệ thống.')}</p>
           <p className="mt-1">
-            Thời hạn mượn mới chỉ áp dụng cho các yêu cầu được duyệt sau khi lưu. Các sách đã mượn
-            giữ nguyên ngày đến hạn hiện tại.
+            {t('adminSettings.rulesSaveNoteDesc', 'Thời hạn mượn mới chỉ áp dụng cho các yêu cầu được duyệt sau khi lưu. Các sách đã mượn giữ nguyên ngày đến hạn hiện tại.')}
           </p>
         </div>
 
@@ -551,7 +552,7 @@ export default function AdminSettings() {
                 <span className="material-symbols-outlined filled text-[20px] text-primary">
                   timelapse
                 </span>
-                Quy tắc mượn sách
+                {t('adminSettings.sectionBorrowRules', 'Quy tắc mượn sách')}
               </h4>
               <button
                 type="submit"
@@ -560,22 +561,22 @@ export default function AdminSettings() {
                 className="flex items-center gap-2 rounded-xl bg-surface-container px-5 py-2.5 font-medium text-on-surface transition-all hover:bg-surface-container-high disabled:cursor-wait disabled:opacity-60"
               >
                 <span className="material-symbols-outlined text-sm">save</span>
-                {isSavingSettings ? 'Đang lưu...' : 'Lưu quy tắc mượn sách'}
+                {isSavingSettings ? t('adminSettings.saving', 'Đang lưu...') : t('adminSettings.btnSave', 'Lưu quy tắc mượn sách')}
               </button>
             </div>
 
             {isLoadingSettings ? (
               <div className="rounded-xl border border-dashed border-surface-container-high bg-surface-container-low px-4 py-6 text-center text-sm text-on-surface-variant">
-                Đang tải quy tắc mượn sách...
+                {t('adminSettings.loadingRules', 'Đang tải quy tắc mượn sách...')}
               </div>
             ) : (
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                 <label className="space-y-2">
                   <span className="block text-xs font-bold uppercase tracking-widest text-slate-500">
-                    Thời hạn mượn trước khi quá hạn (ngày)
+                    {t('adminSettings.loanPeriodDays', 'Thời hạn mượn trước khi quá hạn (ngày)')}
                   </span>
                   <input
-                    aria-label="Thời hạn mượn trước khi quá hạn"
+                    aria-label={t('adminSettings.loanPeriodDays', 'Thời hạn mượn trước khi quá hạn')}
                     data-testid="loan-period-days"
                     type="number"
                     min={1}
@@ -593,10 +594,10 @@ export default function AdminSettings() {
                 </label>
                 <label className="space-y-2">
                   <span className="block text-xs font-bold uppercase tracking-widest text-slate-500">
-                    Số lượng mượn tối đa đang hoạt động
+                    {t('adminSettings.maxActiveLoans', 'Số lượng mượn tối đa đang hoạt động')}
                   </span>
                   <input
-                    aria-label="Số lượng mượn tối đa đang hoạt động"
+                    aria-label={t('adminSettings.maxActiveLoans', 'Số lượng mượn tối đa đang hoạt động')}
                     data-testid="max-active-loans"
                     type="number"
                     min={1}
@@ -614,10 +615,10 @@ export default function AdminSettings() {
                 </label>
                 <label className="space-y-2 md:col-span-2">
                   <span className="block text-xs font-bold uppercase tracking-widest text-slate-500">
-                    Phí phạt trễ hạn mỗi ngày (VND)
+                    {t('adminSettings.fineRatePerDay', 'Phí phạt trễ hạn mỗi ngày (VND)')}
                   </span>
                   <input
-                    aria-label="Phí phạt trễ hạn mỗi ngày"
+                    aria-label={t('adminSettings.fineRatePerDay', 'Phí phạt trễ hạn mỗi ngày')}
                     data-testid="fine-per-day"
                     type="number"
                     min={0}
@@ -635,10 +636,10 @@ export default function AdminSettings() {
                 </label>
                 <label className="space-y-2">
                   <span className="block text-xs font-bold uppercase tracking-widest text-slate-500">
-                    Trần phạt tối đa mỗi phiếu (VND)
+                    {t('adminSettings.maxFine', 'Trần phạt tối đa mỗi phiếu (VND)')}
                   </span>
                   <input
-                    aria-label="Trần phạt tối đa mỗi phiếu"
+                    aria-label={t('adminSettings.maxFine', 'Trần phạt tối đa mỗi phiếu')}
                     data-testid="max-fine-per-loan"
                     type="number"
                     min={0}
@@ -656,10 +657,10 @@ export default function AdminSettings() {
                 </label>
                 <label className="space-y-2">
                   <span className="block text-xs font-bold uppercase tracking-widest text-slate-500">
-                    Số ngày ân hạn trước khi tính phạt
+                    {t('adminSettings.gracePeriod', 'Số ngày ân hạn trước khi tính phạt')}
                   </span>
                   <input
-                    aria-label="Số ngày ân hạn trước khi tính phạt"
+                    aria-label={t('adminSettings.gracePeriod', 'Số ngày ân hạn trước khi tính phạt')}
                     data-testid="grace-period-days"
                     type="number"
                     min={0}
@@ -677,10 +678,10 @@ export default function AdminSettings() {
                 </label>
                 <label className="space-y-2">
                   <span className="block text-xs font-bold uppercase tracking-widest text-slate-500">
-                    Hạn chót đến nhận sách (tiếng)
+                    {t('adminSettings.pickupDeadline', 'Hạn chót đến nhận sách (tiếng)')}
                   </span>
                   <input
-                    aria-label="Hạn chót đến nhận sách"
+                    aria-label={t('adminSettings.pickupDeadline', 'Hạn chót đến nhận sách')}
                     data-testid="pickup-deadline-hours"
                     type="number"
                     min={1}
@@ -698,10 +699,10 @@ export default function AdminSettings() {
                 </label>
                 <label className="space-y-2">
                   <span className="block text-xs font-bold uppercase tracking-widest text-slate-500">
-                    Số lần lỡ nhận tối đa trước khi khóa
+                    {t('adminSettings.maxMissedPickups', 'Số lần lỡ nhận tối đa trước khi khóa')}
                   </span>
                   <input
-                    aria-label="Số lần lỡ nhận tối đa trước khi khóa"
+                    aria-label={t('adminSettings.maxMissedPickups', 'Số lần lỡ nhận tối đa trước khi khóa')}
                     data-testid="max-missed-pickups"
                     type="number"
                     min={1}
@@ -719,10 +720,10 @@ export default function AdminSettings() {
                 </label>
                 <label className="space-y-2 md:col-span-2">
                   <span className="block text-xs font-bold uppercase tracking-widest text-slate-500">
-                    Số ngày khóa tài khoản khi vi phạm
+                    {t('adminSettings.suspensionDuration', 'Số ngày khóa tài khoản khi vi phạm')}
                   </span>
                   <input
-                    aria-label="Số ngày khóa tài khoản khi vi phạm"
+                    aria-label={t('adminSettings.suspensionDuration', 'Số ngày khóa tài khoản khi vi phạm')}
                     data-testid="suspension-duration-days"
                     type="number"
                     min={1}
@@ -750,22 +751,22 @@ export default function AdminSettings() {
                 <span className="material-symbols-outlined filled text-[20px] text-primary">
                   meeting_room
                 </span>
-                Quy tắc đặt phòng học nhóm
+                {t('adminSettings.sectionRoomRules', 'Quy tắc đặt phòng học nhóm')}
               </h4>
             </div>
 
             {isLoadingSettings ? (
               <div className="rounded-xl border border-dashed border-surface-container-high bg-surface-container-low px-4 py-6 text-center text-sm text-on-surface-variant">
-                Đang tải quy tắc đặt phòng...
+                {t('adminSettings.loadingRooms', 'Đang tải quy tắc đặt phòng...')}
               </div>
             ) : (
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                 <label className="space-y-2">
                   <span className="block text-xs font-bold uppercase tracking-widest text-slate-500">
-                    Thời gian sử dụng tối đa/lần đặt (tiếng)
+                    {t('adminSettings.roomBookingMaxDuration', 'Thời gian sử dụng tối đa/lần đặt (tiếng)')}
                   </span>
                   <input
-                    aria-label="Thời gian đặt tối đa"
+                    aria-label={t('adminSettings.roomBookingMaxDuration', 'Thời gian đặt tối đa')}
                     type="number"
                     min={1}
                     max={12}
@@ -782,10 +783,10 @@ export default function AdminSettings() {
                 </label>
                 <label className="space-y-2">
                   <span className="block text-xs font-bold uppercase tracking-widest text-slate-500">
-                    Thời gian sử dụng tối đa/tuần (tiếng)
+                    {t('adminSettings.roomMaxHoursWeek', 'Thời gian sử dụng tối đa/tuần (tiếng)')}
                   </span>
                   <input
-                    aria-label="Thời gian đặt tối đa tuần"
+                    aria-label={t('adminSettings.roomMaxHoursWeek', 'Thời gian đặt tối đa tuần')}
                     type="number"
                     min={1}
                     max={168}
@@ -802,10 +803,10 @@ export default function AdminSettings() {
                 </label>
                 <label className="space-y-2">
                   <span className="block text-xs font-bold uppercase tracking-widest text-slate-500">
-                    Số lượt đặt tối đa mỗi sinh viên/ngày
+                    {t('adminSettings.roomMaxBookingsDay', 'Số lượt đặt tối đa mỗi sinh viên/ngày')}
                   </span>
                   <input
-                    aria-label="Lượt đặt tối đa ngày"
+                    aria-label={t('adminSettings.roomMaxBookingsDay', 'Lượt đặt tối đa ngày')}
                     type="number"
                     min={1}
                     max={10}
@@ -822,10 +823,10 @@ export default function AdminSettings() {
                 </label>
                 <label className="space-y-2">
                   <span className="block text-xs font-bold uppercase tracking-widest text-slate-500">
-                    Được đặt trước tối đa bao nhiêu ngày
+                    {t('adminSettings.roomBookingAdvanceDays', 'Được đặt trước tối đa bao nhiêu ngày')}
                   </span>
                   <input
-                    aria-label="Đặt trước tối đa"
+                    aria-label={t('adminSettings.roomBookingAdvanceDays', 'Đặt trước tối đa')}
                     type="number"
                     min={1}
                     max={30}
@@ -842,10 +843,10 @@ export default function AdminSettings() {
                 </label>
                 <label className="space-y-2">
                   <span className="block text-xs font-bold uppercase tracking-widest text-slate-500">
-                    Số người tối thiểu để đặt phòng nhóm
+                    {t('adminSettings.roomMinGroup', 'Số người tối thiểu để đặt phòng nhóm')}
                   </span>
                   <input
-                    aria-label="Số người tối thiểu"
+                    aria-label={t('adminSettings.roomMinGroup', 'Số người tối thiểu')}
                     type="number"
                     min={1}
                     max={20}
@@ -862,10 +863,10 @@ export default function AdminSettings() {
                 </label>
                 <label className="space-y-2">
                   <span className="block text-xs font-bold uppercase tracking-widest text-slate-500">
-                    Cửa sổ thời gian check-in trễ (phút)
+                    {t('adminSettings.roomCheckinWindow', 'Cửa sổ thời gian check-in trễ (phút)')}
                   </span>
                   <input
-                    aria-label="Cửa sổ check-in"
+                    aria-label={t('adminSettings.roomCheckinWindow', 'Cửa sổ check-in')}
                     type="number"
                     min={5}
                     max={60}
@@ -882,10 +883,10 @@ export default function AdminSettings() {
                 </label>
                 <label className="space-y-2">
                   <span className="block text-xs font-bold uppercase tracking-widest text-slate-500">
-                    Hạn hủy lịch đặt miễn phạt (tiếng trước giờ đặt)
+                    {t('adminSettings.roomCancelDeadline', 'Hạn hủy lịch đặt miễn phạt (tiếng trước giờ đặt)')}
                   </span>
                   <input
-                    aria-label="Hạn hủy miễn phạt"
+                    aria-label={t('adminSettings.roomCancelDeadline', 'Hạn hủy miễn phạt')}
                     type="number"
                     min={0}
                     max={24}
@@ -902,10 +903,10 @@ export default function AdminSettings() {
                 </label>
                 <label className="space-y-2">
                   <span className="block text-xs font-bold uppercase tracking-widest text-slate-500">
-                    Giờ mở cửa đặt phòng
+                    {t('adminSettings.roomOpenTime', 'Giờ mở cửa đặt phòng')}
                   </span>
                   <input
-                    aria-label="Giờ mở cửa phòng"
+                    aria-label={t('adminSettings.roomOpenTime', 'Giờ mở cửa phòng')}
                     type="text"
                     placeholder="07:00"
                     value={settings.room_open_time}
@@ -921,10 +922,10 @@ export default function AdminSettings() {
                 </label>
                 <label className="space-y-2">
                   <span className="block text-xs font-bold uppercase tracking-widest text-slate-500">
-                    Giờ đóng cửa đặt phòng
+                    {t('adminSettings.roomCloseTime', 'Giờ đóng cửa đặt phòng')}
                   </span>
                   <input
-                    aria-label="Giờ đóng cửa phòng"
+                    aria-label={t('adminSettings.roomCloseTime', 'Giờ đóng cửa phòng')}
                     type="text"
                     placeholder="21:00"
                     value={settings.room_close_time}
@@ -953,7 +954,7 @@ export default function AdminSettings() {
                     className="h-5 w-5 rounded-md border-slate-300 text-primary focus:ring-primary/20"
                   />
                   <label htmlFor="room_booking_requires_approval" className="text-sm font-semibold text-slate-700">
-                    Yêu cầu thủ thư phê duyệt trước khi đặt phòng thành công (Manual Approve)
+                    {t('adminSettings.roomManualApprove', 'Yêu cầu thủ thư phê duyệt trước khi đặt phòng thành công (Manual Approve)')}
                   </label>
                 </div>
               </div>
@@ -968,20 +969,20 @@ export default function AdminSettings() {
             <span className="material-symbols-outlined filled text-[20px] text-blue-500">
               devices
             </span>
-            Thiết bị đang hoạt động
+            {t('studentSettings.devicesSection', 'Thiết bị đang hoạt động')}
           </h3>
           <p className="mt-1 text-sm text-on-surface-variant">
-            Danh sách các thiết bị hiện đang đăng nhập vào bảng quản trị của bạn. Bạn có thể đăng xuất khỏi các thiết bị khác từ xa nếu phát hiện truy cập đáng ngờ.
+            {t('studentSettings.devicesDesc', 'Danh sách các thiết bị hiện đang đăng nhập vào bảng quản trị của bạn. Bạn có thể đăng xuất khỏi các thiết bị khác từ xa nếu phát hiện truy cập đáng ngờ.')}
           </p>
         </div>
 
         {loadingDevices ? (
           <div className="text-xs text-slate-400 py-4 flex items-center gap-2">
             <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
-            Đang tải danh sách thiết bị...
+            {t('studentSettings.loadingDevices', 'Đang tải danh sách thiết bị...')}
           </div>
         ) : devices.length === 0 ? (
-          <div className="text-xs text-slate-400 py-4">Không tìm thấy thông tin thiết bị hoạt động.</div>
+          <div className="text-xs text-slate-400 py-4">{t('studentSettings.emptyDevices', 'Không tìm thấy thông tin thiết bị hoạt động.')}</div>
         ) : (
           <div className="space-y-4">
             {devices.map((device) => (
@@ -999,14 +1000,14 @@ export default function AdminSettings() {
                       </span>
                       {device.is_current ? (
                         <span className="bg-green-100 text-green-800 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
-                          Thiết bị này
+                          {t('studentSettings.currentDevice', 'Thiết bị này')}
                         </span>
                       ) : null}
                     </div>
                     <div className="text-xs text-slate-500 mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
                       <span>IP: {device.ip_address}</span>
                       <span className="w-1.5 h-1.5 bg-slate-300 rounded-full shrink-0" />
-                      <span>Đăng nhập lúc: {new Date(device.created_at).toLocaleString('vi-VN')}</span>
+                      <span>{t('adminSettings.loginAt', 'Đăng nhập lúc:')} {new Date(device.created_at).toLocaleString(i18n.language)}</span>
                     </div>
                   </div>
                 </div>
@@ -1017,7 +1018,7 @@ export default function AdminSettings() {
                     onClick={() => handleRevoke(device.token_id)}
                     className="text-xs font-bold text-red-600 hover:text-red-700 bg-white border border-red-200 hover:bg-red-50 px-3 py-1.5 rounded-lg transition-all shadow-sm cursor-pointer"
                   >
-                    Đăng xuất
+                    {t('studentSettings.btnRevoke', 'Đăng xuất')}
                   </button>
                 )}
               </div>
@@ -1035,9 +1036,9 @@ export default function AdminSettings() {
                   <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-100 text-sky-600">
                     <span className="material-symbols-outlined text-3xl font-light">mail</span>
                   </div>
-                  <h3 className="text-xl font-bold text-slate-800">Xác thực OTP</h3>
+                  <h3 className="text-xl font-bold text-slate-800">{t('studentSettings.modalOtpTitle', 'Xác thực OTP')}</h3>
                   <p className="mt-2 text-sm text-slate-500">
-                    Mã xác thực OTP gồm 6 chữ số đã được gửi đến địa chỉ email quản trị của bạn: <span className="font-semibold text-slate-700">{user?.email}</span>.
+                    {t('studentSettings.modalOtpDesc', 'Mã xác thực OTP gồm 6 chữ số đã được gửi đến địa chỉ email quản trị của bạn:')} <span className="font-semibold text-slate-700">{user?.email}</span>.
                   </p>
                 </div>
 
@@ -1051,10 +1052,10 @@ export default function AdminSettings() {
 
                   <div className="space-y-2">
                     <label className="block text-center text-xs font-bold uppercase tracking-widest text-slate-500">
-                      Nhập mã OTP
+                      {t('studentSettings.formOtp', 'Nhập mã OTP')}
                     </label>
                     <input
-                      aria-label="Mã OTP đổi mật khẩu"
+                      aria-label={t('studentSettings.formOtp', 'Nhập mã OTP')}
                       type="text"
                       maxLength={6}
                       value={passwordForm.otp}
@@ -1068,9 +1069,9 @@ export default function AdminSettings() {
                   <div className="flex items-center justify-between text-xs font-medium">
                     <span className="text-slate-500">
                       {otpCountdown > 0 ? (
-                        <>Mã hết hạn sau: <span className="font-bold text-slate-700">{formatCountdown(otpCountdown)}</span></>
+                        <>{t('studentSettings.countdownActive', 'Mã hết hạn sau:')} <span className="font-bold text-slate-700">{formatCountdown(otpCountdown)}</span></>
                       ) : (
-                        <span className="text-rose-500 font-semibold">Mã đã hết hạn</span>
+                        <span className="text-rose-500 font-semibold">{t('studentSettings.countdownExpired', 'Mã đã hết hạn')}</span>
                       )}
                     </span>
                     <button
@@ -1081,7 +1082,7 @@ export default function AdminSettings() {
                         otpCountdown > 0 ? 'text-slate-400 cursor-not-allowed' : 'text-primary hover:underline'
                       }`}
                     >
-                      {resendingOtp ? 'Đang gửi...' : 'Gửi lại mã'}
+                      {resendingOtp ? t('studentSettings.btnResendingOtp', 'Đang gửi...') : t('studentSettings.btnResendOtp', 'Gửi lại mã')}
                     </button>
                   </div>
 
@@ -1091,14 +1092,14 @@ export default function AdminSettings() {
                       onClick={() => setShowPasswordModal(false)}
                       className="flex-1 rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
                     >
-                      Hủy bỏ
+                      {t('studentSettings.btnCancel', 'Hủy bỏ')}
                     </button>
                     <button
                       type="submit"
                       disabled={passwordForm.otp.length !== 6 || isVerifyingOtp}
                       className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-primary py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary/20 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-wait cursor-pointer"
                     >
-                      {isVerifyingOtp ? 'Đang xác thực...' : 'Tiếp tục'}
+                      {isVerifyingOtp ? t('studentSettings.btnVerifyingOtp', 'Đang xác thực...') : t('studentSettings.btnContinue', 'Tiếp tục')}
                     </button>
                   </div>
                 </form>
@@ -1109,9 +1110,9 @@ export default function AdminSettings() {
                   <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600">
                     <span className="material-symbols-outlined text-3xl font-light">key</span>
                   </div>
-                  <h3 className="text-xl font-bold text-slate-800">Thiết lập mật khẩu mới</h3>
+                  <h3 className="text-xl font-bold text-slate-800">{t('studentSettings.otpVerifiedTitle', 'Thiết lập mật khẩu mới')}</h3>
                   <p className="mt-2 text-sm text-slate-500">
-                    Mã OTP đã được xác thực thành công. Vui lòng nhập mật khẩu mới của bạn dưới đây.
+                    {t('studentSettings.otpVerifiedDesc', 'Mã OTP đã được xác thực thành công. Vui lòng nhập mật khẩu mới của bạn dưới đây.')}
                   </p>
                 </div>
 
@@ -1125,7 +1126,7 @@ export default function AdminSettings() {
 
                   <div className="space-y-2">
                     <label htmlFor="new-password-input" className="block text-xs font-bold uppercase tracking-widest text-slate-500">
-                      Mật khẩu mới
+                      {t('studentSettings.newPassword', 'Mật khẩu mới')}
                     </label>
                     <input
                       id="new-password-input"
@@ -1139,7 +1140,7 @@ export default function AdminSettings() {
 
                   <div className="space-y-2">
                     <label htmlFor="confirm-new-password-input" className="block text-xs font-bold uppercase tracking-widest text-slate-500">
-                      Xác nhận mật khẩu mới
+                      {t('studentSettings.confirmNewPassword', 'Xác nhận mật khẩu mới')}
                     </label>
                     <input
                       id="confirm-new-password-input"
@@ -1157,14 +1158,14 @@ export default function AdminSettings() {
                       onClick={() => setShowPasswordModal(false)}
                       className="flex-1 rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
                     >
-                      Hủy bỏ
+                      {t('studentSettings.btnCancel', 'Hủy bỏ')}
                     </button>
                     <button
                       type="submit"
                       disabled={isSavingProfile}
                       className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-primary py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary/20 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-wait cursor-pointer"
                     >
-                      {isSavingProfile ? 'Đang lưu...' : 'Xác nhận'}
+                      {isSavingProfile ? t('studentSettings.saving', 'Đang lưu...') : t('studentSettings.btnSave', 'Xác nhận')}
                     </button>
                   </div>
                 </form>

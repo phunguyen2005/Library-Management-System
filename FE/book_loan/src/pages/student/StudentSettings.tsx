@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { getIntlLocale } from '../../i18n';
 import { updateMyProfile, sendPasswordOtp, verifyPasswordOtp } from '../../api/userApi';
 import { getActiveDevices, revokeDevice, type DeviceSession } from '../../api/authApi';
 import { useAuth } from '../../auth/AuthContext';
@@ -21,6 +23,7 @@ const parseBool = (val: any, defVal = true): boolean => {
 };
 
 export default function StudentSettings() {
+  const { t } = useTranslation();
   const { user, updateUser } = useAuth();
   const [form, setForm] = useState({
     name: '',
@@ -84,16 +87,16 @@ export default function StudentSettings() {
       setShowPasswordModal(true);
       emitToast({
         tone: 'success',
-        title: 'Mã OTP đã gửi',
-        message: 'Vui lòng kiểm tra email của bạn để nhận mã xác thực.',
+        title: t('studentSettings.toastOtpSent'),
+        message: t('studentSettings.toastOtpSentMsg'),
       });
     } catch (error: unknown) {
       setIsSendingOtp(false);
-      const message = getErrorMessage(error, 'Không thể gửi mã xác thực OTP.');
+      const message = getErrorMessage(error, t('studentSettings.toastOtpError'));
       setFeedback({ tone: 'error', message });
       emitToast({
         tone: 'error',
-        title: 'Không thể gửi OTP',
+        title: t('studentSettings.toastOtpError'),
         message,
       });
     }
@@ -112,11 +115,11 @@ export default function StudentSettings() {
       setOtpError(null);
       emitToast({
         tone: 'success',
-        title: 'Xác thực thành công',
-        message: 'Vui lòng thiết lập mật khẩu mới của bạn.',
+        title: t('studentSettings.toastVerifySuccess'),
+        message: t('studentSettings.toastVerifySuccessMsg'),
       });
     } catch (error: unknown) {
-      const message = getErrorMessage(error, 'Mã OTP không chính xác hoặc đã hết hạn.');
+      const message = getErrorMessage(error, t('studentSettings.toastVerifyErrorMsg'));
       setOtpError(message);
     } finally {
       setIsVerifyingOtp(false);
@@ -138,15 +141,15 @@ export default function StudentSettings() {
       });
 
       updateUser(response.user);
-      setFeedback({ tone: 'success', message: response.message || 'Thay đổi mật khẩu thành công.' });
+      setFeedback({ tone: 'success', message: response.message || t('studentSettings.toastPasswordSuccess') });
       emitToast({
         tone: 'success',
-        title: 'Thành công',
-        message: response.message || 'Đổi mật khẩu thành công.',
+        title: t('common.success'),
+        message: response.message || t('studentSettings.toastPasswordSuccess'),
       });
       setShowPasswordModal(false);
     } catch (error: unknown) {
-      const message = getErrorMessage(error, 'Không thể cập nhật mật khẩu mới.');
+      const message = getErrorMessage(error, t('studentSettings.toastPasswordError'));
       setOtpError(message);
     } finally {
       setIsSaving(false);
@@ -163,11 +166,11 @@ export default function StudentSettings() {
       setPasswordForm((prev) => ({ ...prev, otp: '' }));
       emitToast({
         tone: 'success',
-        title: 'Mã OTP mới đã gửi',
-        message: 'Mã xác thực mới đã được gửi về email của bạn.',
+        title: t('studentSettings.toastOtpSent'),
+        message: t('studentSettings.toastOtpSentMsg'),
       });
     } catch (error: unknown) {
-      const message = getErrorMessage(error, 'Không thể gửi lại mã xác thực.');
+      const message = getErrorMessage(error, t('studentSettings.toastOtpError'));
       setOtpError(message);
     } finally {
       setResendingOtp(false);
@@ -189,10 +192,10 @@ export default function StudentSettings() {
   const handleRevoke = async (tokenId: string) => {
     try {
       await revokeDevice(tokenId);
-      emitToast({ tone: 'success', title: 'Thành công', message: 'Đã hủy phiên làm việc của thiết bị thành công.' });
+      emitToast({ tone: 'success', title: t('common.success'), message: t('studentSettings.toastRevokeSuccess') });
       setDevices((prev) => prev.filter((d) => d.token_id !== tokenId));
     } catch (error: any) {
-      emitToast({ tone: 'error', title: 'Thất bại', message: error?.message || 'Không thể hủy phiên đăng nhập.' });
+      emitToast({ tone: 'error', title: t('common.error'), message: error?.message || t('studentSettings.toastRevokeError') });
     }
   };
 
@@ -234,10 +237,10 @@ export default function StudentSettings() {
       });
 
       updateUser(response.user);
-      setFeedback({ tone: 'success', message: response.message });
+      setFeedback({ tone: 'success', message: response.message || t('studentSettings.toastSaved') });
       emitToast({
         tone: 'success',
-        title: 'Đã lưu hồ sơ',
+        title: t('studentSettings.toastSaved'),
         message: response.message,
       });
     } catch (error: unknown) {
@@ -245,11 +248,11 @@ export default function StudentSettings() {
         return;
       }
 
-      const message = getErrorMessage(error, 'Không thể cập nhật hồ sơ.');
+      const message = getErrorMessage(error, t('studentSettings.toastSaveError'));
       setFeedback({ tone: 'error', message });
       emitToast({
         tone: 'error',
-        title: 'Không thể cập nhật hồ sơ',
+        title: t('studentSettings.toastSaveError'),
         message,
       });
     } finally {
@@ -262,9 +265,9 @@ export default function StudentSettings() {
       <form onSubmit={handleSubmit} className="mx-auto w-full max-w-4xl space-y-6 p-4 md:p-8">
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
         <div>
-          <h2 className="text-2xl md:text-3xl font-bold text-on-surface">Cài đặt cá nhân</h2>
+          <h2 className="text-2xl md:text-3xl font-bold text-on-surface">{t('studentSettings.title')}</h2>
           <p className="mt-1 text-xs md:text-sm text-on-surface-variant">
-            Quản lý hồ sơ độc giả và tùy chọn nhận thông báo của bạn
+            {t('studentSettings.subtitle')}
           </p>
         </div>
         <button
@@ -272,7 +275,7 @@ export default function StudentSettings() {
           className="w-full md:w-auto flex items-center justify-center gap-2 rounded-xl bg-primary px-6 py-2.5 font-medium text-white shadow-lg shadow-primary/20 transition-all hover:-translate-y-0.5 cursor-pointer"
         >
           <span className="material-symbols-outlined text-sm">save</span>
-          {isSaving ? 'Đang lưu...' : 'Lưu thay đổi'}
+          {isSaving ? t('studentSettings.saving') : t('studentSettings.btnSave')}
         </button>
       </div>
 
@@ -298,7 +301,7 @@ export default function StudentSettings() {
             <span className="material-symbols-outlined filled text-[20px] text-primary">
               account_circle
             </span>
-            Thông tin hồ sơ
+            {t('studentSettings.profileSection')}
           </h4>
           <div className="flex flex-col gap-8 md:flex-row">
             <div className="flex flex-col items-center gap-4">
@@ -312,7 +315,7 @@ export default function StudentSettings() {
                   htmlFor="student-settings-name"
                   className="block text-xs font-bold uppercase tracking-widest text-slate-500"
                 >
-                  Họ và tên
+                  {t('studentSettings.fullName')}
                 </label>
                 <input
                   id="student-settings-name"
@@ -328,7 +331,7 @@ export default function StudentSettings() {
                   htmlFor="student-settings-member-id"
                   className="block text-xs font-bold uppercase tracking-widest text-slate-500"
                 >
-                  Mã số độc giả
+                  {t('studentSettings.memberId')}
                 </label>
                 <input
                   id="student-settings-member-id"
@@ -343,7 +346,7 @@ export default function StudentSettings() {
                   htmlFor="student-settings-email"
                   className="block text-xs font-bold uppercase tracking-widest text-slate-500"
                 >
-                  Email liên hệ
+                  {t('studentSettings.email')}
                 </label>
                 <input
                   id="student-settings-email"
@@ -358,7 +361,7 @@ export default function StudentSettings() {
                   htmlFor="student-settings-phone"
                   className="block text-xs font-bold uppercase tracking-widest text-slate-500"
                 >
-                  Số điện thoại
+                  {t('studentSettings.phone')}
                 </label>
                 <input
                   id="student-settings-phone"
@@ -377,12 +380,12 @@ export default function StudentSettings() {
             <span className="material-symbols-outlined filled text-[20px] text-orange-500">
               lock
             </span>
-            Bảo mật tài khoản
+            {t('studentSettings.securitySection')}
           </h4>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between border border-slate-100 rounded-xl p-4 bg-slate-50/50 hover:bg-slate-50 transition-colors gap-3">
             <div>
-              <p className="text-sm font-semibold text-slate-800">Mật khẩu tài khoản</p>
-              <p className="text-xs text-slate-500 mt-1">Thay đổi mật khẩu tài khoản của bạn để bảo mật thông tin.</p>
+              <p className="text-sm font-semibold text-slate-800">{t('studentSettings.passwordLabel')}</p>
+              <p className="text-xs text-slate-500 mt-1">{t('studentSettings.passwordDesc')}</p>
             </div>
             <button
               type="button"
@@ -390,7 +393,7 @@ export default function StudentSettings() {
               disabled={isSendingOtp}
               className="w-full sm:w-auto text-center text-xs font-bold text-primary hover:text-white bg-white border border-primary hover:bg-primary px-4 py-2 rounded-xl transition-all shadow-sm cursor-pointer disabled:opacity-50 disabled:cursor-wait"
             >
-              {isSendingOtp ? 'Đang gửi mã...' : 'Thay đổi mật khẩu'}
+              {isSendingOtp ? t('studentSettings.btnSendingOtp') : t('studentSettings.btnChangePassword')}
             </button>
           </div>
         </section>
@@ -400,7 +403,7 @@ export default function StudentSettings() {
             <span className="material-symbols-outlined filled text-[20px] text-purple-500">
               notifications
             </span>
-            Tùy chọn thông báo
+            {t('studentSettings.notificationsSection')}
           </h4>
           <div className="max-w-2xl space-y-4">
             <label className="flex cursor-pointer items-start gap-4">
@@ -411,9 +414,9 @@ export default function StudentSettings() {
                 className="mt-1 h-4 w-4 rounded border-outline text-primary focus:ring-primary"
               />
               <span>
-                <p className="text-sm font-bold text-slate-800">Cảnh báo sách sắp đến hạn trả</p>
+                <p className="text-sm font-bold text-slate-800">{t('studentSettings.notifyDueSoon')}</p>
                 <p className="mt-0.5 text-xs text-slate-500">
-                  Hệ thống sẽ gửi email nhắc nhở trước 2 ngày.
+                  {t('studentSettings.notifyDueSoonDesc')}
                 </p>
               </span>
             </label>
@@ -425,9 +428,9 @@ export default function StudentSettings() {
                 className="mt-1 h-4 w-4 rounded border-outline text-primary focus:ring-primary"
               />
               <span>
-                <p className="text-sm font-bold text-slate-800">Trạng thái mượn sách</p>
+                <p className="text-sm font-bold text-slate-800">{t('studentSettings.notifyBorrowStatus')}</p>
                 <p className="mt-0.5 text-xs text-slate-500">
-                  Gửi email khi yêu cầu mượn sách được duyệt (kèm mã QR) hoặc bị từ chối.
+                  {t('studentSettings.notifyBorrowStatusDesc')}
                 </p>
               </span>
             </label>
@@ -439,9 +442,9 @@ export default function StudentSettings() {
                 className="mt-1 h-4 w-4 rounded border-outline text-primary focus:ring-primary"
               />
               <span>
-                <p className="text-sm font-bold text-slate-800">Sách đặt chỗ đã sẵn sàng</p>
+                <p className="text-sm font-bold text-slate-800">{t('studentSettings.notifyReservation')}</p>
                 <p className="mt-0.5 text-xs text-slate-500">
-                  Gửi email khi sách bạn đặt chỗ trước có sẵn và yêu cầu đã được tự động duyệt.
+                  {t('studentSettings.notifyReservationDesc')}
                 </p>
               </span>
             </label>
@@ -453,9 +456,9 @@ export default function StudentSettings() {
                 className="mt-1 h-4 w-4 rounded border-outline text-primary focus:ring-primary"
               />
               <span>
-                <p className="text-sm font-bold text-slate-800">Trạng thái phòng tự học</p>
+                <p className="text-sm font-bold text-slate-800">{t('studentSettings.notifyRoomStatus')}</p>
                 <p className="mt-0.5 text-xs text-slate-500">
-                  Gửi email khi yêu cầu đặt phòng được phê duyệt, bị từ chối hoặc hủy bỏ.
+                  {t('studentSettings.notifyRoomStatusDesc')}
                 </p>
               </span>
             </label>
@@ -467,9 +470,9 @@ export default function StudentSettings() {
                 className="mt-1 h-4 w-4 rounded border-outline text-primary focus:ring-primary"
               />
               <span>
-                <p className="text-sm font-bold text-slate-800">Nhắc nhở lịch đặt phòng học</p>
+                <p className="text-sm font-bold text-slate-800">{t('studentSettings.notifyRoomReminder')}</p>
                 <p className="mt-0.5 text-xs text-slate-500">
-                  Gửi email và thông báo trước 30-60 phút khi giờ đặt phòng tự học bắt đầu.
+                  {t('studentSettings.notifyRoomReminderDesc')}
                 </p>
               </span>
             </label>
@@ -481,9 +484,9 @@ export default function StudentSettings() {
                 className="mt-1 h-4 w-4 rounded border-outline text-primary focus:ring-primary"
               />
               <span>
-                <p className="text-sm font-bold text-slate-800">Biên lai tiền phạt</p>
+                <p className="text-sm font-bold text-slate-800">{t('studentSettings.notifyFineStatus')}</p>
                 <p className="mt-0.5 text-xs text-slate-500">
-                  Gửi email xác nhận biên lai khi thanh toán phạt hoặc được miễn giảm phạt.
+                  {t('studentSettings.notifyFineStatusDesc')}
                 </p>
               </span>
             </label>
@@ -495,9 +498,9 @@ export default function StudentSettings() {
                 className="mt-1 h-4 w-4 rounded border-outline text-primary focus:ring-primary"
               />
               <span>
-                <p className="text-sm font-bold text-slate-800">Nhận thông báo sách mới</p>
+                <p className="text-sm font-bold text-slate-800">{t('studentSettings.notifyNewBooks')}</p>
                 <p className="mt-0.5 text-xs text-slate-500">
-                  Gợi ý đầu sách mới phù hợp với hồ sơ của bạn.
+                  {t('studentSettings.notifyNewBooksDesc')}
                 </p>
               </span>
             </label>
@@ -509,19 +512,19 @@ export default function StudentSettings() {
             <span className="material-symbols-outlined filled text-[20px] text-blue-500">
               devices
             </span>
-            Thiết bị đang hoạt động
+            {t('studentSettings.devicesSection')}
           </h4>
           <p className="text-xs text-slate-500 mb-6">
-            Danh sách các thiết bị hiện đang đăng nhập vào tài khoản của bạn. Bạn có thể đăng xuất khỏi các thiết bị khác từ xa nếu phát hiện truy cập đáng ngờ.
+            {t('studentSettings.devicesDesc')}
           </p>
 
           {loadingDevices ? (
             <div className="text-xs text-slate-400 py-4 flex items-center gap-2">
               <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
-              Đang tải danh sách thiết bị...
+              {t('studentSettings.loadingDevices')}
             </div>
           ) : devices.length === 0 ? (
-            <div className="text-xs text-slate-400 py-4">Không tìm thấy thông tin thiết bị hoạt động.</div>
+            <div className="text-xs text-slate-400 py-4">{t('studentSettings.emptyDevices')}</div>
           ) : (
             <div className="space-y-4">
               {devices.map((device) => (
@@ -539,14 +542,16 @@ export default function StudentSettings() {
                         </span>
                         {device.is_current ? (
                           <span className="bg-green-100 text-green-800 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
-                            Thiết bị này
+                            {t('studentSettings.currentDevice')}
                           </span>
                         ) : null}
                       </div>
                       <div className="text-[11px] text-slate-500 mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
                         <span>IP: {device.ip_address}</span>
                         <span className="w-1 h-1 bg-slate-300 rounded-full shrink-0" />
-                        <span className="line-clamp-1">Lúc: {new Date(device.created_at).toLocaleString('vi-VN')}</span>
+                        <span className="line-clamp-1">
+                          {t('common.time', 'Lúc')}: {new Date(device.created_at).toLocaleString(getIntlLocale())}
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -557,7 +562,7 @@ export default function StudentSettings() {
                       onClick={() => handleRevoke(device.token_id)}
                       className="w-full sm:w-auto text-center text-xs font-bold text-red-600 hover:text-red-700 bg-white border border-red-200 hover:bg-red-50 px-3 py-1.5 rounded-lg transition-all shadow-sm cursor-pointer"
                     >
-                      Đăng xuất
+                      {t('studentSettings.btnRevoke')}
                     </button>
                   )}
                 </div>
@@ -577,9 +582,9 @@ export default function StudentSettings() {
                 <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-100 text-sky-600">
                   <span className="material-symbols-outlined text-3xl font-light">mail</span>
                 </div>
-                <h3 className="text-xl font-bold text-slate-800">Xác thực OTP</h3>
+                <h3 className="text-xl font-bold text-slate-800">{t('studentSettings.modalOtpTitle')}</h3>
                 <p className="mt-2 text-sm text-slate-500">
-                  Mã xác thực OTP gồm 6 chữ số đã được gửi đến địa chỉ email của bạn: <span className="font-semibold text-slate-700">{user?.email}</span>.
+                  {t('studentSettings.modalOtpDesc')} <span className="font-semibold text-slate-700">{user?.email}</span>.
                 </p>
               </div>
 
@@ -593,10 +598,10 @@ export default function StudentSettings() {
 
                 <div className="space-y-2">
                   <label className="block text-center text-xs font-bold uppercase tracking-widest text-slate-500">
-                    Nhập mã OTP
+                    {t('studentSettings.formOtp')}
                   </label>
                   <input
-                    aria-label="Mã OTP đổi mật khẩu"
+                    aria-label={t('studentSettings.otpAriaLabel', 'Mã OTP đổi mật khẩu')}
                     type="text"
                     maxLength={6}
                     value={passwordForm.otp}
@@ -610,9 +615,9 @@ export default function StudentSettings() {
                 <div className="flex items-center justify-between text-xs font-medium">
                   <span className="text-slate-500">
                     {otpCountdown > 0 ? (
-                      <>Mã hết hạn sau: <span className="font-bold text-slate-700">{formatCountdown(otpCountdown)}</span></>
+                      <>{t('studentSettings.countdownActive', { time: formatCountdown(otpCountdown) })}</>
                     ) : (
-                      <span className="text-rose-500 font-semibold">Mã đã hết hạn</span>
+                      <span className="text-rose-500 font-semibold">{t('studentSettings.countdownExpired')}</span>
                     )}
                   </span>
                   <button
@@ -623,7 +628,7 @@ export default function StudentSettings() {
                       otpCountdown > 0 ? 'text-slate-400 cursor-not-allowed' : 'text-primary hover:underline'
                     }`}
                   >
-                    {resendingOtp ? 'Đang gửi...' : 'Gửi lại mã'}
+                    {resendingOtp ? t('studentSettings.btnResendingOtp') : t('studentSettings.btnResendOtp')}
                   </button>
                 </div>
 
@@ -633,14 +638,14 @@ export default function StudentSettings() {
                     onClick={() => setShowPasswordModal(false)}
                     className="flex-1 rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
                   >
-                    Hủy bỏ
+                    {t('studentSettings.btnCancel')}
                   </button>
                   <button
                     type="submit"
                     disabled={passwordForm.otp.length !== 6 || isVerifyingOtp}
                     className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-primary py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary/20 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-wait cursor-pointer"
                   >
-                    {isVerifyingOtp ? 'Đang xác thực...' : 'Tiếp tục'}
+                    {isVerifyingOtp ? t('common.processing') : t('studentSettings.btnContinue')}
                   </button>
                 </div>
               </form>
@@ -651,9 +656,9 @@ export default function StudentSettings() {
                 <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600">
                   <span className="material-symbols-outlined text-3xl font-light">key</span>
                 </div>
-                <h3 className="text-xl font-bold text-slate-800">Thiết lập mật khẩu mới</h3>
+                <h3 className="text-xl font-bold text-slate-800">{t('studentSettings.modalPasswordTitle')}</h3>
                 <p className="mt-2 text-sm text-slate-500">
-                  Mã OTP đã được xác thực thành công. Vui lòng nhập mật khẩu mới của bạn dưới đây.
+                  {t('studentSettings.modalPasswordDesc')}
                 </p>
               </div>
 
@@ -667,7 +672,7 @@ export default function StudentSettings() {
 
                 <div className="space-y-2">
                   <label className="block text-xs font-bold uppercase tracking-widest text-slate-500">
-                    Mật khẩu mới
+                    {t('studentSettings.formNewPassword')}
                   </label>
                   <input
                     type="password"
@@ -680,7 +685,7 @@ export default function StudentSettings() {
 
                 <div className="space-y-2">
                   <label className="block text-xs font-bold uppercase tracking-widest text-slate-500">
-                    Xác nhận mật khẩu mới
+                    {t('studentSettings.formConfirmNewPassword')}
                   </label>
                   <input
                     type="password"
@@ -697,14 +702,14 @@ export default function StudentSettings() {
                     onClick={() => setShowPasswordModal(false)}
                     className="flex-1 rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
                   >
-                    Hủy bỏ
+                    {t('studentSettings.btnCancel')}
                   </button>
                   <button
                     type="submit"
                     disabled={isSaving}
                     className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-primary py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary/20 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-wait cursor-pointer"
                   >
-                    {isSaving ? 'Đang lưu...' : 'Xác nhận'}
+                    {isSaving ? t('studentSettings.saving') : t('studentSettings.btnConfirm')}
                   </button>
                 </div>
               </form>

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { useTranslation } from 'react-i18next';
 import {
   getAdminRewards,
   createAdminReward,
@@ -16,6 +17,7 @@ interface AdminRewardsModalProps {
 }
 
 export default function AdminRewardsModal({ isOpen, onClose }: AdminRewardsModalProps) {
+  const { t } = useTranslation();
   const [rewards, setRewards] = useState<RewardRecord[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -39,8 +41,8 @@ export default function AdminRewardsModal({ isOpen, onClose }: AdminRewardsModal
     } catch (err) {
       emitToast({
         tone: 'error',
-        title: 'Thất bại',
-        message: getErrorMessage(err, 'Không thể tải danh sách phần thưởng.'),
+        title: t('adminRewards.toastDeleteError', 'Thất bại'),
+        message: getErrorMessage(err, t('adminRewards.loadError', 'Không thể tải danh sách phần thưởng.')),
       });
     } finally {
       setIsLoading(false);
@@ -83,8 +85,8 @@ export default function AdminRewardsModal({ isOpen, onClose }: AdminRewardsModal
     if (!code.trim() || !name.trim() || !description.trim()) {
       emitToast({
         tone: 'error',
-        title: 'Thiếu thông tin',
-        message: 'Vui lòng nhập đầy đủ các trường bắt buộc.',
+        title: t('adminRewards.toastMissingInfo', 'Thiếu thông tin'),
+        message: t('adminRewards.toastMissingInfoMsg', 'Vui lòng nhập đầy đủ các trường bắt buộc.'),
       });
       return;
     }
@@ -105,15 +107,15 @@ export default function AdminRewardsModal({ isOpen, onClose }: AdminRewardsModal
         await updateAdminReward(editingReward.id, payload);
         emitToast({
           tone: 'success',
-          title: 'Thành công',
-          message: 'Đã cập nhật thông tin quà tặng.',
+          title: t('adminRewards.toastUpdateSuccess', 'Thành công'),
+          message: t('adminRewards.toastUpdateSuccessMsg', 'Đã cập nhật thông tin quà tặng.'),
         });
       } else {
         await createAdminReward(payload);
         emitToast({
           tone: 'success',
-          title: 'Thành công',
-          message: 'Đã thêm quà tặng mới vào kho.',
+          title: t('adminRewards.toastAddSuccess', 'Thành công'),
+          message: t('adminRewards.toastAddSuccessMsg', 'Đã thêm quà tặng mới vào kho.'),
         });
       }
       resetForm();
@@ -121,8 +123,8 @@ export default function AdminRewardsModal({ isOpen, onClose }: AdminRewardsModal
     } catch (err) {
       emitToast({
         tone: 'error',
-        title: 'Thao tác thất bại',
-        message: getErrorMessage(err, 'Lưu quà tặng không thành công.'),
+        title: t('adminRewards.toastSaveError', 'Thao tác thất bại'),
+        message: getErrorMessage(err, t('adminRewards.toastSaveErrorMsg', 'Lưu quà tặng không thành công.')),
       });
     } finally {
       setIsSaving(false);
@@ -130,13 +132,13 @@ export default function AdminRewardsModal({ isOpen, onClose }: AdminRewardsModal
   };
 
   const handleDelete = async (rewardId: number) => {
-    if (!confirm('Bạn có chắc chắn muốn xóa phần thưởng này khỏi hệ thống?')) return;
+    if (!confirm(t('adminRewards.confirmDelete', 'Bạn có chắc chắn muốn xóa phần thưởng này khỏi hệ thống?'))) return;
     try {
       await deleteAdminReward(rewardId);
       emitToast({
         tone: 'success',
-        title: 'Thành công',
-        message: 'Đã xóa phần thưởng khỏi hệ thống.',
+        title: t('adminRewards.toastDeleteSuccess', 'Thành công'),
+        message: t('adminRewards.toastDeleteSuccessMsg', 'Đã xóa phần thưởng khỏi hệ thống.'),
       });
       await loadRewards();
       if (editingReward?.id === rewardId) {
@@ -145,8 +147,8 @@ export default function AdminRewardsModal({ isOpen, onClose }: AdminRewardsModal
     } catch (err) {
       emitToast({
         tone: 'error',
-        title: 'Thất bại',
-        message: getErrorMessage(err, 'Không thể xóa phần thưởng.'),
+        title: t('adminRewards.toastDeleteError', 'Thất bại'),
+        message: getErrorMessage(err, t('adminRewards.toastDeleteErrorMsg', 'Không thể xóa phần thưởng.')),
       });
     }
   };
@@ -173,10 +175,10 @@ export default function AdminRewardsModal({ isOpen, onClose }: AdminRewardsModal
               <div>
                 <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
                   <span className="material-symbols-outlined text-indigo-500">storefront</span>
-                  Quản lý Kho Quà tặng Gamify
+                  {t('adminRewards.title', 'Quản lý Kho Quà tặng Gamify')}
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Thiết lập và quản lý các phần quà học viên có thể dùng điểm đổi được.
+                  {t('adminRewards.subtitle', 'Thiết lập và quản lý các phần quà học viên có thể dùng điểm đổi được.')}
                 </p>
               </div>
               <button
@@ -196,12 +198,12 @@ export default function AdminRewardsModal({ isOpen, onClose }: AdminRewardsModal
                   <span className="material-symbols-outlined text-indigo-500 text-sm">
                     {isEditing ? 'edit_note' : 'add_circle'}
                   </span>
-                  {isEditing ? 'Chỉnh sửa Quà tặng' : 'Thêm Quà tặng mới'}
+                  {isEditing ? t('adminRewards.formTitleEdit', 'Chỉnh sửa Quà tặng') : t('adminRewards.formTitleAdd', 'Thêm Quà tặng mới')}
                 </h4>
                 
                 <form onSubmit={handleSave} className="space-y-4">
                   <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1">Mã code định danh *</label>
+                    <label className="block text-xs font-bold text-slate-600 mb-1">{t('adminRewards.labelCode', 'Mã code định danh *')}</label>
                     <input
                       type="text"
                       required
@@ -214,32 +216,32 @@ export default function AdminRewardsModal({ isOpen, onClose }: AdminRewardsModal
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1">Tên quà tặng *</label>
+                    <label className="block text-xs font-bold text-slate-600 mb-1">{t('adminRewards.labelName', 'Tên quà tặng *')}</label>
                     <input
                       type="text"
                       required
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      placeholder="e.g. Tăng hạn mức mượn sách (+2)"
+                      placeholder={t('adminRewards.placeholderName', 'Ví dụ: Tăng hạn mức mượn sách (+2)')}
                       className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1">Mô tả chi tiết *</label>
+                    <label className="block text-xs font-bold text-slate-600 mb-1">{t('adminRewards.labelDesc', 'Mô tả chi tiết *')}</label>
                     <textarea
                       required
                       rows={3}
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
-                      placeholder="Mô tả quyền lợi nhận được khi đổi quà..."
+                      placeholder={t('adminRewards.placeholderDesc', 'Mô tả quyền lợi nhận được khi đổi quà...')}
                       className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 resize-none"
                     />
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-xs font-bold text-slate-600 mb-1">Xu đổi quà (🪙) *</label>
+                      <label className="block text-xs font-bold text-slate-600 mb-1">{t('adminRewards.labelPoints', 'Xu đổi quà (🪙) *')}</label>
                       <input
                         type="number"
                         min="0"
@@ -251,7 +253,7 @@ export default function AdminRewardsModal({ isOpen, onClose }: AdminRewardsModal
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-slate-600 mb-1">Giá trị kích hoạt *</label>
+                      <label className="block text-xs font-bold text-slate-600 mb-1">{t('adminRewards.labelValue', 'Giá trị kích hoạt *')}</label>
                       <input
                         type="number"
                         min="1"
@@ -264,15 +266,15 @@ export default function AdminRewardsModal({ isOpen, onClose }: AdminRewardsModal
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1">Loại đặc quyền *</label>
+                    <label className="block text-xs font-bold text-slate-600 mb-1">{t('adminRewards.labelType', 'Loại đặc quyền *')}</label>
                     <select
                       value={benefitType}
                       onChange={(e) => setBenefitType(e.target.value as any)}
                       className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20"
                     >
-                      <option value="loan_limit">Tăng giới hạn sách mượn cùng lúc (cuốn)</option>
-                      <option value="loan_duration">Tăng thời hạn mượn sách (ngày)</option>
-                      <option value="fine_waiver">Phiếu miễn giảm tiền phạt (VND)</option>
+                      <option value="loan_limit">{t('adminRewards.optionLoanLimit', 'Tăng giới hạn sách mượn cùng lúc (cuốn)')}</option>
+                      <option value="loan_duration">{t('adminRewards.optionLoanDuration', 'Tăng thời hạn mượn sách (ngày)')}</option>
+                      <option value="fine_waiver">{t('adminRewards.optionFineWaiver', 'Phiếu miễn giảm tiền phạt (VND)')}</option>
                     </select>
                   </div>
 
@@ -285,7 +287,7 @@ export default function AdminRewardsModal({ isOpen, onClose }: AdminRewardsModal
                       className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                     />
                     <label htmlFor="is_active_reward" className="text-xs font-bold text-slate-700 cursor-pointer select-none">
-                      Kích hoạt cho phép đổi thưởng
+                      {t('adminRewards.labelIsActive', 'Kích hoạt cho phép đổi thưởng')}
                     </label>
                   </div>
 
@@ -296,7 +298,7 @@ export default function AdminRewardsModal({ isOpen, onClose }: AdminRewardsModal
                         onClick={resetForm}
                         className="flex-1 rounded-xl bg-slate-100 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-200 transition-colors"
                       >
-                        Hủy chỉnh sửa
+                        {t('adminRewards.btnCancel', 'Hủy chỉnh sửa')}
                       </button>
                     )}
                     <button
@@ -304,7 +306,7 @@ export default function AdminRewardsModal({ isOpen, onClose }: AdminRewardsModal
                       disabled={isSaving}
                       className="flex-1 rounded-xl bg-indigo-600 text-white px-4 py-2 text-xs font-bold hover:bg-indigo-700 disabled:opacity-50 transition-colors"
                     >
-                      {isSaving ? 'Đang lưu...' : isEditing ? 'Lưu thay đổi' : 'Tạo mới'}
+                      {isSaving ? t('adminRewards.btnSaveSaving', 'Đang lưu...') : isEditing ? t('adminRewards.btnSaveEdit', 'Lưu thay đổi') : t('adminRewards.btnSaveAdd', 'Tạo mới')}
                     </button>
                   </div>
                 </form>
@@ -315,19 +317,19 @@ export default function AdminRewardsModal({ isOpen, onClose }: AdminRewardsModal
                 <h4 className="font-bold text-sm text-slate-800 mb-4 flex items-center justify-between border-b pb-2">
                   <span className="flex items-center gap-1.5">
                     <span className="material-symbols-outlined text-indigo-500 text-sm">list_alt</span>
-                    Danh sách quà tặng hiện có
+                    {t('adminRewards.listTitle', 'Danh sách quà tặng hiện có')}
                   </span>
                   <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full text-2xs font-semibold">
-                    {rewards.length} quà tặng
+                    {t('adminRewards.listCount', '{{count}} quà tặng', { count: rewards.length })}
                   </span>
                 </h4>
 
                 <div className="flex-1 overflow-y-auto space-y-3 pr-1">
                   {isLoading ? (
-                    <div className="text-center py-8 text-xs text-slate-400">Đang tải dữ liệu...</div>
+                    <div className="text-center py-8 text-xs text-slate-400">{t('adminRewards.loading', 'Đang tải dữ liệu...')}</div>
                   ) : rewards.length === 0 ? (
                     <div className="text-center py-12 text-xs text-slate-400">
-                      Chưa có phần thưởng nào trong kho. Hãy tạo mới ở biểu mẫu bên trái!
+                      {t('adminRewards.emptyState', 'Chưa có phần thưởng nào trong kho. Hãy tạo mới ở biểu mẫu bên trái!')}
                     </div>
                   ) : (
                     rewards.map((reward) => (
@@ -348,14 +350,14 @@ export default function AdminRewardsModal({ isOpen, onClose }: AdminRewardsModal
                                 : 'bg-amber-50 text-amber-600 border border-amber-100'
                             }`}>
                               {reward.benefit_type === 'loan_limit'
-                                ? 'Hạn mức'
+                                ? t('adminRewards.badgeLimit', 'Hạn mức')
                                 : reward.benefit_type === 'loan_duration'
-                                ? 'Gia hạn'
-                                : 'Phạt'}
+                                ? t('adminRewards.badgeDuration', 'Gia hạn')
+                                : t('adminRewards.badgeWaiver', 'Phạt')}
                             </span>
                             {!reward.is_active && (
                               <span className="bg-red-50 text-red-600 border border-red-100 text-[10px] px-1.5 py-0.5 rounded-md font-semibold">
-                                Tắt
+                                {t('adminRewards.statusOff', 'Tắt')}
                               </span>
                             )}
                           </div>
@@ -365,9 +367,9 @@ export default function AdminRewardsModal({ isOpen, onClose }: AdminRewardsModal
                               🪙 {reward.points_cost} xu
                             </span>
                             <span className="text-slate-400">|</span>
-                            <span>Mã: <code className="font-mono bg-slate-100 px-1 py-0.5 rounded text-slate-600 text-[10px]">{reward.code}</code></span>
+                            <span>{t('adminRewards.labelCodeShort', 'Mã:')} <code className="font-mono bg-slate-100 px-1 py-0.5 rounded text-slate-600 text-[10px]">{reward.code}</code></span>
                             <span className="text-slate-400">|</span>
-                            <span>Trị giá: <strong className="text-indigo-600 font-bold">+{reward.benefit_value}</strong></span>
+                            <span>{t('adminRewards.labelValueShort', 'Trị giá:')} <strong className="text-indigo-600 font-bold">+{reward.benefit_value}</strong></span>
                           </div>
                         </div>
 
@@ -376,7 +378,7 @@ export default function AdminRewardsModal({ isOpen, onClose }: AdminRewardsModal
                             type="button"
                             onClick={() => handleEditClick(reward)}
                             className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                            title="Sửa"
+                            title={t('adminRewards.tooltipEdit', 'Sửa')}
                           >
                             <span className="material-symbols-outlined text-[18px]">edit</span>
                           </button>
@@ -384,7 +386,7 @@ export default function AdminRewardsModal({ isOpen, onClose }: AdminRewardsModal
                             type="button"
                             onClick={() => handleDelete(reward.id)}
                             className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                            title="Xóa"
+                            title={t('adminRewards.tooltipDelete', 'Xóa')}
                           >
                             <span className="material-symbols-outlined text-[18px]">delete</span>
                           </button>

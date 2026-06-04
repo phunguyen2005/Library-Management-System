@@ -1,14 +1,33 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { ReportData } from '../../../api/reportApi';
+import { getIntlLocale } from '../../../i18n';
 
 // ─── Donut Chart ─────────────────────────────────────────────────────────────
 
 export function DonutChart({ rates }: { rates: ReportData['return_rates'] }) {
+  const { t } = useTranslation();
+
+  const translateRateName = (name: string): string => {
+    switch (name) {
+      case 'Đúng hạn':
+        return t('adminReports.rateOnTime', 'Đúng hạn');
+      case 'Trễ hạn (Đã trả)':
+        return t('adminReports.rateReturnedLate', 'Trễ hạn (Đã trả)');
+      case 'Đang mượn (Trong hạn)':
+        return t('adminReports.rateOnTimeActive', 'Đang mượn (Trong hạn)');
+      case 'Đang mượn (Quá hạn)':
+        return t('adminReports.rateOverdueUnreturned', 'Đang mượn (Quá hạn)');
+      default:
+        return name;
+    }
+  };
+
   const total = rates.reduce((sum, r) => sum + r.value, 0);
   if (total === 0)
     return (
       <div className="flex items-center justify-center h-full text-xs text-muted-foreground">
-        Chưa có đủ số liệu
+        {t('adminReports.noData', 'Chưa có đủ số liệu')}
       </div>
     );
 
@@ -36,14 +55,14 @@ export function DonutChart({ rates }: { rates: ReportData['return_rates'] }) {
                 strokeDashoffset={strokeDashoffset}
                 className="transition-all duration-500 hover:stroke-[4]"
               >
-                <title>{`${rate.name}: ${rate.value} phiếu (${Math.round(percentage)}%)`}</title>
+                <title>{`${translateRateName(rate.name)}: ${rate.value} ${t('adminReports.chartLabelTickets', 'phiếu')} (${Math.round(percentage)}%)`}</title>
               </circle>
             );
           })}
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-white dark:bg-slate-900 rounded-full m-4 shadow-inner">
           <span className="text-2xl font-extrabold text-foreground">{total}</span>
-          <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Lượt phiếu</span>
+          <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">{t('adminReports.chartLabelTicketsTotal', 'Lượt phiếu')}</span>
         </div>
       </div>
 
@@ -54,7 +73,7 @@ export function DonutChart({ rates }: { rates: ReportData['return_rates'] }) {
             <div key={rate.name} className="flex items-center justify-between text-xs">
               <div className="flex items-center gap-2">
                 <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: colors[index % colors.length] }} />
-                <span className="text-slate-600 font-medium">{rate.name}</span>
+                <span className="text-slate-600 font-medium">{translateRateName(rate.name)}</span>
               </div>
               <span className="font-bold text-slate-800">{rate.value} ({percentage}%)</span>
             </div>
@@ -68,10 +87,24 @@ export function DonutChart({ rates }: { rates: ReportData['return_rates'] }) {
 // ─── Monthly Trend Line ───────────────────────────────────────────────────────
 
 export function TrendLineChart({ trends }: { trends: ReportData['monthly_trends'] }) {
+  const { t } = useTranslation();
+
+  const localizeMonthLabel = (monthStr: string): string => {
+    if (monthStr.startsWith('Tháng ')) {
+      const parts = monthStr.replace('Tháng ', '').split('/');
+      if (parts.length === 2) {
+        const m = parts[0];
+        const y = parts[1];
+        return t('common.monthLabel', { month: m, year: y, defaultValue: `Tháng ${m}/${y}` });
+      }
+    }
+    return monthStr;
+  };
+
   if (trends.length === 0)
     return (
       <div className="flex items-center justify-center h-full text-xs text-muted-foreground">
-        Chưa có dữ liệu lịch sử
+        {t('adminReports.noHistoryData', 'Chưa có dữ liệu lịch sử')}
       </div>
     );
 
@@ -117,7 +150,7 @@ export function TrendLineChart({ trends }: { trends: ReportData['monthly_trends'
             <text x={p.x} y={p.y - 10} fill="#1e293b" fontSize="8" fontWeight="bold" textAnchor="middle"
               className="opacity-0 group-hover:opacity-100 transition-opacity">{p.count}</text>
             <text x={p.x} y={height - padding + 14} fill="#64748b" fontSize="8" fontWeight="semibold" textAnchor="middle">
-              {p.month}
+              {localizeMonthLabel(p.month)}
             </text>
           </g>
         ))}
@@ -129,10 +162,11 @@ export function TrendLineChart({ trends }: { trends: ReportData['monthly_trends'
 // ─── Revenue Trend Line ───────────────────────────────────────────────────────
 
 export function RevenueTrendChart({ trends }: { trends: ReportData['revenue_trends'] }) {
+  const { t } = useTranslation();
   if (trends.length === 0)
     return (
       <div className="flex items-center justify-center h-full text-xs text-muted-foreground">
-        Chưa có dữ liệu giao dịch phát sinh
+        {t('adminReports.noRevenueData', 'Chưa có dữ liệu giao dịch phát sinh')}
       </div>
     );
 
@@ -174,18 +208,24 @@ export function RevenueTrendChart({ trends }: { trends: ReportData['revenue_tren
         })}
         <path d={areaD} fill="url(#revAreaGrad)" />
         <path d={pathD} fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-        {points.map((p, i) => (
-          <g key={i} className="group">
-            <circle cx={p.x} cy={p.y} r="3.5" fill="#ffffff" stroke="#10b981" strokeWidth="2"
-              className="hover:scale-150 transition-transform cursor-pointer" />
-            <title>{`${p.date}: ${p.total.toLocaleString('vi-VN')} đ`}</title>
-            {i % step === 0 && (
-              <text x={p.x} y={height - padding + 12} fill="#64748b" fontSize="7" fontWeight="semibold" textAnchor="middle">
-                {p.date.substring(5)}
-              </text>
-            )}
-          </g>
-        ))}
+        {points.map((p, i) => {
+          const parts = p.date.split('-');
+          const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+          const localDateStr = d.toLocaleDateString(getIntlLocale(), { year: 'numeric', month: '2-digit', day: '2-digit' });
+          const displayDate = d.toLocaleDateString(getIntlLocale(), { month: 'numeric', day: 'numeric' });
+          return (
+            <g key={i} className="group">
+              <circle cx={p.x} cy={p.y} r="3.5" fill="#ffffff" stroke="#10b981" strokeWidth="2"
+                className="hover:scale-150 transition-transform cursor-pointer" />
+              <title>{`${localDateStr}: ${p.total.toLocaleString(getIntlLocale())} ${t('common.currencySymbol')}`}</title>
+              {i % step === 0 && (
+                <text x={p.x} y={height - padding + 12} fill="#64748b" fontSize="7" fontWeight="semibold" textAnchor="middle">
+                  {displayDate}
+                </text>
+              )}
+            </g>
+          );
+        })}
       </svg>
     </div>
   );
@@ -194,18 +234,19 @@ export function RevenueTrendChart({ trends }: { trends: ReportData['revenue_tren
 // ─── Payment Methods Donut ────────────────────────────────────────────────────
 
 export function PaymentMethodsChart({ byMethod }: { byMethod: ReportData['financials']['by_method'] }) {
+  const { t } = useTranslation();
   const total = byMethod.cash + byMethod.momo + byMethod.vnpay;
   if (total === 0)
     return (
       <div className="flex items-center justify-center h-full text-xs text-muted-foreground">
-        Chưa có giao dịch thanh toán nào
+        {t('adminReports.noPaymentTransactions', 'Chưa có giao dịch thanh toán nào')}
       </div>
     );
 
   const rates = [
-    { name: 'Tiền mặt', value: byMethod.cash, color: '#10b981' },
-    { name: 'Ví MoMo', value: byMethod.momo, color: '#ec4899' },
-    { name: 'Ví VNPay', value: byMethod.vnpay, color: '#3b82f6' },
+    { name: t('adminReports.methodCash', 'Tiền mặt'), value: byMethod.cash, color: '#10b981' },
+    { name: t('adminReports.methodMomo', 'Ví MoMo'), value: byMethod.momo, color: '#ec4899' },
+    { name: t('adminReports.methodVnpay', 'Ví VNPay'), value: byMethod.vnpay, color: '#3b82f6' },
   ];
 
   let accumulatedPercentage = 0;
@@ -231,14 +272,14 @@ export function PaymentMethodsChart({ byMethod }: { byMethod: ReportData['financ
                 strokeDashoffset={strokeDashoffset}
                 className="transition-all duration-500"
               >
-                <title>{`${rate.name}: ${rate.value.toLocaleString('vi-VN')}đ (${Math.round(percentage)}%)`}</title>
+                <title>{`${rate.name}: ${rate.value.toLocaleString(getIntlLocale())}${t('common.currencySymbol')} (${Math.round(percentage)}%)`}</title>
               </circle>
             );
           })}
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-white dark:bg-slate-900 rounded-full m-4 shadow-inner">
           <span className="text-sm font-extrabold text-foreground">{Math.round(total / 1000)}K</span>
-          <span className="text-[9px] text-muted-foreground uppercase font-bold tracking-wider">Tổng thu</span>
+          <span className="text-[9px] text-muted-foreground uppercase font-bold tracking-wider">{t('adminReports.totalRevenueLabel', 'Tổng thu')}</span>
         </div>
       </div>
 
@@ -251,7 +292,7 @@ export function PaymentMethodsChart({ byMethod }: { byMethod: ReportData['financ
                 <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: rate.color }} />
                 <span className="text-slate-600 font-medium">{rate.name}</span>
               </div>
-              <span className="font-bold text-slate-800">{rate.value.toLocaleString('vi-VN')} đ ({percentage}%)</span>
+              <span className="font-bold text-slate-800">{rate.value.toLocaleString(getIntlLocale())} {t('common.currencySymbol')} ({percentage}%)</span>
             </div>
           );
         })}

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Scanner } from '@yudiel/react-qr-scanner';
 import { echoClient } from '../../lib/echo';
 import { 
@@ -23,6 +24,7 @@ import { getErrorMessage } from '../../lib/errors';
 import { emitToast } from '../../notifications/events';
 
 export default function AdminRoomBookings() {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<'rooms' | 'requests' | 'stats'>('rooms');
 
   // Rooms CRUD States
@@ -99,7 +101,7 @@ export default function AdminRoomBookings() {
       const res = await fetchRooms();
       setRooms(res);
     } catch (e: any) {
-      emitToast({ tone: 'error', title: 'Lỗi', message: getErrorMessage(e, 'Không thể tải phòng.') });
+      emitToast({ tone: 'error', title: t('common.error'), message: getErrorMessage(e, t('adminRoomBookings.loadRoomsError')) });
     } finally {
       setLoadingRooms(false);
     }
@@ -120,7 +122,7 @@ export default function AdminRoomBookings() {
       setTotalPages(res.meta ? res.meta.last_page : ((res as any).last_page ?? 1));
       setCurrentPage(res.meta ? res.meta.current_page : ((res as any).current_page ?? 1));
     } catch (e: any) {
-      emitToast({ tone: 'error', title: 'Lỗi', message: getErrorMessage(e, 'Không thể tải lượt đặt phòng.') });
+      emitToast({ tone: 'error', title: t('common.error'), message: getErrorMessage(e, t('adminRoomBookings.loadBookingsError')) });
     } finally {
       setLoadingBookings(false);
     }
@@ -182,11 +184,11 @@ export default function AdminRoomBookings() {
     try {
       setCheckingIn(true);
       const res = await checkInRoomBooking(checkInCode.trim().toUpperCase());
-      emitToast({ tone: 'success', title: 'Check-in thành công', message: res.message });
+      emitToast({ tone: 'success', title: t('adminRoomBookings.checkinSuccess'), message: res.message });
       setCheckInCode('');
       void loadBookings(1);
     } catch (err: any) {
-      emitToast({ tone: 'error', title: 'Check-in thất bại', message: getErrorMessage(err, 'Mã không hợp lệ.') });
+      emitToast({ tone: 'error', title: t('adminRoomBookings.checkinFailed'), message: getErrorMessage(err, t('adminRoomBookings.invalidCodeError')) });
     } finally {
       setCheckingIn(false);
     }
@@ -196,7 +198,7 @@ export default function AdminRoomBookings() {
   const handleAdminWalkinSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!walkinSelectedRoomId || !walkinSelectedMember) {
-      emitToast({ tone: 'error', title: 'Lỗi', message: 'Vui lòng điền đầy đủ thông tin phòng và sinh viên.' });
+      emitToast({ tone: 'error', title: t('common.error'), message: t('adminRoomBookings.walkinValidation') });
       return;
     }
 
@@ -219,7 +221,7 @@ export default function AdminRoomBookings() {
         purpose: walkinPurpose.trim() || undefined,
       });
 
-      emitToast({ tone: 'success', title: 'Thành công', message: 'Đăng ký phòng Walk-in cho sinh viên thành công!' });
+      emitToast({ tone: 'success', title: t('adminRoomBookings.toastSuccess'), message: t('adminRoomBookings.walkinSuccess') });
       setShowWalkinModal(false);
       setWalkinStudentSearch('');
       setWalkinSelectedMember(null);
@@ -228,7 +230,7 @@ export default function AdminRoomBookings() {
       setWalkinGroupSize(1);
       void loadBookings(1);
     } catch (err: any) {
-      emitToast({ tone: 'error', title: 'Thất bại', message: getErrorMessage(err, 'Đã xảy ra lỗi.') });
+      emitToast({ tone: 'error', title: t('adminRoomBookings.toastFailed'), message: getErrorMessage(err, t('adminRoomBookings.generalError')) });
     } finally {
       setSubmittingWalkin(false);
     }
@@ -249,7 +251,7 @@ export default function AdminRoomBookings() {
           status: roomForm.status,
           amenities: roomForm.amenities,
         });
-        emitToast({ tone: 'success', title: 'Thành công', message: 'Đã cập nhật phòng thành công!' });
+        emitToast({ tone: 'success', title: t('adminRoomBookings.toastSuccess'), message: t('adminRoomBookings.updateRoomSuccess') });
       } else {
         // Create
         await createRoom({
@@ -260,7 +262,7 @@ export default function AdminRoomBookings() {
           status: roomForm.status,
           amenities: roomForm.amenities,
         });
-        emitToast({ tone: 'success', title: 'Thành công', message: 'Đã thêm phòng mới thành công!' });
+        emitToast({ tone: 'success', title: t('adminRoomBookings.toastSuccess'), message: t('adminRoomBookings.addRoomSuccess') });
       }
 
       setShowRoomModal(false);
@@ -268,7 +270,7 @@ export default function AdminRoomBookings() {
       setRoomForm({ name: '', capacity: 6, location: '', description: '', status: 'active', amenities: [] });
       void loadRooms();
     } catch (e: any) {
-      emitToast({ tone: 'error', title: 'Thất bại', message: getErrorMessage(e, 'Có lỗi xảy ra.') });
+      emitToast({ tone: 'error', title: t('adminRoomBookings.toastFailed'), message: getErrorMessage(e, t('adminRoomBookings.generalError')) });
     }
   };
 
@@ -294,24 +296,24 @@ export default function AdminRoomBookings() {
       });
       emitToast({ 
         tone: 'success', 
-        title: 'Thành công', 
-        message: `Đã ${updated.is_active ? 'bật' : 'tắt'} phòng ${room.name} thành công!` 
+        title: t('adminRoomBookings.toastSuccess'), 
+        message: t('adminRoomBookings.toggleRoomSuccess', { action: updated.is_active ? t('adminRoomBookings.toggleActionOn') : t('adminRoomBookings.toggleActionOff'), name: room.name }) 
       });
       setRooms(prev => prev.map(r => r.room_id === room.room_id ? updated : r));
     } catch (e: any) {
-      emitToast({ tone: 'error', title: 'Thất bại', message: getErrorMessage(e, 'Không thể cập nhật.') });
+      emitToast({ tone: 'error', title: t('adminRoomBookings.toastFailed'), message: getErrorMessage(e, t('adminRoomBookings.updateFailed')) });
     }
   };
 
   // Delete Room
   const handleDeleteRoom = async (id: number) => {
-    if (!confirm('Bạn có chắc chắn muốn xóa phòng học này?')) return;
+    if (!confirm(t('adminRoomBookings.confirmDeleteRoom'))) return;
     try {
       const res = await deleteRoom(id);
-      emitToast({ tone: 'success', title: 'Thành công', message: res.message });
+      emitToast({ tone: 'success', title: t('adminRoomBookings.toastSuccess'), message: res.message });
       void loadRooms();
     } catch (e: any) {
-      emitToast({ tone: 'error', title: 'Thất bại', message: getErrorMessage(e, 'Không thể xóa phòng.') });
+      emitToast({ tone: 'error', title: t('adminRoomBookings.toastFailed'), message: getErrorMessage(e, t('adminRoomBookings.deleteRoomFailed')) });
     }
   };
 
@@ -319,10 +321,10 @@ export default function AdminRoomBookings() {
   const handleApprove = async (id: number) => {
     try {
       await approveRoomBooking(id);
-      emitToast({ tone: 'success', title: 'Đã duyệt', message: 'Đã duyệt lượt đặt phòng thành công!' });
+      emitToast({ tone: 'success', title: t('status.approved'), message: t('adminRoomBookings.approveSuccess') });
       void loadBookings(currentPage);
     } catch (e: any) {
-      emitToast({ tone: 'error', title: 'Thất bại', message: getErrorMessage(e, 'Có lỗi xảy ra.') });
+      emitToast({ tone: 'error', title: t('adminRoomBookings.toastFailed'), message: getErrorMessage(e, t('adminRoomBookings.generalError')) });
     }
   };
 
@@ -333,12 +335,12 @@ export default function AdminRoomBookings() {
 
     try {
       await rejectRoomBooking(showRejectModal.booking_id, rejectReason.trim());
-      emitToast({ tone: 'success', title: 'Thành công', message: 'Đã từ chối lượt đặt phòng.' });
+      emitToast({ tone: 'success', title: t('adminRoomBookings.toastSuccess'), message: t('adminRoomBookings.rejectSuccess') });
       setShowRejectModal(null);
       setRejectReason('');
       void loadBookings(currentPage);
     } catch (e: any) {
-      emitToast({ tone: 'error', title: 'Thất bại', message: getErrorMessage(e, 'Có lỗi xảy ra.') });
+      emitToast({ tone: 'error', title: t('adminRoomBookings.toastFailed'), message: getErrorMessage(e, t('adminRoomBookings.generalError')) });
     }
   };
 
@@ -346,10 +348,10 @@ export default function AdminRoomBookings() {
   const handleAdminCheckIn = async (id: number) => {
     try {
       const res = await adminCheckInRoomBooking(id);
-      emitToast({ tone: 'success', title: 'Check-in thành công', message: res.message });
+      emitToast({ tone: 'success', title: t('adminRoomBookings.checkinSuccess'), message: res.message });
       void loadBookings(currentPage);
     } catch (e: any) {
-      emitToast({ tone: 'error', title: 'Thất bại', message: getErrorMessage(e, 'Có lỗi xảy ra.') });
+      emitToast({ tone: 'error', title: t('adminRoomBookings.toastFailed'), message: getErrorMessage(e, t('adminRoomBookings.generalError')) });
     }
   };
 
@@ -357,33 +359,33 @@ export default function AdminRoomBookings() {
   const handleAdminCheckOut = async (id: number) => {
     try {
       const res = await adminCheckOutRoomBooking(id);
-      emitToast({ tone: 'success', title: 'Check-out thành công', message: res.message });
+      emitToast({ tone: 'success', title: t('adminRoomBookings.checkoutSuccess'), message: res.message });
       void loadBookings(currentPage);
     } catch (e: any) {
-      emitToast({ tone: 'error', title: 'Thất bại', message: getErrorMessage(e, 'Có lỗi xảy ra.') });
+      emitToast({ tone: 'error', title: t('adminRoomBookings.toastFailed'), message: getErrorMessage(e, t('adminRoomBookings.generalError')) });
     }
   };
 
   // Admin cancel check-in on behalf
   const handleCancelCheckIn = async (id: number) => {
-    if (!confirm('Bạn có chắc chắn muốn hủy check-in cho lượt đặt phòng này?')) return;
+    if (!confirm(t('adminRoomBookings.confirmCancelCheckin', 'Are you sure you want to cancel check-in for this booking?'))) return;
     try {
       const res = await adminCancelCheckInRoomBooking(id);
-      emitToast({ tone: 'success', title: 'Hủy check-in thành công', message: res.message });
+      emitToast({ tone: 'success', title: t('adminRoomBookings.cancelCheckinSuccess', 'Check-in cancelled successfully'), message: res.message });
       void loadBookings(currentPage);
     } catch (err: any) {
-      emitToast({ tone: 'error', title: 'Thất bại', message: getErrorMessage(err, 'Có lỗi xảy ra.') });
+      emitToast({ tone: 'error', title: t('common.error'), message: getErrorMessage(err, t('common.errorMessage', 'An error occurred.')) });
     }
   };
 
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case 'pending': return { text: 'Chờ duyệt', color: 'bg-amber-100 text-amber-800 border-amber-200' };
-      case 'approved': return { text: 'Đã duyệt', color: 'bg-green-100 text-green-800 border-green-200' };
-      case 'rejected': return { text: 'Bị từ chối', color: 'bg-red-100 text-red-800 border-red-200' };
-      case 'cancelled': return { text: 'Đã hủy', color: 'bg-slate-100 text-slate-800 border-slate-200' };
-      case 'completed': return { text: 'Hoàn thành', color: 'bg-blue-100 text-blue-800 border-blue-200' };
-      case 'no_show': return { text: 'No-show (Vắng)', color: 'bg-rose-100 text-rose-800 border-rose-200' };
+      case 'pending': return { text: t('status.pending', 'Pending'), color: 'bg-amber-100 text-amber-800 border-amber-200' };
+      case 'approved': return { text: t('status.approved', 'Approved'), color: 'bg-green-100 text-green-800 border-green-200' };
+      case 'rejected': return { text: t('status.rejected', 'Rejected'), color: 'bg-red-100 text-red-800 border-red-200' };
+      case 'cancelled': return { text: t('status.cancelled', 'Cancelled'), color: 'bg-slate-100 text-slate-800 border-slate-200' };
+      case 'completed': return { text: t('status.completed', 'Completed'), color: 'bg-blue-100 text-blue-800 border-blue-200' };
+      case 'no_show': return { text: t('status.no_show', 'No-show'), color: 'bg-rose-100 text-rose-800 border-rose-200' };
       default: return { text: status, color: 'bg-slate-100 text-slate-800' };
     }
   };
@@ -406,9 +408,9 @@ export default function AdminRoomBookings() {
       {/* Header */}
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
         <div>
-          <h2 className="text-3xl font-bold text-on-surface">Quản lý phòng học nhóm</h2>
+          <h2 className="text-3xl font-bold text-on-surface">{t('adminRoomBookings.title')}</h2>
           <p className="mt-1 text-sm text-on-surface-variant">
-            Duyệt lịch đặt phòng của sinh viên, thống kê hiệu suất sử dụng và quản lý danh sách phòng.
+            {t('adminRoomBookings.subtitle')}
           </p>
         </div>
 
@@ -420,7 +422,7 @@ export default function AdminRoomBookings() {
               activeTab === 'rooms' ? 'bg-white text-primary shadow-xs' : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            Quản lý phòng
+            {t('adminRoomBookings.tabRooms', 'Room Management')}
           </button>
           <button
             onClick={() => setActiveTab('requests')}
@@ -428,7 +430,7 @@ export default function AdminRoomBookings() {
               activeTab === 'requests' ? 'bg-white text-primary shadow-xs' : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            Duyệt yêu cầu
+            {t('adminRoomBookings.tabApprovals', 'Approve Requests')}
           </button>
           <button
             onClick={() => setActiveTab('stats')}
@@ -436,7 +438,7 @@ export default function AdminRoomBookings() {
               activeTab === 'stats' ? 'bg-white text-primary shadow-xs' : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            Báo cáo thống kê
+            {t('adminRoomBookings.tabStats', 'Statistical Reports')}
           </button>
         </div>
       </div>
@@ -445,7 +447,7 @@ export default function AdminRoomBookings() {
         /* TAB 1: ROOMS MANAGEMENT LIST */
         <div className="space-y-6">
           <div className="flex justify-between items-center bg-white p-4 rounded-2xl border border-slate-100 shadow-xs">
-            <span className="text-sm font-semibold text-slate-700">Tổng số phòng: {rooms.length} phòng</span>
+            <span className="text-sm font-semibold text-slate-700">{t('adminRoomBookings.totalRooms', { count: rooms.length })}</span>
             <button
               onClick={() => {
                 setEditingRoom(null);
@@ -455,28 +457,28 @@ export default function AdminRoomBookings() {
               className="bg-primary text-white text-sm font-medium px-4 py-2.5 rounded-xl shadow-xs transition-all hover:bg-opacity-90 flex items-center gap-1 cursor-pointer"
             >
               <span className="material-symbols-outlined text-sm">add</span>
-              Thêm phòng mới
+              {t('adminRoomBookings.btnAddRoom')}
             </button>
           </div>
 
           {loadingRooms ? (
-            <div className="text-center py-12 text-sm text-slate-500">Đang tải danh sách phòng...</div>
+            <div className="text-center py-12 text-sm text-slate-500">{t('adminRoomBookings.loadingRooms')}</div>
           ) : rooms.length === 0 ? (
             <div className="text-center py-12 border-2 border-dashed border-slate-200 rounded-2xl bg-white text-slate-500">
-              Chưa có phòng nào được tạo. Nhấp "Thêm phòng mới" để bắt đầu.
+              {t('adminRoomBookings.emptyRooms')}
             </div>
           ) : (
             <div className="bg-white rounded-2xl border border-surface-container overflow-hidden shadow-xs">
               <table className="w-full text-left border-collapse text-sm">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-100 text-xs font-bold uppercase tracking-wider text-slate-500">
-                    <th className="px-6 py-4">Tên phòng</th>
-                    <th className="px-6 py-4">Vị trí</th>
-                    <th className="px-6 py-4">Sức chứa</th>
-                    <th className="px-6 py-4">Tiện ích</th>
-                    <th className="px-6 py-4">Trạng thái vận hành</th>
-                    <th className="px-6 py-4">Bật/Tắt đặt</th>
-                    <th className="px-6 py-4 text-right">Thao tác</th>
+                    <th className="px-6 py-4">{t('adminRoomBookings.roomName')}</th>
+                    <th className="px-6 py-4">{t('adminRoomBookings.roomLocation')}</th>
+                    <th className="px-6 py-4">{t('adminRoomBookings.roomCapacity')}</th>
+                    <th className="px-6 py-4">{t('adminRoomBookings.roomAmenities')}</th>
+                    <th className="px-6 py-4">{t('adminRoomBookings.roomStatus')}</th>
+                    <th className="px-6 py-4">{t('adminRoomBookings.roomToggle')}</th>
+                    <th className="px-6 py-4 text-right">{t('adminRoomBookings.tableHeaderActions')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -484,12 +486,12 @@ export default function AdminRoomBookings() {
                     <tr key={room.room_id} className="hover:bg-slate-50/50">
                       <td className="px-6 py-4 font-bold text-slate-800">{room.name}</td>
                       <td className="px-6 py-4 text-slate-600">{room.location}</td>
-                      <td className="px-6 py-4">{room.capacity} người</td>
+                      <td className="px-6 py-4">{t('adminRoomBookings.capacityValue', { count: room.capacity })}</td>
                       <td className="px-6 py-4">
                         <div className="flex flex-wrap gap-1">
                           {room.amenities?.map((am) => (
                             <span key={am} className="bg-slate-100 text-[10px] text-slate-600 px-2 py-0.5 rounded border border-slate-200/50">
-                              {am === 'projector' ? 'Máy chiếu' : am === 'whiteboard' ? 'Bảng' : am === 'tv' ? 'TV' : am}
+                              {am === 'projector' ? t('adminRoomBookings.amenityProjector') : am === 'whiteboard' ? t('adminRoomBookings.amenityWhiteboard') : am === 'tv' ? t('adminRoomBookings.amenityTv') : am}
                             </span>
                           ))}
                         </div>
@@ -499,7 +501,7 @@ export default function AdminRoomBookings() {
                           room.status === 'active' ? 'bg-green-100 text-green-800' :
                           room.status === 'maintenance' ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-800'
                         }`}>
-                          {room.status === 'active' ? 'Hoạt động' : room.status === 'maintenance' ? 'Bảo trì' : 'Đóng cửa'}
+                          {room.status === 'active' ? t('status.active') : room.status === 'maintenance' ? t('status.maintenance') : t('status.closed')}
                         </span>
                       </td>
                       <td className="px-6 py-4">
@@ -521,13 +523,13 @@ export default function AdminRoomBookings() {
                           onClick={() => handleEditRoom(room)}
                           className="text-xs font-bold text-primary hover:underline cursor-pointer"
                         >
-                          Sửa
+                          {t('common.edit')}
                         </button>
                         <button
                           onClick={() => handleDeleteRoom(room.room_id)}
                           className="text-xs font-bold text-red-600 hover:underline cursor-pointer"
                         >
-                          Xóa
+                          {t('common.delete')}
                         </button>
                       </td>
                     </tr>
@@ -544,13 +546,13 @@ export default function AdminRoomBookings() {
           <div className="rounded-2xl border border-primary/20 bg-blue-50/20 p-6 scholar-shadow">
             <h3 className="text-sm font-bold uppercase tracking-wider text-primary mb-3 flex items-center gap-1">
               <span className="material-symbols-outlined text-[18px]">qr_code_scanner</span>
-              Xác nhận Check-in tại quầy bằng Mã Đặt Phòng (Booking Code)
+              {t('adminRoomBookings.checkinByCodeTitle')}
             </h3>
             <form onSubmit={handleQuickCheckIn} className="flex flex-wrap gap-4 items-center max-w-2xl">
               <input
                 type="text"
                 maxLength={6}
-                placeholder="Nhập mã đặt phòng (6 ký tự)"
+                placeholder={t('adminRoomBookings.bookingCodePlaceholder') || 'Enter booking code...'}
                 value={checkInCode}
                 onChange={(e) => setCheckInCode(e.target.value.toUpperCase())}
                 className="flex-1 min-w-[200px] rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20"
@@ -561,7 +563,7 @@ export default function AdminRoomBookings() {
                 className="bg-primary text-white text-sm font-medium px-6 py-2.5 rounded-xl transition-all shadow-sm hover:opacity-90 disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
               >
                 <span className="material-symbols-outlined text-sm">login</span>
-                {checkingIn ? 'Đang xử lý...' : 'Xác nhận Check-in'}
+                {checkingIn ? t('common.processing') : t('adminRoomBookings.btnConfirmCheckin')}
               </button>
               <button
                 type="button"
@@ -569,7 +571,7 @@ export default function AdminRoomBookings() {
                 className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-5 py-2.5 rounded-xl transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
               >
                 <span className="material-symbols-outlined text-sm">qr_code_scanner</span>
-                Quét mã QR Check-in
+                {t('adminRoomBookings.btnQrCheckin')}
               </button>
               <button
                 type="button"
@@ -580,7 +582,7 @@ export default function AdminRoomBookings() {
                 className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium px-5 py-2.5 rounded-xl transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
               >
                 <span className="material-symbols-outlined text-sm">bolt</span>
-                Đăng ký Walk-in cho SV
+                {t('adminRoomBookings.btnWalkin')}
               </button>
             </form>
           </div>
@@ -589,10 +591,10 @@ export default function AdminRoomBookings() {
           <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-xs space-y-4">
             <form onSubmit={handleSearchSubmit} className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <label className="space-y-1 block">
-                <span className="block text-xs font-bold uppercase tracking-wider text-slate-500">Mã/Tên sinh viên</span>
+                <span className="block text-xs font-bold uppercase tracking-wider text-slate-500">{t('adminRoomBookings.filterMemberLabel')}</span>
                 <input
                   type="text"
-                  placeholder="Tìm kiếm..."
+                  placeholder={t('adminRoomBookings.searchPlaceholder') || 'Search...'}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20"
@@ -600,7 +602,7 @@ export default function AdminRoomBookings() {
               </label>
 
               <label className="space-y-1 block">
-                <span className="block text-xs font-bold uppercase tracking-wider text-slate-500">Ngày đặt phòng</span>
+                <span className="block text-xs font-bold uppercase tracking-wider text-slate-500">{t('adminRoomBookings.filterBookingDate')}</span>
                 <input
                   type="date"
                   value={dateFilter}
@@ -610,19 +612,19 @@ export default function AdminRoomBookings() {
               </label>
 
               <label className="space-y-1 block">
-                <span className="block text-xs font-bold uppercase tracking-wider text-slate-500">Trạng thái</span>
+                <span className="block text-xs font-bold uppercase tracking-wider text-slate-500">{t('adminRoomBookings.filterStatus')}</span>
                 <select
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
                   className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none bg-white focus:ring-2 focus:ring-primary/20"
                 >
-                  <option value="">Tất cả trạng thái</option>
-                  <option value="pending">Chờ duyệt</option>
-                  <option value="approved">Đã duyệt</option>
-                  <option value="completed">Hoàn thành</option>
-                  <option value="no_show">No-show (Vắng)</option>
-                  <option value="rejected">Bị từ chối</option>
-                  <option value="cancelled">Đã hủy</option>
+                  <option value="">{t('adminRoomBookings.allStatus')}</option>
+                  <option value="pending">{t('adminRoomBookings.tabPending')}</option>
+                  <option value="approved">{t('adminRoomBookings.tabApproved')}</option>
+                  <option value="completed">{t('status.completed')}</option>
+                  <option value="no_show">{t('status.no_show')}</option>
+                  <option value="rejected">{t('status.rejected')}</option>
+                  <option value="cancelled">{t('status.cancelled')}</option>
                 </select>
               </label>
 
@@ -632,29 +634,29 @@ export default function AdminRoomBookings() {
                   className="w-full bg-primary text-white text-sm font-medium py-2.5 rounded-xl shadow-xs transition-all hover:bg-opacity-95 hover:shadow-md cursor-pointer flex items-center justify-center gap-1"
                 >
                   <span className="material-symbols-outlined text-sm">search</span>
-                  Tìm kiếm
+                  {t('common.search')}
                 </button>
               </div>
             </form>
           </div>
 
           {loadingBookings ? (
-            <div className="text-center py-12 text-sm text-slate-500">Đang tải danh sách đặt phòng...</div>
+            <div className="text-center py-12 text-sm text-slate-500">{t('adminRoomBookings.loadingBookings')}</div>
           ) : bookings.length === 0 ? (
             <div className="text-center py-12 border-2 border-dashed border-slate-200 rounded-2xl bg-white text-slate-500">
-              Không tìm thấy kết quả đặt phòng nào trùng khớp.
+              {t('adminRoomBookings.emptyBookingsDesc')}
             </div>
           ) : (
             <div className="bg-white rounded-2xl border border-surface-container overflow-hidden shadow-xs">
               <table className="w-full text-left border-collapse text-sm">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-100 text-xs font-bold uppercase tracking-wider text-slate-500">
-                    <th className="px-6 py-4">Sinh viên</th>
-                    <th className="px-6 py-4">Phòng</th>
-                    <th className="px-6 py-4">Thời gian</th>
-                    <th className="px-6 py-4">Mã Check-in</th>
-                    <th className="px-6 py-4">Trạng thái</th>
-                    <th className="px-6 py-4 text-right">Duyệt thao tác</th>
+                    <th className="px-6 py-4">{t('adminRoomBookings.tableHeaderMember')}</th>
+                    <th className="px-6 py-4">{t('adminRoomBookings.tableHeaderRoom')}</th>
+                    <th className="px-6 py-4">{t('adminRoomBookings.tableHeaderTime')}</th>
+                    <th className="px-6 py-4">{t('adminRoomBookings.bookingCode')}</th>
+                    <th className="px-6 py-4">{t('adminRoomBookings.tableHeaderStatus')}</th>
+                    <th className="px-6 py-4 text-right">{t('adminRoomBookings.tableHeaderActions')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -695,13 +697,13 @@ export default function AdminRoomBookings() {
                                 onClick={() => handleApprove(b.booking_id)}
                                 className="bg-green-600 hover:bg-green-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg cursor-pointer"
                               >
-                                Duyệt
+                                {t('adminRoomBookings.btnApprove')}
                               </button>
                               <button
                                 onClick={() => setShowRejectModal(b)}
                                 className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg cursor-pointer"
                               >
-                                Từ chối
+                                {t('adminRoomBookings.btnReject')}
                               </button>
                             </>
                           )}
@@ -727,7 +729,7 @@ export default function AdminRoomBookings() {
                                 onClick={() => handleCancelCheckIn(b.booking_id)}
                                 className="bg-rose-100 hover:bg-rose-200 text-rose-700 text-xs font-bold px-3 py-1.5 rounded-lg cursor-pointer"
                               >
-                                Hủy Check-in
+                                {t('adminRoomBookings.btnCancelCheckin')}
                               </button>
                             </div>
                           )}
@@ -746,7 +748,7 @@ export default function AdminRoomBookings() {
                     onClick={() => void loadBookings(currentPage - 1)}
                     className="border border-slate-200 rounded-lg px-3 py-1 text-sm font-bold text-slate-600 hover:bg-slate-100 disabled:opacity-50 cursor-pointer"
                   >
-                    Trước
+                    {t('pagination.prev')}
                   </button>
                   <span className="text-xs text-slate-500 font-medium">Trang {currentPage} / {totalPages}</span>
                   <button
@@ -754,7 +756,7 @@ export default function AdminRoomBookings() {
                     onClick={() => void loadBookings(currentPage + 1)}
                     className="border border-slate-200 rounded-lg px-3 py-1 text-sm font-bold text-slate-600 hover:bg-slate-100 disabled:opacity-50 cursor-pointer"
                   >
-                    Sau
+                    {t('pagination.next')}
                   </button>
                 </div>
               )}
@@ -768,7 +770,7 @@ export default function AdminRoomBookings() {
           <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-xs">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
               <label className="space-y-1 block">
-                <span className="block text-xs font-bold uppercase tracking-wider text-slate-500">Từ ngày</span>
+                <span className="block text-xs font-bold uppercase tracking-wider text-slate-500">{t('adminRoomBookings.reportFromDate')}</span>
                 <input
                   type="date"
                   value={statsStartDate}
@@ -778,7 +780,7 @@ export default function AdminRoomBookings() {
               </label>
 
               <label className="space-y-1 block">
-                <span className="block text-xs font-bold uppercase tracking-wider text-slate-500">Đến ngày</span>
+                <span className="block text-xs font-bold uppercase tracking-wider text-slate-500">{t('adminRoomBookings.reportToDate')}</span>
                 <input
                   type="date"
                   value={statsEndDate}
@@ -796,45 +798,45 @@ export default function AdminRoomBookings() {
                   className="w-full border border-slate-200 text-slate-600 text-sm font-semibold py-2.5 rounded-xl transition-all hover:bg-slate-50 cursor-pointer flex items-center justify-center gap-1"
                 >
                   <span className="material-symbols-outlined text-sm">clear_all</span>
-                  Xóa bộ lọc
+                  {t('adminRoomBookings.reportResetFilter')}
                 </button>
               </div>
             </div>
           </div>
 
           {loadingStats ? (
-            <div className="text-center py-12 text-sm text-slate-500">Đang tải dữ liệu báo cáo...</div>
+            <div className="text-center py-12 text-sm text-slate-500">{t('adminRoomBookings.loadingReport')}</div>
           ) : !stats ? (
-            <div className="text-center py-12 text-sm text-slate-500">Không thể tải số liệu thống kê.</div>
+            <div className="text-center py-12 text-sm text-slate-500">{t('adminRoomBookings.loadReportError')}</div>
           ) : (
             <>
               {/* Quick Stat Cards */}
               <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
                 <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-xs space-y-2">
-                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Tổng lượt đặt phòng</span>
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">{t('adminRoomBookings.reportTotalBookings')}</span>
                   <span className="text-3xl font-black text-slate-800 block">{stats.total_bookings}</span>
                   <span className="text-[10px] text-green-600 font-semibold flex items-center gap-0.5">
                     <span className="material-symbols-outlined text-[12px]">trending_up</span>
-                    Kể từ khi kích hoạt
+                    {t('adminRoomBookings.reportTotalBookingsDesc')}
                   </span>
                 </div>
 
                 <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-xs space-y-2">
-                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Yêu cầu chờ duyệt</span>
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">{t('adminRoomBookings.reportPendingBookings')}</span>
                   <span className="text-3xl font-black text-amber-600 block">{stats.pending_count}</span>
-                  <span className="text-[10px] text-slate-500 block">Cần xử lý phê duyệt</span>
+                  <span className="text-[10px] text-slate-500 block">{t('adminRoomBookings.reportPendingBookingsDesc')}</span>
                 </div>
 
                 <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-xs space-y-2">
-                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Lượt bỏ phòng (No-show)</span>
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">{t('adminRoomBookings.reportNoShow')}</span>
                   <span className="text-3xl font-black text-rose-600 block">{stats.no_show_count}</span>
-                  <span className="text-[10px] text-rose-500 block">Tỷ lệ: {stats.total_bookings > 0 ? round((stats.no_show_count / stats.total_bookings) * 100) : 0}%</span>
+                  <span className="text-[10px] text-rose-500 block">{t('adminRoomBookings.reportNoShowRate', { rate: stats.total_bookings > 0 ? Math.round((stats.no_show_count / stats.total_bookings) * 100) : 0 })}</span>
                 </div>
 
                 <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-xs space-y-2">
-                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Tỷ lệ check-in thành công</span>
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">{t('adminRoomBookings.reportCheckinSuccess')}</span>
                   <span className="text-3xl font-black text-blue-600 block">{stats.usage_rate}%</span>
-                  <span className="text-[10px] text-slate-500 block">Tính trên số lượt được duyệt</span>
+                  <span className="text-[10px] text-slate-500 block">{t('adminRoomBookings.reportCheckinSuccessDesc')}</span>
                 </div>
               </div>
 
@@ -846,9 +848,9 @@ export default function AdminRoomBookings() {
                       <span className="material-symbols-outlined text-[28px] filled">star</span>
                     </div>
                     <div>
-                      <h4 className="font-bold text-slate-800 text-lg">Phòng được yêu thích nhất</h4>
+                      <h4 className="font-bold text-slate-800 text-lg">{t('adminRoomBookings.reportPopularRoom')}</h4>
                       <p className="text-sm text-slate-600 mt-0.5">
-                        <span className="font-semibold text-primary">{stats.most_popular_room.name}</span> với tổng cộng <span className="font-semibold">{stats.most_popular_room.count} lượt đặt</span>.
+                        <span>{t('adminRoomBookings.reportPopularRoomDesc', { roomName: stats.most_popular_room.name, count: stats.most_popular_room.count })}</span>
                       </p>
                     </div>
                   </div>
@@ -859,23 +861,23 @@ export default function AdminRoomBookings() {
               <div className="bg-white p-8 rounded-2xl border border-slate-100 shadow-xs space-y-6">
                 <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
                   <span className="material-symbols-outlined text-primary">bar_chart</span>
-                  Biểu đồ phân phối trạng thái lượt đặt phòng
+                  {t('adminRoomBookings.reportChartTitle')}
                 </h3>
                 
                 <div className="space-y-4">
                   {[
-                    { label: 'Hoàn thành sử dụng', count: stats.completed_count, color: 'bg-blue-500' },
-                    { label: 'Đã duyệt (Chưa sử dụng)', count: stats.approved_count, color: 'bg-green-500' },
-                    { label: 'Chờ thủ thư duyệt', count: stats.pending_count, color: 'bg-amber-500' },
-                    { label: 'No-show (Bỏ phòng)', count: stats.no_show_count, color: 'bg-rose-500' },
-                    { label: 'Sinh viên hủy lịch', count: stats.cancelled_count, color: 'bg-slate-400' },
+                    { label: t('status.completed'), count: stats.completed_count, color: 'bg-blue-500' },
+                    { label: t('adminRoomBookings.tabApproved'), count: stats.approved_count, color: 'bg-green-500' },
+                    { label: t('adminRoomBookings.tabPending'), count: stats.pending_count, color: 'bg-amber-500' },
+                    { label: t('status.no_show'), count: stats.no_show_count, color: 'bg-rose-500' },
+                    { label: t('status.cancelled'), count: stats.cancelled_count, color: 'bg-slate-400' },
                   ].map((item) => {
                     const pct = stats.total_bookings > 0 ? (item.count / stats.total_bookings) * 100 : 0;
                     return (
                       <div key={item.label} className="space-y-1">
                         <div className="flex justify-between text-xs font-semibold text-slate-600">
                           <span>{item.label}</span>
-                          <span>{item.count} lượt ({pct.toFixed(1)}%)</span>
+                          <span>{item.count} {t('adminRoomBookings.turnLabel')} ({pct.toFixed(1)}%)</span>
                         </div>
                         <div className="w-full bg-slate-100 h-3 rounded-full overflow-hidden">
                           <div 
@@ -899,7 +901,7 @@ export default function AdminRoomBookings() {
           <div className="w-full max-w-lg bg-white rounded-3xl scholar-shadow p-8 space-y-6">
             <div className="flex justify-between items-start">
               <h3 className="text-xl font-bold text-slate-800">
-                {editingRoom ? 'Chỉnh sửa phòng học' : 'Thêm phòng học mới'}
+                {editingRoom ? t('adminRoomBookings.editRoomTitle') : t('adminRoomBookings.addRoomTitle')}
               </h3>
               <button
                 onClick={() => {
@@ -914,11 +916,11 @@ export default function AdminRoomBookings() {
 
             <form onSubmit={handleRoomSubmit} className="space-y-4">
               <label className="space-y-1 block">
-                <span className="block text-xs font-bold uppercase tracking-wider text-slate-500">Tên phòng học</span>
+                <span className="block text-xs font-bold uppercase tracking-wider text-slate-500">{t('adminRoomBookings.formRoomName')}</span>
                 <input
                   type="text"
                   required
-                  placeholder="Ví dụ: Phòng A1"
+                  placeholder={t('adminRoomBookings.placeholderRoomName') || 'e.g. Room A1'}
                   value={roomForm.name}
                   onChange={(e) => setRoomForm({ ...roomForm, name: e.target.value })}
                   className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20"
@@ -927,7 +929,7 @@ export default function AdminRoomBookings() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <label className="space-y-1 block">
-                  <span className="block text-xs font-bold uppercase tracking-wider text-slate-500">Sức chứa tối đa (người)</span>
+                  <span className="block text-xs font-bold uppercase tracking-wider text-slate-500">{t('adminRoomBookings.formMaxCapacity')}</span>
                   <input
                     type="number"
                     required
@@ -939,25 +941,25 @@ export default function AdminRoomBookings() {
                 </label>
 
                 <label className="space-y-1 block">
-                  <span className="block text-xs font-bold uppercase tracking-wider text-slate-500">Vận hành</span>
+                  <span className="block text-xs font-bold uppercase tracking-wider text-slate-500">{t('adminRoomBookings.formOperation')}</span>
                   <select
                     value={roomForm.status}
                     onChange={(e) => setRoomForm({ ...roomForm, status: e.target.value as RoomStatus })}
                     className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none bg-white focus:ring-2 focus:ring-primary/20"
                   >
-                    <option value="active">Hoạt động bình thường</option>
-                    <option value="maintenance">Đang bảo trì thiết bị</option>
-                    <option value="closed">Đóng cửa tạm thời</option>
+                    <option value="active">{t('adminRoomBookings.statusActive')}</option>
+                    <option value="maintenance">{t('adminRoomBookings.statusMaintenance')}</option>
+                    <option value="closed">{t('adminRoomBookings.statusClosed')}</option>
                   </select>
                 </label>
               </div>
 
               <label className="space-y-1 block">
-                <span className="block text-xs font-bold uppercase tracking-wider text-slate-500">Vị trí / Tầng</span>
+                <span className="block text-xs font-bold uppercase tracking-wider text-slate-500">{t('adminRoomBookings.formLocation')}</span>
                 <input
                   type="text"
                   required
-                  placeholder="Ví dụ: Tầng 2, Khu A"
+                  placeholder={t('adminRoomBookings.placeholderLocation') || 'e.g. Floor 2, Zone A'}
                   value={roomForm.location}
                   onChange={(e) => setRoomForm({ ...roomForm, location: e.target.value })}
                   className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20"
@@ -966,14 +968,14 @@ export default function AdminRoomBookings() {
 
               {/* Amenities checkboxes */}
               <div className="space-y-2">
-                <span className="block text-xs font-bold uppercase tracking-wider text-slate-500">Tiện ích trong phòng</span>
+                <span className="block text-xs font-bold uppercase tracking-wider text-slate-500">{t('adminRoomBookings.formAmenities')}</span>
                 <div className="grid grid-cols-2 gap-2 bg-slate-50 p-3 rounded-xl border border-slate-100">
                   {[
-                    { key: 'projector', val: 'Máy chiếu' },
-                    { key: 'whiteboard', val: 'Bảng viết' },
-                    { key: 'power_outlets', val: 'Ổ cắm điện' },
-                    { key: 'tv', val: 'Màn hình TV' },
-                    { key: 'microphone', val: 'Thiết bị micro' },
+                    { key: 'projector', val: t('adminRoomBookings.amenityProjector') },
+                    { key: 'whiteboard', val: t('adminRoomBookings.amenityWhiteboard') },
+                    { key: 'power_outlets', val: t('adminRoomBookings.amenityPowerOutlets') },
+                    { key: 'tv', val: t('adminRoomBookings.amenityTv') },
+                    { key: 'microphone', val: t('adminRoomBookings.amenityMicrophone') },
                   ].map((item) => (
                     <label key={item.key} className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
                       <input
@@ -989,9 +991,9 @@ export default function AdminRoomBookings() {
               </div>
 
               <label className="space-y-1 block">
-                <span className="block text-xs font-bold uppercase tracking-wider text-slate-500">Mô tả chi tiết phòng</span>
+                <span className="block text-xs font-bold uppercase tracking-wider text-slate-500">{t('adminRoomBookings.formDescription')}</span>
                 <textarea
-                  placeholder="Phòng trang bị đầy đủ máy chiếu không dây..."
+                  placeholder={t('adminRoomBookings.placeholderDescription') || 'e.g. Room equipped with...'}
                   rows={3}
                   value={roomForm.description}
                   onChange={(e) => setRoomForm({ ...roomForm, description: e.target.value })}
@@ -1008,13 +1010,13 @@ export default function AdminRoomBookings() {
                   }}
                   className="border border-slate-200 text-slate-600 text-sm font-bold px-5 py-2 rounded-xl hover:bg-slate-50 transition-all cursor-pointer"
                 >
-                  Hủy
+                  {t('common.cancel')}
                 </button>
                 <button
                   type="submit"
                   className="bg-primary text-white text-sm font-bold px-6 py-2 rounded-xl shadow-xs hover:opacity-90 transition-all cursor-pointer"
                 >
-                  Lưu thiết lập
+                  {t('adminRoomBookings.btnSave')}
                 </button>
               </div>
             </form>
@@ -1027,7 +1029,7 @@ export default function AdminRoomBookings() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
           <div className="w-full max-w-md bg-white rounded-3xl scholar-shadow p-8 space-y-6">
             <div className="flex justify-between items-start">
-              <h3 className="text-xl font-bold text-slate-800">Từ chối đặt phòng</h3>
+              <h3 className="text-xl font-bold text-slate-800">{t('adminRoomBookings.rejectModalTitle', { id: showRejectModal.booking_id })}</h3>
               <button
                 onClick={() => {
                   setShowRejectModal(null);
@@ -1041,14 +1043,14 @@ export default function AdminRoomBookings() {
 
             <form onSubmit={handleRejectSubmit} className="space-y-4">
               <div className="text-sm text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-100">
-                Bạn đang từ chối yêu cầu của sinh viên <span className="font-bold">{showRejectModal.member?.name}</span> cho phòng <span className="font-bold">{showRejectModal.room?.name}</span>.
+                {t('adminRoomBookings.rejectDesc', { name: showRejectModal.member?.name, room: showRejectModal.room?.name })}
               </div>
 
               <label className="space-y-1 block">
-                <span className="block text-xs font-bold uppercase tracking-wider text-slate-500">Lý do từ chối</span>
+                <span className="block text-xs font-bold uppercase tracking-wider text-slate-500">{t('adminRoomBookings.rejectReasonLabel')}</span>
                 <textarea
                   required
-                  placeholder="Lý do từ chối (ví dụ: Trùng lịch sự kiện đột xuất của trường, phòng đang sửa...)"
+                  placeholder={t('adminRoomBookings.rejectReasonPlaceholder') || 'Reason...'}
                   rows={4}
                   value={rejectReason}
                   onChange={(e) => setRejectReason(e.target.value)}
@@ -1065,14 +1067,14 @@ export default function AdminRoomBookings() {
                   }}
                   className="border border-slate-200 text-slate-600 text-sm font-bold px-5 py-2 rounded-xl hover:bg-slate-50 transition-all cursor-pointer"
                 >
-                  Hủy
+                  {t('common.cancel')}
                 </button>
                 <button
                   type="submit"
                   disabled={!rejectReason.trim()}
                   className="bg-red-600 hover:bg-red-700 text-white text-sm font-bold px-6 py-2 rounded-xl shadow-xs transition-all disabled:opacity-50 cursor-pointer"
                 >
-                  Xác nhận từ chối
+                  {t('adminRoomBookings.btnSubmitReject')}
                 </button>
               </div>
             </form>
@@ -1085,7 +1087,7 @@ export default function AdminRoomBookings() {
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/80 p-4 backdrop-blur-sm">
           <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
-              <h3 className="text-lg font-bold text-slate-900">Quét mã QR Check-in phòng</h3>
+              <h3 className="text-lg font-bold text-slate-900">{t('adminRoomBookings.scanQrTitle')}</h3>
               <button 
                 onClick={() => setShowScanner(false)} 
                 className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 cursor-pointer"
@@ -1102,19 +1104,19 @@ export default function AdminRoomBookings() {
                     
                     emitToast({
                       tone: 'info',
-                      title: 'Đang xử lý',
-                      message: `Đang check-in cho mã: ${scannedCode}...`,
+                      title: t('adminRoomBookings.processing'),
+                      message: t('adminRoomBookings.processingMsg', { code: scannedCode }),
                     });
 
                     try {
                       const res = await checkInRoomBooking(scannedCode);
-                      emitToast({ tone: 'success', title: 'Check-in thành công', message: res.message });
+                      emitToast({ tone: 'success', title: t('adminRoomBookings.checkinSuccess'), message: res.message });
                       void loadBookings(1);
                     } catch (err: any) {
                       emitToast({
                         tone: 'error',
-                        title: 'Check-in thất bại',
-                        message: getErrorMessage(err, 'Mã không hợp lệ hoặc đã hết hạn.'),
+                        title: t('adminRoomBookings.checkinFailed'),
+                        message: getErrorMessage(err, t('adminRoomBookings.invalidQrMsg')),
                       });
                     }
                   }
@@ -1123,7 +1125,7 @@ export default function AdminRoomBookings() {
               />
             </div>
             <div className="bg-slate-50 p-4 text-center text-xs text-slate-500">
-              Đưa mã QR trên lịch hẹn đặt phòng của sinh viên vào khung camera để check-in tự động.
+              {t('adminRoomBookings.scanQrInstruction')}
             </div>
           </div>
         </div>
@@ -1134,8 +1136,8 @@ export default function AdminRoomBookings() {
           <div className="w-full max-w-lg bg-white rounded-3xl scholar-shadow p-8 space-y-6 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-start">
               <div>
-                <h3 className="text-xl font-bold text-slate-800">Đăng ký Walk-in cho Sinh viên</h3>
-                <p className="text-xs text-slate-500 mt-1">Đăng ký và check-in ngay lập tức cho sinh viên tại quầy.</p>
+                <h3 className="text-xl font-bold text-slate-800">{t('adminRoomBookings.walkinTitle')}</h3>
+                <p className="text-xs text-slate-500 mt-1">{t('adminRoomBookings.walkinSubtitle')}</p>
               </div>
               <button
                 onClick={() => {
@@ -1154,32 +1156,32 @@ export default function AdminRoomBookings() {
             <form onSubmit={handleAdminWalkinSubmit} className="space-y-4">
               {/* Member Search */}
               <div className="space-y-2 relative">
-                <span className="block text-xs font-bold uppercase tracking-wider text-slate-500">Tìm kiếm sinh viên</span>
+                <span className="block text-xs font-bold uppercase tracking-wider text-slate-500">{t('adminRoomBookings.filterMemberLabel')}</span>
                 {walkinSelectedMember ? (
                   <div className="flex items-center justify-between border border-emerald-200 bg-emerald-50/50 rounded-xl p-3">
                     <div>
                       <div className="font-bold text-sm text-slate-800">{walkinSelectedMember.name}</div>
-                      <div className="text-xs text-slate-500">Mã SV: {walkinSelectedMember.member_id} | {walkinSelectedMember.email}</div>
+                      <div className="text-xs text-slate-500">{t('adminMembers.formMemberId')}: {walkinSelectedMember.member_id} | {walkinSelectedMember.email}</div>
                     </div>
                     <button
                       type="button"
                       onClick={() => setWalkinSelectedMember(null)}
                       className="text-xs font-bold text-red-600 hover:underline cursor-pointer"
                     >
-                      Thay đổi
+                      {t('common.change')}
                     </button>
                   </div>
                 ) : (
                   <div>
                     <input
                       type="text"
-                      placeholder="Tìm theo tên hoặc email..."
+                      placeholder={t('adminRoomBookings.walkinSearchPlaceholder') || 'Search...'}
                       value={walkinStudentSearch}
                       onChange={(e) => setWalkinStudentSearch(e.target.value)}
                       className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20"
                     />
                     {loadingMembers && (
-                      <div className="absolute right-3 top-9 text-xs text-slate-400">Đang tìm...</div>
+                      <div className="absolute right-3 top-9 text-xs text-slate-400">{t('adminRoomBookings.searching')}</div>
                     )}
                     {walkinMembersList.length > 0 && (
                       <div className="absolute z-10 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-48 overflow-y-auto divide-y divide-slate-100">
@@ -1194,7 +1196,7 @@ export default function AdminRoomBookings() {
                             className="p-3 hover:bg-slate-50 cursor-pointer transition-colors text-left"
                           >
                             <div className="font-semibold text-sm text-slate-800">{m.name}</div>
-                            <div className="text-xs text-slate-500">Mã: {m.member_id} | {m.email}</div>
+                            <div className="text-xs text-slate-500">{t('adminMembers.formMemberId')}: {m.member_id} | {m.email}</div>
                           </div>
                         ))}
                       </div>
@@ -1205,17 +1207,17 @@ export default function AdminRoomBookings() {
 
               {/* Room Selection */}
               <label className="space-y-1 block">
-                <span className="block text-xs font-bold uppercase tracking-wider text-slate-500">Chọn phòng học</span>
+                <span className="block text-xs font-bold uppercase tracking-wider text-slate-500">{t('adminRoomBookings.formSelectRoom')}</span>
                 <select
                   required
                   value={walkinSelectedRoomId}
                   onChange={(e) => setWalkinSelectedRoomId(Number(e.target.value))}
                   className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20 bg-white"
                 >
-                  <option value="">Chọn phòng trống...</option>
+                  <option value="">{t('adminRoomBookings.selectRoomPlaceholder')}</option>
                   {rooms.filter(r => r.status === 'active' && r.is_active).map((r) => (
                     <option key={r.room_id} value={r.room_id}>
-                      {r.name} ({r.location} - Sức chứa: {r.capacity})
+                      {r.name} ({r.location} - {t('adminRoomBookings.roomCapacity')}: {r.capacity})
                     </option>
                   ))}
                 </select>
@@ -1224,24 +1226,24 @@ export default function AdminRoomBookings() {
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 {/* Duration */}
                 <label className="space-y-1 block">
-                  <span className="block text-xs font-bold uppercase tracking-wider text-slate-500">Thời lượng sử dụng</span>
+                  <span className="block text-xs font-bold uppercase tracking-wider text-slate-500">{t('adminRoomBookings.formDuration')}</span>
                   <select
                     value={walkinDuration}
                     onChange={(e) => setWalkinDuration(Number(e.target.value))}
                     className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary/20 bg-white"
                   >
-                    <option value={30}>30 phút</option>
-                    <option value={60}>1 tiếng</option>
-                    <option value={90}>1.5 tiếng</option>
-                    <option value={120}>2 tiếng</option>
-                    <option value={150}>2.5 tiếng</option>
-                    <option value={180}>3 tiếng</option>
+                    <option value={30}>{t('adminRoomBookings.durationMinutes', { count: 30 })}</option>
+                    <option value={60}>{t('adminRoomBookings.durationHours', { count: 1 })}</option>
+                    <option value={90}>{t('adminRoomBookings.durationHours', { count: 1.5 })}</option>
+                    <option value={120}>{t('adminRoomBookings.durationHours', { count: 2 })}</option>
+                    <option value={150}>{t('adminRoomBookings.durationHours', { count: 2.5 })}</option>
+                    <option value={180}>{t('adminRoomBookings.durationHours', { count: 3 })}</option>
                   </select>
                 </label>
 
                 {/* Group size */}
                 <label className="space-y-1 block">
-                  <span className="block text-xs font-bold uppercase tracking-wider text-slate-500">Số lượng thành viên</span>
+                  <span className="block text-xs font-bold uppercase tracking-wider text-slate-500">{t('adminRoomBookings.formGroupSize')}</span>
                   <input
                     type="number"
                     required
@@ -1255,9 +1257,9 @@ export default function AdminRoomBookings() {
 
               {/* Purpose */}
               <label className="space-y-1 block">
-                <span className="block text-xs font-bold uppercase tracking-wider text-slate-500">Mục đích sử dụng</span>
+                <span className="block text-xs font-bold uppercase tracking-wider text-slate-500">{t('adminRoomBookings.formPurpose')}</span>
                 <textarea
-                  placeholder="Làm việc nhóm, tự học, thảo luận..."
+                  placeholder={t('adminRoomBookings.placeholderPurpose') || 'Group work, discussion...'}
                   rows={2}
                   value={walkinPurpose}
                   onChange={(e) => setWalkinPurpose(e.target.value)}
@@ -1278,14 +1280,14 @@ export default function AdminRoomBookings() {
                   }}
                   className="border border-slate-200 text-slate-600 text-sm font-bold px-6 py-2.5 rounded-xl hover:bg-slate-50 transition-all cursor-pointer"
                 >
-                  Hủy bỏ
+                  {t('common.cancel')}
                 </button>
                 <button
                   type="submit"
                   disabled={submittingWalkin || !walkinSelectedMember || !walkinSelectedRoomId}
                   className="bg-primary text-white text-sm font-bold px-8 py-2.5 rounded-xl shadow-md transition-all hover:bg-opacity-90 disabled:opacity-60 cursor-pointer"
                 >
-                  {submittingWalkin ? 'Đang đăng ký...' : 'Xác nhận đặt phòng'}
+                  {submittingWalkin ? t('adminRoomBookings.walkinSubmitting') : t('adminRoomBookings.walkinSubmit')}
                 </button>
               </div>
             </form>
