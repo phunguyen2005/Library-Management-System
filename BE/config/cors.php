@@ -27,7 +27,10 @@ return [
         ))
     ))),
 
-    'allowed_origins_patterns' => [],
+    'allowed_origins_patterns' => [
+        '#^https://hcmue-library-frontend-.*\.vercel\.app$#',
+        '#^https://.*-phungyuen018-s-projects\.vercel\.app$#',
+    ],
 
     'allowed_headers' => ['*'],
 
