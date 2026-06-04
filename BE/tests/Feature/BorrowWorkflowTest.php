@@ -332,4 +332,56 @@ class BorrowWorkflowTest extends TestCase
             'repairing_quantity' => 0,
         ]);
     }
+
+    public function test_admin_can_cancel_approved_request_restoring_inventory(): void
+    {
+        $librarian = Librarian::query()->findOrFail(1);
+        $token = $librarian->createToken('librarian-access', ['role:admin']);
+        $member = Member::query()->findOrFail(3);
+        $book = Book::query()->create([
+            'title' => 'Cancel Approved Fixture',
+            'author' => 'Library Ops',
+            'genre' => 'Technology',
+            'published_year' => 2026,
+            'is_available' => true,
+            'cover' => null,
+            'location' => 'C1',
+            'is_digital' => false,
+            'resource_type' => null,
+            'file_format' => null,
+            'file_size' => null,
+            'download_count' => 0,
+            'total_quantity' => 1,
+            'available_quantity' => 1,
+            'repairing_quantity' => 0,
+        ]);
+        $loan = Borrowing::query()->create([
+            'book_id' => $book->book_id,
+            'member_id' => $member->member_id,
+            'status' => Borrowing::STATUS_PENDING,
+            'borrow_date' => today()->toDateString(),
+        ]);
+
+        // First approve the request, which decreases available_quantity to 0
+        $this->withToken($token->plainTextToken)
+            ->postJson("/api/requests/{$loan->loan_id}/approve")
+            ->assertOk();
+
+        $this->assertDatabaseHas('books', [
+            'book_id' => $book->book_id,
+            'available_quantity' => 0,
+        ]);
+
+        // Now librarian cancels the approved request
+        $this->withToken($token->plainTextToken)
+            ->deleteJson("/api/requests/{$loan->loan_id}/cancel")
+            ->assertOk()
+            ->assertJsonPath('loan.status', 'cancelled');
+
+        // Available quantity should be restored to 1
+        $this->assertDatabaseHas('books', [
+            'book_id' => $book->book_id,
+            'available_quantity' => 1,
+        ]);
+    }
 }

@@ -498,35 +498,69 @@ class BorrowController extends Controller
     /**
      * Student cancels their own pending borrow request.
      */
+    /**
+     * Cancel a borrow request (Student cancels their own pending, or Admin/Librarian cancels approved/pending).
+     */
     public function cancelBorrow(Request $request, int $loanId)
     {
-        $member = $request->user();
+        $user = $request->user();
+        $role = method_exists($user, 'getRoleName') ? $user->getRoleName() : 'student';
+        $isAdminOrLibrarian = in_array($role, ['admin', 'librarian'], true);
 
-        $loan = DB::transaction(function () use ($loanId, $member) {
+        $loan = DB::transaction(function () use ($loanId, $user, $isAdminOrLibrarian) {
             $loan = Borrowing::query()->lockForUpdate()->find($loanId);
 
             if (! $loan) {
                 throw new HttpResponseException(response()->json(['message' => __('messages.borrow.request_not_found')], 404));
             }
 
-            if ($loan->member_id !== $member->member_id) {
-                throw new HttpResponseException(response()->json(['message' => __('messages.borrow.cancel_forbidden')], 403));
+            if (! $isAdminOrLibrarian) {
+                if ($loan->member_id !== $user->member_id) {
+                    throw new HttpResponseException(response()->json(['message' => __('messages.borrow.cancel_forbidden')], 403));
+                }
+
+                if ($loan->status !== Borrowing::STATUS_PENDING) {
+                    throw new HttpResponseException(response()->json(['message' => __('messages.borrow.cancel_requires_pending')], 422));
+                }
+            } else {
+                // Admin or Librarian can cancel if it is PENDING or APPROVED
+                if (! in_array($loan->status, [Borrowing::STATUS_PENDING, Borrowing::STATUS_APPROVED], true)) {
+                    throw new HttpResponseException(response()->json(['message' => 'Thủ thư chỉ có thể hủy yêu cầu đang chờ duyệt hoặc đã duyệt.'], 422));
+                }
             }
 
-            if ($loan->status !== Borrowing::STATUS_PENDING) {
-                throw new HttpResponseException(response()->json(['message' => __('messages.borrow.cancel_requires_pending')], 422));
-            }
+            $oldStatus = $loan->status;
 
             $loan->status = Borrowing::STATUS_CANCELLED;
-            $loan->rejection_reason = __('messages.borrow.cancelled_by_student');
+            if ($isAdminOrLibrarian) {
+                $loan->rejection_reason = 'Yêu cầu mượn sách bị hủy bởi thủ thư.';
+            } else {
+                $loan->rejection_reason = __('messages.borrow.cancelled_by_student');
+            }
             $loan->rejected_at = now();
             $loan->save();
 
-            \App\Services\AuditLoggerService::log(
-                'borrow_cancel',
-                'Sinh viên đã hủy yêu cầu mượn sách: ' . $loan->book->title . ' (Mã phiếu: #' . $loan->loan_id . ')',
-                $member
-            );
+            // Sync book counters if it was approved previously
+            if ($oldStatus === Borrowing::STATUS_APPROVED) {
+                $book = Book::query()->lockForUpdate()->find($loan->book_id);
+                if ($book) {
+                    BookCopy::syncBookCounters($book);
+                }
+            }
+
+            if ($isAdminOrLibrarian) {
+                \App\Services\AuditLoggerService::log(
+                    'borrow_cancel',
+                    'Thủ thư đã hủy yêu cầu mượn sách: ' . $loan->book->title . ' (Mã phiếu: #' . $loan->loan_id . ')',
+                    $user
+                );
+            } else {
+                \App\Services\AuditLoggerService::log(
+                    'borrow_cancel',
+                    'Sinh viên đã hủy yêu cầu mượn sách: ' . $loan->book->title . ' (Mã phiếu: #' . $loan->loan_id . ')',
+                    $user
+                );
+            }
 
             return $loan->fresh(['book', 'member']);
         });

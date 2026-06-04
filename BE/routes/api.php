@@ -84,11 +84,11 @@ Route::middleware('auth:sanctum')->group(function () {
     // Room Booking Creation (shared for students and librarians/admins)
     Route::post('/room-bookings', [RoomBookingController::class, 'store']);
     Route::get('/gamify/leaderboard', [GamifyController::class, 'leaderboard']);
+    Route::delete('/requests/{loanId}/cancel', [BorrowController::class, 'cancelBorrow']);
 
     Route::middleware('role:student')->group(function () {
         Route::post('/requests', [BorrowController::class, 'requestBorrow']);
         Route::get('/requests/me', [BorrowController::class, 'getMemberRequests']);
-        Route::delete('/requests/{loanId}/cancel', [BorrowController::class, 'cancelBorrow']);
         Route::get('/favorites', [FavoriteController::class, 'index']);
         Route::post('/favorites/{book}', [FavoriteController::class, 'store']);
         Route::delete('/favorites/{book}', [FavoriteController::class, 'destroy']);
