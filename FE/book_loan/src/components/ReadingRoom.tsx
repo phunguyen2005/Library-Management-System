@@ -427,6 +427,20 @@ export default function ReadingRoom({ document, onClose, onProgressSaved }: Read
     setIsIframeLoading(true);
   }, [document.id]);
 
+  // Re-sync page progress state when opening a different document.
+  // useState() only captures the initial value once – when the user switches books,
+  // we must explicitly restore the saved position from the new document's readingProgress.
+  useEffect(() => {
+    const savedPage = document.readingProgress?.current_page ?? 1;
+    const savedTotal = document.readingProgress?.total_pages ?? 1;
+    setCurrentPage(savedPage);
+    setTotalPages(savedTotal);
+    currentPageRef.current = savedPage;
+    totalPagesRef.current = savedTotal;
+    lastSavedPageRef.current = savedPage;
+    audioReadyRef.current = false; // reset audio guard for new document
+  }, [document.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Audio helper handlers
   const formatTime = (timeInSeconds: number) => {
     if (isNaN(timeInSeconds)) return '0:00';
@@ -737,9 +751,14 @@ export default function ReadingRoom({ document, onClose, onProgressSaved }: Read
                   )}
                   <iframe
                     src={
-                      /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
-                        ? `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(document.openUrl)}`
-                        : `${document.openUrl}#toolbar=1`
+                      (() => {
+                        const savedPage = document.readingProgress?.current_page ?? 1;
+                        const pageParam = savedPage > 1 ? `page=${savedPage}&` : '';
+                        if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+                          return `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(document.openUrl)}`;
+                        }
+                        return `${document.openUrl}#${pageParam}toolbar=1`;
+                      })()
                     }
                     title={document.title}
                     onLoad={() => setIsIframeLoading(false)}
