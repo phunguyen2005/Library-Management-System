@@ -41,6 +41,7 @@ export default function StudentFines() {
   const [currentPaymentId, setCurrentPaymentId] = useState<number | null>(null);
   const [isQrZoomed, setIsQrZoomed] = useState(false);
   const [selectedTicketId, setSelectedTicketId] = useState<number | null>(null);
+  const [waiverModalFine, setWaiverModalFine] = useState<FineEntry | null>(null);
 
   const fetchFines = React.useCallback(() => {
     setIsLoading(true);
@@ -326,6 +327,15 @@ export default function StudentFines() {
     return { unpaidCount, paidTotal };
   }, [fines]);
 
+  const hasWaiverTickets = useMemo(() => {
+    return activeTickets.some(
+      (t) =>
+        t.status === 'active' &&
+        t.reward?.benefit_type === 'fine_waiver' &&
+        (t.expires_at === null || new Date(t.expires_at) > new Date())
+    );
+  }, [activeTickets]);
+
   return (
     <div className="mx-auto w-full max-w-6xl space-y-6 p-4 md:p-8">
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
@@ -396,12 +406,11 @@ export default function StudentFines() {
                 <div className="flex justify-between items-center gap-2 pt-1 w-full">
                   {fine.status === 'unpaid' ? (
                     <>
-                      {getEligibleWaiverTicket(fine.amount) ? (
+                      {hasWaiverTickets ? (
                         <div className="grid grid-cols-2 gap-2 w-full">
                           <button
                             type="button"
-                            disabled={isWaiverLoading}
-                            onClick={() => handleApplyWaiver(fine.fine_id, getEligibleWaiverTicket(fine.amount)!)}
+                            onClick={() => setWaiverModalFine(fine)}
                             className="rounded-lg bg-emerald-600 py-2 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 cursor-pointer flex items-center justify-center gap-1"
                           >
                             <span className="material-symbols-outlined text-sm">local_activity</span>
@@ -501,11 +510,10 @@ export default function StudentFines() {
                       <td className="px-6 py-4 text-right">
                         {fine.status === 'unpaid' ? (
                           <div className="flex flex-col md:flex-row gap-2 justify-end items-center">
-                            {getEligibleWaiverTicket(fine.amount) && (
+                            {hasWaiverTickets && (
                               <button
                                 type="button"
-                                disabled={isWaiverLoading}
-                                onClick={() => handleApplyWaiver(fine.fine_id, getEligibleWaiverTicket(fine.amount)!)}
+                                onClick={() => setWaiverModalFine(fine)}
                                 className="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-sm shadow-emerald-600/20 hover:bg-emerald-700 hover:scale-[1.02] active:scale-95 transition-all cursor-pointer flex items-center gap-1 shrink-0"
                               >
                                 <span className="material-symbols-outlined text-sm">local_activity</span>
@@ -750,6 +758,127 @@ export default function StudentFines() {
             >
               {t('studentFines.zoomedClose')}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Waiver Ticket Selection Modal */}
+      {waiverModalFine && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-slate-900/60 p-0 md:p-4 backdrop-blur-sm animate-fade-in"
+        >
+          <div className="w-full max-w-lg rounded-t-3xl rounded-b-none md:rounded-2xl border border-slate-200 bg-white p-5 md:p-6 shadow-2xl relative animate-in slide-in-from-bottom duration-300 md:animate-none flex flex-col max-h-[85vh]">
+            <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-4">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">
+                  {t('studentFines.waiverModalTitle', 'Chọn vé miễn phạt')}
+                </h3>
+                <p className="mt-1 text-xs text-slate-500">
+                  {t('studentFines.waiverModalSubtitle', 'Áp dụng cho khoản phạt sách: {{title}} (Số tiền: {{amount}})', {
+                    title: waiverModalFine.book_title || t('studentFines.bookTitle'),
+                    amount: formatDisplayCurrency(waiverModalFine.amount)
+                  })}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setWaiverModalFine(null)}
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors cursor-pointer"
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            <div className="mt-4 flex-1 overflow-y-auto space-y-3 py-1 pr-1 custom-scrollbar">
+              {activeTickets.filter(t => t.reward?.benefit_type === 'fine_waiver').length === 0 ? (
+                <div className="text-center py-8 text-slate-500">
+                  <span className="material-symbols-outlined text-4xl text-slate-300 block mb-2">local_activity</span>
+                  <p className="text-sm font-medium">{t('studentFines.noWaiverTickets', 'Bạn không có vé miễn phạt nào.')}</p>
+                  <p className="text-xs text-slate-400 mt-1">
+                    {t('studentFines.goToStoreDesc', 'Hãy đến Cửa hàng đổi thưởng để đổi điểm lấy vé miễn phạt.')}
+                  </p>
+                </div>
+              ) : (
+                activeTickets
+                  .filter(t => t.reward?.benefit_type === 'fine_waiver')
+                  .map((ticket) => {
+                    const isEligible = Number(waiverModalFine.amount) <= Number(ticket.reward?.benefit_value || 0);
+                    const isExpired = ticket.expires_at !== null && new Date(ticket.expires_at) < new Date();
+                    const isValid = ticket.status === 'active' && !isExpired;
+
+                    return (
+                      <div
+                        key={ticket.id}
+                        className={`rounded-xl border p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all ${
+                          isValid && isEligible
+                            ? 'border-emerald-200 bg-emerald-50/30 hover:border-emerald-400'
+                            : 'border-slate-200 bg-slate-50 opacity-70'
+                        }`}
+                      >
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className={`material-symbols-outlined text-xl ${isValid && isEligible ? 'text-emerald-600' : 'text-slate-400'}`}>
+                              confirmation_number
+                            </span>
+                            <h4 className="text-sm font-bold text-slate-800">
+                              {ticket.reward?.name}
+                            </h4>
+                          </div>
+                          <p className="text-xs text-slate-500">
+                            {ticket.reward?.description || t('studentFines.maxWaiverAmount', 'Mức miễn tối đa: {{value}}', { value: formatDisplayCurrency(ticket.reward?.benefit_value || 0) })}
+                          </p>
+                          <div className="flex flex-wrap gap-1.5 pt-1">
+                            <span className="text-[10px] font-semibold text-slate-400">
+                              {ticket.expires_at
+                                ? t('studentFines.expiryDate', 'Hạn: {{date}}', { date: new Date(ticket.expires_at).toLocaleDateString() })
+                                : t('studentFines.noExpiry', 'Không hết hạn')}
+                            </span>
+                            {!isEligible && (
+                              <span className="text-[10px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded">
+                                {t('studentFines.insufficientBenefit', 'Chỉ áp dụng cho phạt dưới {{value}}', { value: formatDisplayCurrency(ticket.reward?.benefit_value || 0) })}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="shrink-0">
+                          <button
+                            type="button"
+                            disabled={isWaiverLoading || !isValid || !isEligible}
+                            onClick={() => {
+                              handleApplyWaiver(waiverModalFine.fine_id, ticket);
+                              setWaiverModalFine(null);
+                            }}
+                            className={`w-full md:w-auto px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                              isValid && isEligible
+                                ? 'bg-emerald-600 text-white hover:bg-emerald-700 cursor-pointer shadow-sm shadow-emerald-600/10'
+                                : 'bg-slate-200 text-slate-400 cursor-not-allowed border border-slate-300'
+                            }`}
+                          >
+                            {isWaiverLoading ? (
+                              <span className="animate-spin h-3.5 w-3.5 border-2 border-white border-t-transparent rounded-full block"></span>
+                            ) : (
+                              t('studentFines.btnApplyTicketSmall', 'Áp dụng')
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })
+              )}
+            </div>
+
+            <div className="mt-6 border-t border-slate-100 pt-4 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setWaiverModalFine(null)}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                {t('common.close', 'Đóng')}
+              </button>
+            </div>
           </div>
         </div>
       )}
