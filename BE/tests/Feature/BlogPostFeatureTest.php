@@ -163,4 +163,61 @@ class BlogPostFeatureTest extends TestCase
 
         $this->assertContains('manage_blog', $admin->getAllPermissions());
     }
+
+    public function test_blog_post_translation_via_gemini_api(): void
+    {
+        Http::fake([
+            'generativelanguage.googleapis.com/*' => Http::response([
+                'candidates' => [
+                    [
+                        'content' => [
+                            'parts' => [
+                                [
+                                    'text' => json_encode([
+                                        'title' => 'English title',
+                                        'excerpt' => 'English excerpt',
+                                        'content' => '<p>English content</p>',
+                                    ])
+                                ]
+                            ]
+                        ]
+                    ]
+                ]
+            ]),
+        ]);
+
+        config(['services.gemini.api_key' => 'fake-api-key']);
+
+        $author = Librarian::query()->findOrFail(1);
+
+        $post = BlogPost::query()->create([
+            'title' => 'Tiêu đề tiếng Việt',
+            'slug' => 'tieu-de-tieng-viet',
+            'excerpt' => 'Tóm tắt tiếng Việt.',
+            'content' => '<p>Nội dung tiếng Việt.</p>',
+            'category' => 'news',
+            'status' => 'published',
+            'author_id' => $author->getKey(),
+            'author_type' => Librarian::class,
+            'published_at' => now()->subDay(),
+        ]);
+
+        // Requesting with 'en' header
+        $this->getJson('/api/blog/posts/tieu-de-tieng-viet', [
+            'Accept-Language' => 'en',
+        ])
+            ->assertOk()
+            ->assertJsonPath('title', 'English title')
+            ->assertJsonPath('excerpt', 'English excerpt')
+            ->assertJsonPath('content', '<p>English content</p>');
+
+        // Requesting with 'vi' header should return original content
+        $this->getJson('/api/blog/posts/tieu-de-tieng-viet', [
+            'Accept-Language' => 'vi',
+        ])
+            ->assertOk()
+            ->assertJsonPath('title', 'Tiêu đề tiếng Việt')
+            ->assertJsonPath('excerpt', 'Tóm tắt tiếng Việt.')
+            ->assertJsonPath('content', '<p>Nội dung tiếng Việt.</p>');
+    }
 }

@@ -11,6 +11,17 @@ class BlogPost extends Model
 {
     use HasFactory, SoftDeletes;
 
+    protected static function booted(): void
+    {
+        static::saved(function (BlogPost $blogPost) {
+            app(\App\Services\BlogTranslationService::class)->clearCache($blogPost->id);
+        });
+
+        static::deleted(function (BlogPost $blogPost) {
+            app(\App\Services\BlogTranslationService::class)->clearCache($blogPost->id);
+        });
+    }
+
     protected $fillable = [
         'title',
         'slug',

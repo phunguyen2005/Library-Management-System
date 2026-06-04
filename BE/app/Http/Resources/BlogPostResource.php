@@ -12,12 +12,26 @@ class BlogPostResource extends JsonResource
     {
         $author = $this->whenLoaded('author');
 
+        $isAdminRequest = $request->is('api/admin/*') || $request->is('admin/*') || \Illuminate\Support\Str::contains($request->path(), 'admin/');
+
+        $title = $this->title;
+        $excerpt = $this->excerpt;
+        $content = $this->content;
+
+        if (!$isAdminRequest) {
+            $locale = app()->getLocale();
+            $translated = app(\App\Services\BlogTranslationService::class)->translate($this->resource, $locale);
+            $title = $translated['title'];
+            $excerpt = $translated['excerpt'];
+            $content = $translated['content'];
+        }
+
         return [
             'id' => $this->id,
-            'title' => $this->title,
+            'title' => $title,
             'slug' => $this->slug,
-            'excerpt' => $this->excerpt,
-            'content' => $this->content,
+            'excerpt' => $excerpt,
+            'content' => $content,
             'cover_image' => $this->cover_image,
             'category' => $this->category,
             'status' => $this->status,
