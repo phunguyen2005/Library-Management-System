@@ -1,5 +1,5 @@
 import React, { Suspense, lazy } from 'react';
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useAuth } from './auth/AuthContext';
 import PageLoader from './components/PageLoader';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -42,7 +42,12 @@ const AdminLibrarians = lazy(() => import('./pages/admin/AdminLibrarians'));
 const BlogManagement = lazy(() => import('./pages/admin/BlogManagement'));
 
 export default function App() {
+  const { pathname } = useLocation();
   const { isAuthReady, isAuthenticated, role, user } = useAuth();
+
+  React.useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
   const homePath = (role === 'admin' || role === 'librarian') ? '/admin/dashboard' : '/home';
 
   const isOutlookStudent = !!(user?.email && (
