@@ -385,57 +385,57 @@ export default function AiChatbot() {
         }}
         dragElastic={0.1}
         dragMomentum={false}
-        onClick={() => setIsOpen(!isOpen)}
+        onTap={() => setIsOpen(!isOpen)}
         aria-label={t('aiChatbot.robotAssistant', 'Trợ lý AI')}
         className={`fixed z-40 flex items-center justify-center rounded-full bg-primary text-white shadow-xl shadow-primary/30 active:scale-95 cursor-pointer glow-pulse touch-none transition-all duration-300
           bottom-28 right-4 h-12 w-12 md:bottom-6 md:right-6 md:h-14 md:w-14
-          \${isScrolling ? 'opacity-20 scale-75 pointer-events-none md:opacity-100 md:scale-100 md:pointer-events-auto' : 'opacity-100 scale-100'}`}
+          ${isScrolling ? 'opacity-40 scale-90' : 'opacity-100 scale-100'}`}
       >
         <span className="material-symbols-outlined text-2xl md:text-3xl animate-pulse">smart_toy</span>
       </motion.button>
-
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            initial={{ opacity: 0, x: 100 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 100 }}
-            transition={{ type: 'spring', damping: 25, stiffness: 220 }}
-            className="fixed inset-y-0 right-0 z-50 flex w-full flex-col border-l border-surface-container-high bg-surface-bright shadow-2xl sm:max-w-md"
-          >
-            <header className="flex h-16 items-center justify-between border-b border-surface-container-high px-6 bg-surface">
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-primary text-2xl">smart_toy</span>
-                <div>
-                  <h2 className="text-sm font-bold text-on-surface">{t('aiChatbot.headerTitle', 'Thủ thư AI HCMUE')}</h2>
-                  <span className="flex items-center gap-1 text-[10px] font-semibold text-green-600">
-                    <span className="h-1.5 w-1.5 rounded-full bg-green-600 animate-ping" />
-                    {t('aiChatbot.headerSubtitle', 'Trực tuyến 24/7')}
-                  </span>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsOpen(false)}
-                className="flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container hover:text-on-surface cursor-pointer"
-              >
-                <span className="material-symbols-outlined">close</span>
-              </button>
-            </header>
-
-            <div className="custom-scrollbar flex-1 overflow-y-auto p-6 space-y-4">
-              {messages.map((msg, index) => (
-                <div
-                  key={index}
-                  className={`flex \${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-                >
-                  <div
-                    className={`max-w-[85%] rounded-2xl p-4 text-sm scholar-shadow relative group \${
-                      msg.sender === 'user'
-                        ? 'bg-primary text-white rounded-tr-none'
-                        : 'bg-surface-container text-on-surface rounded-tl-none border border-surface-container-high'
-                    }`}
-                  >
+ 
+       <AnimatePresence>
+         {isOpen && (
+           <motion.div
+             initial={{ opacity: 0, x: 100 }}
+             animate={{ opacity: 1, x: 0 }}
+             exit={{ opacity: 0, x: 100 }}
+             transition={{ type: 'spring', damping: 25, stiffness: 220 }}
+             className="fixed inset-y-0 right-0 z-50 flex w-full flex-col border-l border-surface-container-high bg-surface-bright shadow-2xl sm:max-w-md"
+           >
+             <header className="flex h-16 items-center justify-between border-b border-surface-container-high px-6 bg-surface">
+               <div className="flex items-center gap-2">
+                 <span className="material-symbols-outlined text-primary text-2xl">smart_toy</span>
+                 <div>
+                   <h2 className="text-sm font-bold text-on-surface">{t('aiChatbot.headerTitle', 'Thủ thư AI HCMUE')}</h2>
+                   <span className="flex items-center gap-1 text-[10px] font-semibold text-green-600">
+                     <span className="h-1.5 w-1.5 rounded-full bg-green-600 animate-ping" />
+                     {t('aiChatbot.headerSubtitle', 'Trực tuyến 24/7')}
+                   </span>
+                 </div>
+               </div>
+               <button
+                 type="button"
+                 onClick={() => setIsOpen(false)}
+                 className="flex h-8 w-8 items-center justify-center rounded-full text-on-surface-variant hover:bg-surface-container hover:text-on-surface cursor-pointer"
+               >
+                 <span className="material-symbols-outlined">close</span>
+               </button>
+             </header>
+ 
+             <div className="custom-scrollbar flex-1 overflow-y-auto p-6 space-y-4">
+               {messages.map((msg, index) => (
+                 <div
+                   key={index}
+                   className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+                 >
+                   <div
+                     className={`max-w-[85%] rounded-2xl p-4 text-sm scholar-shadow relative group ${
+                       msg.sender === 'user'
+                         ? 'bg-primary text-white rounded-tr-none'
+                         : 'bg-surface-container text-on-surface rounded-tl-none border border-surface-container-high'
+                     }`}
+                   >
                     {renderMessageContent(index === 0 && msg.sender === 'ai' ? t('aiChatbot.initialGreeting', msg.text) : msg.text)}
                   </div>
                 </div>

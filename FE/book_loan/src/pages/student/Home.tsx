@@ -2,8 +2,9 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'motion/react';
+import { useAuth } from '../../auth/AuthContext';
 import { fetchBorrowableBooks } from '../../api/bookApi';
-import { getMyRequests } from '../../api/borrowApi';
+import { getMyRequests, requestBorrow } from '../../api/borrowApi';
 import { fetchAiRecommendations, type RecommendationRecord } from '../../api/aiApi';
 import { getFineSummary, type FineSummary } from '../../api/fineApi';
 import EmptyState from '../../components/EmptyState';
@@ -42,67 +43,74 @@ export default function Home() {
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
 
-  useEffect(() => {
-    let isActive = true;
+  const { user, role } = useAuth();
+  const isOutlookStudent = !!(user?.email && (
+    user.email.toLowerCase().endsWith('@student.hcmue.edu.vn') || 
+    user.email.toLowerCase().endsWith('@hcmue.edu.vn')
+  ));
 
-    const loadHomeData = async () => {
+  const loadHomeData = async (isActive = true) => {
+    if (isActive) {
       setIsLoadingStats(true);
       setIsLoadingRecs(true);
       setLoadError(null);
+    }
 
-      try {
-        const [booksResponse, requests, recsResponse, fineSummaryResponse] = await Promise.all([
-          fetchBorrowableBooks(1, '', 5),
-          getMyRequests(),
-          fetchAiRecommendations(),
-          getFineSummary(),
-        ]);
-        const borrowed = requests.filter((request) => request.status === 'borrowed');
-        const pending = requests.filter((request) => request.status === 'pending');
-        const overdue = borrowed.filter((request) => {
-          if (typeof request.is_overdue === 'boolean') {
-            return request.is_overdue;
-          }
-
-          if (!request.due_date) {
-            return false;
-          }
-
-          return new Date(request.due_date) < new Date();
-        });
-
-        if (!isActive) {
-          return;
+    try {
+      const [booksResponse, requests, recsResponse, fineSummaryResponse] = await Promise.all([
+        fetchBorrowableBooks(1, '', 5),
+        getMyRequests(),
+        fetchAiRecommendations(),
+        getFineSummary(),
+      ]);
+      const borrowed = requests.filter((request) => request.status === 'borrowed');
+      const pending = requests.filter((request) => request.status === 'pending');
+      const overdue = borrowed.filter((request) => {
+        if (typeof request.is_overdue === 'boolean') {
+          return request.is_overdue;
         }
 
-        setStats({
-          activeLoans: borrowed.length,
-          pendingRequests: pending.length,
-          overdueLoans: overdue.length,
-          catalogCount: booksResponse.meta?.total ?? booksResponse.data.length,
-        });
-        setNewBooks(booksResponse.data.slice(0, 5));
-        setBannerBooks(booksResponse.data.filter((b) => b.is_available).slice(0, 5));
-        setAiRecs(recsResponse);
-        setFineSummary(fineSummaryResponse);
-      } catch (error: unknown) {
-        const message = getErrorMessage(error, t('studentHome.loadError'));
+        if (!request.due_date) {
+          return false;
+        }
 
-        if (isActive) {
-          setLoadError(message);
-          emitToast({ tone: 'error', title: t('studentHome.loadError'), message });
-        }
-      } finally {
-        if (isActive) {
-          setIsLoadingStats(false);
-          setIsLoadingRecs(false);
-        }
+        return new Date(request.due_date) < new Date();
+      });
+
+      if (!isActive) {
+        return;
       }
-    };
 
-    void loadHomeData();
+      setStats({
+        activeLoans: borrowed.length,
+        pendingRequests: pending.length,
+        overdueLoans: overdue.length,
+        catalogCount: booksResponse.meta?.total ?? booksResponse.data.length,
+      });
+      setNewBooks(booksResponse.data.slice(0, 5));
+      setBannerBooks(booksResponse.data.filter((b) => b.is_available).slice(0, 5));
+      setAiRecs(recsResponse);
+      setFineSummary(fineSummaryResponse);
+    } catch (error: unknown) {
+      const message = getErrorMessage(error, t('studentHome.loadError'));
 
+      if (isActive) {
+        setLoadError(message);
+        emitToast({ tone: 'error', title: t('studentHome.loadError'), message });
+      }
+    } finally {
+      if (isActive) {
+        setIsLoadingStats(false);
+        setIsLoadingRecs(false);
+      }
+    }
+  };
+
+  useEffect(() => {
+    let isActive = true;
+    void loadHomeData(isActive);
     return () => {
       isActive = false;
     };
@@ -119,7 +127,7 @@ export default function Home() {
     }, 5000);
 
     return () => clearInterval(timer);
-  }, [bannerBooks.length, isHovered]);
+  }, [bannerBooks.length, isHovered, currentIndex]);
 
   const scrollBanner = (direction: 'left' | 'right') => {
     // 1. Call scrollBy to pass the unit test expectations
@@ -138,6 +146,38 @@ export default function Home() {
           return prev === bannerBooks.length - 1 ? 0 : prev + 1;
         }
       });
+    }
+  };
+
+  const handleBorrowImmediately = async (e: React.MouseEvent, book: FormattedBook) => {
+    e.stopPropagation();
+    if (role === 'student' && !isOutlookStudent) {
+      emitToast({
+        tone: 'warning',
+        title: t('aiChatbot.guestBorrowLimitTitle', 'Quyền mượn bị giới hạn'),
+        message: t('aiChatbot.guestBorrowLimitMsg', 'Khách vãng lai không thể mượn sách vật lý. Vui lòng sử dụng tài khoản Outlook trường.'),
+      });
+      return;
+    }
+    setActionLoading(true);
+    try {
+      const response = await requestBorrow(book.id);
+      emitToast({
+        tone: 'success',
+        title: t('aiChatbot.success', 'Thành công'),
+        message: response.message || t('aiChatbot.borrowRequestSubmitted', 'Đã gửi yêu cầu mượn cuốn: {{title}}', { title: book.title }),
+      });
+      
+      // Trượt qua slide tiếp theo
+      scrollBanner('right');
+      
+      // Load lại dữ liệu
+      await loadHomeData(true);
+    } catch (error: unknown) {
+      const message = getErrorMessage(error, t('aiChatbot.borrowError', 'Lỗi khi yêu cầu mượn sách'));
+      emitToast({ tone: 'error', title: t('aiChatbot.borrowFailedTitle', 'Lỗi mượn sách'), message });
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -237,7 +277,7 @@ export default function Home() {
 
             <div 
               ref={scrollContainerRef}
-              className="flex w-full snap-x snap-mandatory overflow-x-auto scroll-smooth gap-4 md:gap-0 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              className="flex w-full snap-x snap-mandatory overflow-hidden scroll-smooth gap-4 md:gap-0 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             >
               <AnimatePresence mode="wait">
                 {bannerBooks.map((book, idx) => {
@@ -292,16 +332,17 @@ export default function Home() {
                         <div className="flex flex-wrap gap-2 md:gap-3">
                           <button
                             type="button"
+                            disabled={actionLoading}
                             aria-label={`${t('studentHome.borrowNow')} ${book.title}`}
-                            onClick={() => navigate(`/catalog?book=${book.id}`)}
-                            className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-xs font-bold text-white transition-all hover:bg-primary/90 hover:scale-[1.02] hover:-translate-y-0.5 active:scale-[0.98] md:px-6 md:py-3 md:text-sm cursor-pointer shadow-md shadow-primary/20"
+                            onClick={(e) => handleBorrowImmediately(e, book)}
+                            className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-xs font-bold text-white transition-all hover:bg-primary/90 hover:scale-[1.02] hover:-translate-y-0.5 active:scale-[0.98] md:px-6 md:py-3 md:text-sm cursor-pointer shadow-md shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed"
                           >
-                            {t('studentHome.borrowNow')}
+                            {actionLoading ? t('aiChatbot.submitting', 'Đang gửi...') : t('studentHome.borrowNow')}
                           </button>
                           <button
                             type="button"
                             aria-label={`${t('studentHome.viewDetails')} ${book.title}`}
-                            onClick={() => navigate(`/catalog?q=${encodeURIComponent(book.title)}`)}
+                            onClick={() => navigate(`/catalog?book=${book.id}`)}
                             className="inline-flex items-center gap-2 rounded-xl border border-surface-container-high/80 bg-surface-bright/70 backdrop-blur-sm px-5 py-2.5 text-xs font-semibold text-on-surface transition-all hover:border-primary/30 hover:bg-primary/5 hover:text-primary hover:scale-[1.02] hover:-translate-y-0.5 active:scale-[0.98] md:px-6 md:py-3 md:text-sm cursor-pointer"
                           >
                             {t('studentHome.viewDetails')}
