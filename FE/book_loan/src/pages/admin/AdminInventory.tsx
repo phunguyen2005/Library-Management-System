@@ -72,6 +72,7 @@ type InventoryFormData = {
   id: number;
   title: string;
   author: string;
+  isbn: string;
   category: string;
   location: string;
   cover: string;
@@ -87,6 +88,7 @@ const EMPTY_FORM: InventoryFormData = {
   id: 0,
   title: '',
   author: '',
+  isbn: '',
   category: 'Giáo trình',
   location: '',
   cover: '',
@@ -125,6 +127,7 @@ function toFormData(book: FormattedBook): InventoryFormData {
     id: book.id,
     title: book.title,
     author: book.author,
+    isbn: book.isbn && !/^ISBN-\d+000$/.test(book.isbn) ? book.isbn : '',
     category: book.category,
     location: book.location,
     cover: book.cover,
@@ -143,6 +146,7 @@ function buildPayload(formData: InventoryFormData, tab: InventoryTab): BookPaylo
   return {
     title: formData.title.trim(),
     author: formData.author.trim(),
+    isbn: formData.isbn.trim() || undefined,
     category: formData.category.trim(),
     genre: formData.category.trim(),
     published_year: Number.isFinite(publishedYear) && publishedYear > 0 ? publishedYear : undefined,
@@ -1492,13 +1496,29 @@ export default function AdminInventory() {
                     Năm xuất bản
                   </label>
                   <input
-                    id="book-published-year"
-                    type="number"
-                    min="1900"
-                    max="2100"
-                    value={formData.published_year}
+                     id="book-published-year"
+                     type="number"
+                     min="1900"
+                     max="2100"
+                     value={formData.published_year}
+                     onChange={(event) =>
+                       setFormData({ ...formData, published_year: event.target.value })
+                     }
+                     className="w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
+                  />
+                </div>
+
+                <div className="col-span-1">
+                  <label htmlFor="book-isbn" className="mb-1 block text-xs font-bold text-slate-600">
+                    Mã ISBN-13
+                  </label>
+                  <input
+                    id="book-isbn"
+                    type="text"
+                    placeholder="Ví dụ: 9786041234567"
+                    value={formData.isbn || ''}
                     onChange={(event) =>
-                      setFormData({ ...formData, published_year: event.target.value })
+                      setFormData({ ...formData, isbn: event.target.value })
                     }
                     className="w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20"
                   />

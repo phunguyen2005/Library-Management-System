@@ -17,7 +17,7 @@ class BookUpsertRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        $fields = ['title', 'author', 'genre', 'location', 'cover', 'resource_type', 'file_format', 'file_size', 'file_path', 'file_url'];
+        $fields = ['title', 'author', 'isbn', 'genre', 'location', 'cover', 'resource_type', 'file_format', 'file_size', 'file_path', 'file_url'];
         $next = [];
 
         foreach ($fields as $field) {
@@ -36,6 +36,7 @@ class BookUpsertRequest extends FormRequest
         return [
             'title' => ['required', 'string', 'max:255'],
             'author' => ['required', 'string', 'max:255'],
+            'isbn' => ['nullable', 'string', 'max:20', Rule::unique('books', 'isbn')->ignore($this->route('book')?->book_id, 'book_id')],
             'genre' => ['nullable', 'string', 'max:100'],
             'published_year' => ['nullable', 'integer', 'min:1900', 'max:2100'],
             'location' => ['nullable', 'string', 'max:100'],

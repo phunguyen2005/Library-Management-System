@@ -30,6 +30,7 @@ export type BookPayload = {
   file_size?: string;
   file_path?: string;
   file_url?: string;
+  isbn?: string;
 };
 
 function toStatusColor(isAvailable: boolean) {
@@ -57,7 +58,7 @@ export function normalizeBook(book: BookApiRecord): FormattedBook {
     book_id: book.book_id,
     title: book.title,
     author: book.author,
-    isbn: `ISBN-${book.book_id}000`,
+    isbn: book.isbn || `ISBN-${book.book_id}000`,
     category,
     genre: category,
     location,

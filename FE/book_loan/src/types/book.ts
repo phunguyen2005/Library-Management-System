@@ -2,6 +2,7 @@ export interface BookApiRecord {
   book_id: number;
   title: string;
   author: string;
+  isbn?: string | null;
   genre?: string | null;
   published_year?: number | null;
   cover?: string | null;

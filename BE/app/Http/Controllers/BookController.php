@@ -53,8 +53,20 @@ class BookController extends Controller
 
                     if (preg_match('/^SACH-(\d+)$/i', $search, $matches)) {
                         $builder->orWhere('book_id', (int) $matches[1]);
+                    } elseif (str_starts_with(strtoupper($search), 'BC-')) {
+                        $builder->orWhereHas('copies', function ($q) use ($search) {
+                            $q->where('barcode', $search);
+                        });
                     } elseif (is_numeric($search)) {
-                        $builder->orWhere('book_id', (int) $search);
+                        if (strlen($search) >= 10) {
+                            $builder->orWhere('isbn', $search);
+                        } else {
+                            $builder->orWhere('book_id', (int) $search);
+                        }
+                    } else {
+                        $builder->orWhereHas('copies', function ($q) use ($search) {
+                            $q->where('barcode', 'like', '%'.$search.'%');
+                        });
                     }
                 });
             }
@@ -124,6 +136,7 @@ class BookController extends Controller
         $book = Book::query()->create([
             'title' => $validated['title'],
             'author' => $validated['author'],
+            'isbn' => $validated['isbn'] ?? null,
             'genre' => $validated['genre'] ?? null,
             'published_year' => $validated['published_year'] ?? null,
             'location' => $validated['location'] ?? null,
@@ -189,6 +202,7 @@ class BookController extends Controller
             $book->fill([
                 'title' => $validated['title'],
                 'author' => $validated['author'],
+                'isbn' => array_key_exists('isbn', $validated) ? $validated['isbn'] : $book->isbn,
                 'genre' => array_key_exists('genre', $validated) ? $validated['genre'] : $book->genre,
                 'published_year' => array_key_exists('published_year', $validated) ? $validated['published_year'] : $book->published_year,
                 'location' => array_key_exists('location', $validated) ? $validated['location'] : $book->location,
