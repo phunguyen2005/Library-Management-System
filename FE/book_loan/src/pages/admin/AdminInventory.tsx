@@ -1715,41 +1715,116 @@ export default function AdminInventory() {
 
       {showScanner && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/80 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl">
+          <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
-              <h3 className="text-lg font-bold text-slate-900">Quét mã vạch sách vật lý</h3>
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">Quét mã vạch sách</h3>
+                <p className="text-xs text-slate-400 mt-0.5">Hỗ trợ ISBN-13, EAN-13, Code-128, mã nội bộ SACH-XXXXX</p>
+              </div>
               <button type="button" onClick={() => setShowScanner(false)} className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
                 <span className="material-symbols-outlined text-[20px]">close</span>
               </button>
             </div>
-            <div className="relative aspect-square w-full bg-black">
+            <div className="relative w-full bg-black" style={{ aspectRatio: '4/3' }}>
               <Scanner
+                formats={[
+                  'ean_13',
+                  'ean_8',
+                  'code_128',
+                  'code_39',
+                  'code_93',
+                  'upc_a',
+                  'upc_e',
+                  'qr_code',
+                  'data_matrix',
+                ]}
                 onScan={(result) => {
                   if (result && result.length > 0) {
                     const scannedValue = result[0].rawValue.trim();
-                    if (scannedValue.toUpperCase().startsWith('SACH-') || !isNaN(Number(scannedValue))) {
-                      const searchVal = scannedValue.toUpperCase().startsWith('SACH-') ? scannedValue : `SACH-${scannedValue.padStart(5, '0')}`;
+                    const upper = scannedValue.toUpperCase();
+
+                    // Ưu tiên 1: Mã nội bộ thư viện SACH-XXXXX
+                    if (upper.startsWith('SACH-')) {
+                      setShowScanner(false);
+                      handleSearchChange(scannedValue);
+                      emitToast({
+                        tone: 'success',
+                        title: 'Đã quét mã nội bộ',
+                        message: `Đang tìm sách theo mã: ${scannedValue}`,
+                      });
+                      return;
+                    }
+
+                    // Ưu tiên 2: ISBN-13 (bắt đầu bằng 978 hoặc 979) — barcode sách thật
+                    const isISBN13 = /^97[89]\d{10}$/.test(scannedValue);
+                    if (isISBN13) {
+                      setShowScanner(false);
+                      handleSearchChange(scannedValue);
+                      emitToast({
+                        tone: 'success',
+                        title: 'Đã quét ISBN-13',
+                        message: `Đang tìm sách theo ISBN: ${scannedValue}`,
+                      });
+                      return;
+                    }
+
+                    // Ưu tiên 3: Mã số đơn giản (ID nội bộ thuần túy)
+                    const pureNumeric = /^\d+$/.test(scannedValue);
+                    if (pureNumeric && scannedValue.length <= 8) {
+                      const searchVal = `SACH-${scannedValue.padStart(5, '0')}`;
                       setShowScanner(false);
                       handleSearchChange(searchVal);
                       emitToast({
                         tone: 'success',
-                        title: 'Đã nhận diện mã vạch',
-                        message: `Đang lọc sách theo mã: ${searchVal}`,
+                        title: 'Đã quét mã số',
+                        message: `Đang tìm sách theo mã: ${searchVal}`,
+                      });
+                      return;
+                    }
+
+                    // Fallback: tìm kiếm trực tiếp bằng giá trị quét được
+                    if (scannedValue.length >= 3) {
+                      setShowScanner(false);
+                      handleSearchChange(scannedValue);
+                      emitToast({
+                        tone: 'info',
+                        title: 'Đã quét mã vạch',
+                        message: `Đang tìm kiếm: ${scannedValue}`,
                       });
                     } else {
                       emitToast({
-                        tone: 'error',
-                        title: 'Mã không hợp lệ',
-                        message: 'Mã quét không khớp định dạng mã sách thư viện.',
+                        tone: 'warning',
+                        title: 'Mã quá ngắn',
+                        message: `Giá trị "${scannedValue}" quá ngắn. Hãy thử lại.`,
                       });
                     }
                   }
                 }}
+                onError={(error) => {
+                  const msg =
+                    error.kind === 'permission-denied'
+                      ? 'Chưa cấp quyền camera. Vui lòng cho phép truy cập camera trong cài đặt trình duyệt.'
+                      : error.kind === 'insecure-context'
+                        ? 'Camera chỉ hoạt động trên kết nối HTTPS hoặc localhost.'
+                        : error.kind === 'no-camera'
+                          ? 'Không tìm thấy camera trên thiết bị này.'
+                          : error.kind === 'in-use'
+                            ? 'Camera đang được ứng dụng khác sử dụng.'
+                            : error.kind === 'unsupported'
+                              ? 'Trình duyệt không hỗ trợ tính năng quét mã vạch. Hãy dùng Chrome/Edge phiên bản mới.'
+                              : `Không thể khởi động camera: ${error.message}`;
+                  emitToast({ tone: 'error', title: 'Lỗi camera', message: msg });
+                }}
                 components={{ finder: true }}
+                styles={{
+                  container: { width: '100%', height: '100%' },
+                  video: { width: '100%', height: '100%', objectFit: 'cover' },
+                }}
               />
             </div>
-            <div className="bg-slate-50 p-4 text-center text-sm text-slate-500">
-              Đưa mã vạch in trên nhãn sách (SACH-XXXXX) vào khung camera để tìm nhanh trong danh mục.
+            <div className="bg-slate-50 p-4 text-center">
+              <p className="text-sm font-medium text-slate-600">Đưa mã vạch sách vào khung camera</p>
+              <p className="mt-1 text-xs text-slate-400">Hỗ trợ: ISBN-13 (978.../979...) · Mã nội bộ SACH-XXXXX · EAN-13 · Code-128</p>
             </div>
           </div>
         </div>
