@@ -499,5 +499,5 @@ A comprehensive suite of feature tests covers critical workflows, database trans
 
 ## 👨‍💻 Development Team
 
-Developed by **TTVP Group** — PhP Project Presentation.
+Developed by **Phu Nguyen** — PhP Project Presentation.
 Licensed under the [MIT License](LICENSE).
